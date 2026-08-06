@@ -1,0 +1,3035 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ปรุงอักษร — ห้องทำงานนักแปล</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#9F3A38">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ปรุงอักษร">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Thai:wght@500;600;700&family=Sarabun:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E9E2CE;
+    --paper-deep:#DBD1B3;
+    --paper-card:#F4EEDD;
+    --paper-line:#C9BE9C;
+    --ink:#232F3A;
+    --ink-soft:#57636E;
+    --ink-faint:#8A9199;
+    --pen:#9F3A38;
+    --pen-hover:#832F2D;
+    --pen-soft:#C07C79;
+    --pen-bg:#F1DEDB;
+    --gold:#8C6F2E;
+    --gold-light:#B89243;
+    --shadow-soft:0 4px 20px rgba(35,47,58,0.06);
+    --shadow-card:0 8px 30px rgba(35,47,58,0.08);
+  }
+
+  /* โหมดกลางคืนกระดาษดำคลาสสิก (Night Obsidian Paper Mode) */
+  :root.dark-mode{
+    --paper:#161920;
+    --paper-deep:#20242E;
+    --paper-card:#272C38;
+    --paper-line:#3A4150;
+    --ink:#E2D9C5;
+    --ink-soft:#A8A08D;
+    --ink-faint:#6E6859;
+    --pen:#D9534F;
+    --pen-hover:#C9302C;
+    --pen-soft:#8B3A38;
+    --pen-bg:#2C1E1E;
+    --gold:#C5A059;
+    --gold-light:#E0B775;
+    --shadow-soft:0 4px 20px rgba(0,0,0,0.3);
+    --shadow-card:0 8px 30px rgba(0,0,0,0.4);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0; width:100%; overflow-x:hidden;}
+  body.modal-open{overflow:hidden;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Sarabun',sans-serif;
+    min-height:100vh;
+    padding:32px 24px 80px;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--paper-deep); }
+  ::-webkit-scrollbar-thumb { background: var(--paper-line); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+  .wrap{max-width:1280px;margin:0 auto; min-width: 0;}
+
+  /* โหมดสมาธิเต็มจอ (Zen Focus Mode) */
+  body.zen-mode header,
+  body.zen-mode .sidebar,
+  body.zen-mode .mobile-sidebar-toggle,
+  body.zen-mode .active-project-banner,
+  body.zen-mode .translation-toolbar,
+  body.zen-mode .action-container,
+  body.zen-mode .project-history-bottom,
+  body.zen-mode .mobile-sticky-bar {
+    display: none !important;
+  }
+  body.zen-mode .app-layout { grid-template-columns: 1fr; }
+  body.zen-mode .exit-zen-floating-btn { display: flex !important; }
+  body.history-mode .mobile-sticky-bar { display: none !important; }
+
+  /* ปุ่มลอยออกจากโหมดสมาธิ */
+  .exit-zen-floating-btn {
+    display: none;
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    z-index: 150;
+    background: var(--pen);
+    color: #fff;
+    border: 1px solid var(--pen-soft);
+    border-radius: 30px;
+    padding: 10px 20px;
+    font-family: 'Sarabun', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+  }
+  .exit-zen-floating-btn:hover {
+    background: var(--pen-hover);
+    transform: translateY(-2px);
+  }
+
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:16px;margin-bottom:24px;
+  }
+  .brand h1{
+    font-family:'Noto Serif Thai',serif;font-weight:700;
+    font-size:36px;margin:0;letter-spacing:.5px;
+    color:var(--ink);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .brand p{
+    margin:4px 0 0;font-size:13px;color:var(--ink-soft);
+    letter-spacing:1px;
+  }
+  .header-actions{ display:flex; align-items:center; gap:12px; }
+  
+  .gear-btn{
+    background:var(--paper-card);
+    border:1.5px solid var(--ink);
+    border-radius:50%;
+    width:40px;height:48px;
+    cursor:pointer;color:var(--ink);
+    font-size:17px;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0; position:relative;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-soft);
+  }
+  .gear-btn:hover{
+    background:var(--paper-deep);
+    transform: rotate(30deg);
+  }
+
+  .key-status-dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #E53E3E;
+    border: 2px solid var(--paper);
+    transition: background 0.3s ease;
+  }
+  .key-status-dot.ready { background: #38A169; }
+
+  .theme-toggle-btn, .zen-toggle-btn{
+    background:var(--paper-card);border:1.5px solid var(--paper-line);border-radius:6px;
+    padding:8px 14px;font-size:13px;color:var(--ink);cursor:pointer;
+    font-family:'Sarabun',sans-serif; font-weight: 500;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-soft);
+  }
+  .theme-toggle-btn:hover, .zen-toggle-btn:hover{
+    border-color:var(--ink);color:var(--ink);background:var(--paper-deep);
+    transform: translateY(-1px);
+  }
+
+  .settings{
+    background:var(--paper-card);border:1px solid var(--paper-line);
+    border-radius:6px;padding:20px;margin-bottom:24px;
+    display:none;gap:16px;flex-wrap:wrap;align-items:flex-end;
+    box-shadow: var(--shadow-card);
+  }
+  .settings.open{display:flex;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-size:12px;color:var(--ink-soft);letter-spacing:.3px; font-weight: 500;}
+  .field select, .field input[type=text], .field input[type=password]{
+    font-family:'IBM Plex Mono',monospace;font-size:13px;
+    padding:8px 11px;border:1px solid var(--paper-line);border-radius:4px;
+    background:var(--paper);color:var(--ink);min-width:190px;
+    transition: border 0.2s;
+  }
+  .field select:focus, .field input:focus{ outline: none; border-color: var(--gold); }
+  .settings-note{font-size:12px;color:var(--ink-soft);flex-basis:100%;margin-top:4px; line-height: 1.6;}
+
+  .app-layout{display:grid;grid-template-columns:270px 1fr;gap:28px;align-items:start;}
+
+  .sidebar{border-right:1px dashed var(--paper-line);padding-right:20px; min-width:0;}
+  .sidebar-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .sidebar-head span{
+    font-size:11px;letter-spacing:1.5px;color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;text-transform:uppercase; font-weight: 600;
+  }
+  .add-proj-btn{
+    background:var(--paper-card);border:1px solid var(--ink);border-radius:4px;
+    font-size:12px;padding:5px 10px;cursor:pointer;color:var(--ink);
+    font-family:'Sarabun',sans-serif; font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  .add-proj-btn:hover{background:var(--paper-deep); transform: translateY(-1px);}
+
+  .project-item{margin-bottom:8px;}
+  .project-row{
+    display:flex;align-items:center;gap:6px;padding:9px 10px;
+    border:1px solid transparent;border-radius:5px;cursor:pointer;
+    transition: all 0.2s ease;
+  }
+  .project-row:hover{background:var(--paper-deep);}
+  .project-row.active{border-color:var(--ink);background:var(--paper-card); box-shadow: var(--shadow-soft);}
+  .project-name{
+    flex:1;font-family:'Noto Serif Thai',serif;font-size:14.5px;font-weight:600;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .icon-btn{
+    background:none;border:none;color:var(--ink-soft);cursor:pointer;
+    font-size:13px;padding:3px 5px;line-height:1;flex-shrink:0; border-radius: 3px;
+    transition: color 0.2s;
+  }
+  .icon-btn:hover{color:var(--pen);}
+
+  .ic{
+    width:1em;height:1em;
+    stroke:currentColor;fill:none;
+    stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;
+    vertical-align:-2px;margin-right:3px;display:inline-block;
+  }
+
+  .glossary-panel{
+    display:none;margin:8px 0 12px;padding:12px;background:var(--paper-card);
+    border:1px solid var(--paper-line);border-radius:5px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+  }
+  .glossary-panel.open{display:block;}
+  .glossary-panel textarea{
+    width:100%;font-family:'IBM Plex Mono',monospace;font-size:12.5px;
+    padding:8px;border:1px solid var(--paper-line);border-radius:4px;
+    background:var(--paper);color:var(--ink);resize:vertical;
+  }
+  .glossary-panel textarea:focus{ outline: none; border-color: var(--gold); }
+  .glossary-panel p{font-size:11px;color:var(--ink-soft);margin:6px 0 0;}
+  .ai-glossary-btn {
+    width: 100%;
+    margin-top: 6px;
+    padding: 6px;
+    background: var(--paper-deep);
+    border: 1px dashed var(--gold);
+    border-radius: 4px;
+    color: var(--gold);
+    font-family: 'Sarabun', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .ai-glossary-btn:hover {
+    background: var(--gold);
+    color: #fff;
+  }
+
+  .book-list { margin: 4px 0 8px 10px; border-left: 1.5px solid var(--paper-line); padding-left: 8px; }
+  .book-item-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; border-radius: 3px; cursor: pointer; }
+  .book-item-row:hover { background: var(--paper-deep); }
+  .book-item-row.active { font-weight: 700; color: var(--pen); }
+  .book-title-text { font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .history-list{display:none;margin:4px 0 10px 12px;padding-left:8px;}
+  .history-list.open{display:block;}
+  .history-list-label{font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;margin-bottom:6px;letter-spacing:.5px; font-weight: 600;}
+  .history-entry-row{
+    display:flex;align-items:center;gap:4px;
+    border-bottom:1px dotted var(--paper-line);
+  }
+  .history-entry{
+    flex:1;text-align:left;background:none;border:none;
+    padding:6px 0;font-size:12.5px;color:var(--ink-soft);cursor:pointer;
+    font-family:'Sarabun',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    transition: color 0.2s;
+  }
+  .history-entry:hover{color:var(--pen); font-weight: 500;}
+  .history-empty{font-size:12px;color:var(--ink-faint);padding:6px 0;}
+  .sidebar-empty{font-size:12.5px;color:var(--ink-faint);padding:10px 0;}
+
+  .translation-toolbar{display:flex;justify-content:flex-end;margin-bottom:20px; min-width:0;}
+  .translation-settings-btn{
+    display:flex;align-items:center;gap:10px;
+    background:var(--paper-card);border:1px solid var(--paper-line);
+    border-radius:6px;color:var(--ink);padding:10px 14px;
+    font:500 13px 'Sarabun',sans-serif;cursor:pointer; overflow:hidden;
+    box-shadow: var(--shadow-soft); transition: all 0.2s ease;
+  }
+  .translation-settings-btn:hover{background:var(--paper-deep); border-color: var(--ink);}
+  .translation-summary{color:var(--gold);font:600 11.5px 'IBM Plex Mono',monospace;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; flex:1; text-align:right;}
+  
+  .translation-modal{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.65); backdrop-filter: blur(3px);}
+  .translation-modal.open{display:flex;}
+  .translation-modal-card{width:min(860px,100%);max-height:calc(100vh - 48px);overflow:auto;background:var(--paper);border:1.5px solid var(--ink);border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5);padding:24px;}
+  .translation-modal-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding-bottom:14px;margin-bottom:18px;border-bottom:1px dashed var(--paper-line);}
+  .translation-modal-head h2{margin:0;font:600 20px 'Noto Serif Thai',serif;color:var(--ink);}
+  .modal-close{width:32px;height:32px;border:1px solid var(--ink-faint);background:transparent;border-radius:50%;color:var(--ink);font-size:18px;cursor:pointer;}
+  .modal-close:hover{background:var(--paper-deep);}
+  
+  .controls{display:flex;flex-wrap:wrap;gap:22px;}
+  .control-group{display:flex;flex-direction:column;gap:8px;}
+  .control-group>span{
+    font-size:11px;letter-spacing:1.5px;color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;text-transform:uppercase; font-weight: 600;
+  }
+  .seg{display:flex;border:1px solid var(--ink);border-radius:5px;overflow:hidden;}
+  .seg button{
+    background:var(--paper);border:none;padding:9px 15px;font-size:13px;
+    font-family:'Sarabun',sans-serif;color:var(--ink-soft);cursor:pointer;
+    border-right:1px solid var(--ink); transition: background 0.2s, color 0.2s;
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--ink);color:var(--paper);font-weight:600;}
+
+  .chips{display:flex;gap:7px;flex-wrap:wrap;}
+  .chip{
+    background:var(--paper);border:1px solid var(--paper-line);
+    border-radius:4px;padding:8px 14px;font-size:12.5px;color:var(--ink-soft);
+    cursor:pointer; transition: all 0.2s ease;
+  }
+  .chip:hover{ border-color: var(--gold); }
+  .chip.active{
+    background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600;
+    box-shadow: 0 2px 8px rgba(140, 111, 46, 0.3);
+  }
+
+  .active-project-banner{
+    display:flex;justify-content:flex-start;align-items:center;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);
+    margin-bottom:16px;padding:10px 14px;background:var(--paper-card);
+    border:1px solid var(--paper-line);border-radius:5px;
+    overflow:hidden; min-width: 0; box-shadow: var(--shadow-soft);
+  }
+  .active-project-banner span{
+    display: flex; align-items: baseline; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; min-width: 0; width: 100%;
+  }
+  .active-project-banner b{
+    color:var(--ink); font-family:'Noto Serif Thai',serif; font-size:14.5px;
+    margin-left: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .history-view-banner{
+    display:none;justify-content:space-between;align-items:center;
+    font-size:13px;color:var(--pen);background:var(--pen-bg);
+    border:1px solid var(--pen-soft);border-radius:5px;padding:10px 14px;margin-bottom:16px;
+    flex-wrap:wrap;gap:8px; min-width: 0;
+  }
+  .history-view-banner.show{display:flex;}
+  .history-view-banner span{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; font-weight: 500;}
+  .history-view-banner button{
+    background:var(--paper);border:1px solid var(--pen);color:var(--pen);border-radius:4px;
+    padding:5px 12px;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif; font-weight:600;
+    white-space: nowrap; transition: all 0.2s ease;
+  }
+  .history-view-banner button:hover{ background: var(--pen); color: #fff; }
+  .history-view-banner.history-bottom-banner{ margin-top:18px; margin-bottom:6px; }
+
+  .mobile-tabs{display:none;}
+
+  .spread{
+    display:grid;grid-template-columns:1fr 1fr;gap:0;
+    border:1.5px solid var(--ink);border-radius:6px;overflow:hidden;
+    background:var(--paper-card); box-shadow: var(--shadow-card);
+    transition:grid-template-columns .35s ease;
+  }
+  .page{padding:22px 24px 18px;position:relative;min-width:0;transition:padding .35s ease, opacity .25s ease;}
+  
+  .page + .page{
+    border-left:1px dashed var(--paper-line);
+    box-shadow: inset 12px 0 15px -10px rgba(0,0,0,0.06);
+  }
+  .page h2{
+    font-family:'Noto Serif Thai',serif;font-size:16.5px;font-weight:600;
+    margin:0 0 12px;color:var(--ink);display:flex;align-items:center;gap:8px;
+  }
+  .output-heading{justify-content:space-between;}
+  .font-size-controls{display:inline-flex;align-items:center;gap:4px;font:11px 'IBM Plex Mono',monospace;color:var(--ink-soft);}
+  .font-size-controls button{width:28px;height:26px;border:1px solid var(--paper-line);border-radius:4px;background:var(--paper);color:var(--ink);font:600 12px 'IBM Plex Mono',monospace;cursor:pointer; transition: all 0.2s;}
+  .font-size-controls button:hover{background:var(--paper-deep); border-color: var(--ink);}
+  .font-size-value{min-width:28px;text-align:center; font-weight: 600;}
+  .source-expand-btn,.source-collapse-btn{display:none;border:1px solid var(--paper-line);border-radius:4px;background:var(--paper);color:var(--ink-soft);font:11px 'Sarabun',sans-serif;padding:4px 7px;cursor:pointer;}
+  .source-expand-btn:hover,.source-collapse-btn:hover{background:var(--paper-deep);color:var(--ink);}
+  
+  textarea.main-input{
+    width:100%;min-height:360px;resize:vertical;border:none;background:transparent;
+    font-family:'Sarabun',sans-serif;font-size:15.5px;line-height:1.95;color:var(--ink);
+    outline:none;
+  }
+  textarea.main-input::placeholder{color:var(--ink-faint);}
+  .chapter-title{width:100%;margin:0 0 12px;padding:8px 11px;border:1px solid var(--paper-line);border-radius:4px;background:var(--paper);color:var(--ink);font:500 14px 'Sarabun',sans-serif;}
+  .chapter-title:focus{outline:none; border-color:var(--gold); box-shadow: 0 0 0 2px rgba(140, 111, 46, 0.15);}
+  
+  #output{
+    white-space:pre-wrap;font-size:15.5px;line-height:1.95;min-height:360px;
+    font-family:'Sarabun',sans-serif;color:var(--ink);
+    word-break: break-word; overflow-wrap: anywhere;
+  }
+  #output[contenteditable="true"]{outline:1px dashed var(--gold);outline-offset:6px;}
+  #output:empty::before{content:"ผลลัพธ์จะปรากฏที่นี่";color:var(--ink-faint);}
+  
+  @media (min-width:901px){
+    .spread.result-focus{grid-template-columns:138px minmax(0,1fr);}
+    .spread.result-focus .source-page{padding:20px 10px;overflow:hidden;}
+    .spread.result-focus .source-page h2{font-size:13px;line-height:1.25;flex-direction:column;align-items:flex-start;}
+    .spread.result-focus .source-page .main-input,
+    .spread.result-focus .source-page .chapter-title,
+    .spread.result-focus .source-page #suspiciousBox,
+    .spread.result-focus .source-page .page-foot{display:none !important;}
+    .spread.result-focus .source-expand-btn{display:inline-block;}
+    .spread.has-result:not(.result-focus) .source-collapse-btn{display:inline-block;}
+    .spread.result-focus .output-page{padding-left:32px;padding-right:32px;}
+  }
+
+  #suspiciousBox{
+    max-width:100%;box-sizing:border-box;overflow-x:hidden;overflow-y:auto;
+    max-height:220px;word-break:break-word;overflow-wrap:anywhere;white-space:pre-wrap;
+  }
+
+  .page-foot{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-top:12px;font-size:12px;color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace; min-width: 0;
+    padding-top: 8px; border-top: 1px dotted var(--paper-line);
+  }
+  
+  .save-status-text {
+    font-size: 11px;
+    color: var(--ink-faint);
+    transition: color 0.3s;
+  }
+  .save-status-text.saving { color: var(--gold); font-weight: 600; }
+
+  .textbtn{
+    background:none;border:none;color:var(--pen);cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;padding:0;
+    text-decoration:underline;text-underline-offset:2px; font-weight: 500;
+  }
+  .textbtn:disabled{color:var(--ink-faint);cursor:default;text-decoration:none;}
+
+  .stamp{
+    position:absolute;top:16px;right:20px;
+    border:2.5px solid var(--pen);color:var(--pen);
+    border-radius:50%;width:76px;height:74px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Noto Serif Thai',serif;font-weight:700;font-size:13px;
+    transform:rotate(-14deg) scale(0);text-align:center;line-height:1.3;
+    opacity:0;transition:transform .35s cubic-bezier(.34,1.56,.64,1), opacity .35s;
+    pointer-events:none;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    box-shadow: inset 0 0 10px rgba(159,58,56,0.15);
+  }
+  .stamp.show{transform:rotate(-14deg) scale(1);opacity:.9;}
+
+  .action-container {
+    margin-top: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .process-btn-primary {
+    width: 100%;
+    max-width: 600px;
+    background: linear-gradient(135deg, var(--pen), var(--pen-hover));
+    color: #fff;
+    border: none;
+    border-radius: 40px; 
+    padding: 16px 20px;
+    font-family: 'Noto Serif Thai', serif;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    box-shadow: 0 8px 25px rgba(159,58,56,0.3);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .process-btn-primary:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 12px 30px rgba(159,58,56,0.45);
+  }
+  .process-btn-primary:active { transform: translateY(1px) scale(0.98); }
+  .process-btn-primary:disabled {
+    background: var(--ink-faint);
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .secondary-actions-row {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    max-width: 600px;
+  }
+  .btn-outline {
+    flex: 1;
+    background: transparent;
+    color: var(--pen);
+    border: 1.5px solid var(--pen);
+    border-radius: 30px;
+    padding: 12px 16px;
+    font-family: 'Noto Serif Thai', serif;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .btn-outline:hover {
+    background: var(--pen-bg);
+    transform: translateY(-1px);
+  }
+  .btn-outline:active { transform: translateY(1px); }
+  .btn-outline:disabled {
+    color: var(--ink-faint);
+    border-color: var(--ink-faint);
+    background: transparent;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .tertiary-actions-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+  }
+  .utility-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--ink-soft);
+    font-family: 'Sarabun', sans-serif;
+    font-size: 13px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .utility-action-btn:hover { color: var(--ink); }
+  .utility-action-btn.danger { color: var(--pen); }
+  
+  #cancelBtn{display:none;}
+  #cancelBtn.show{display:inline-block;}
+  #resumeBtn{display:none;}
+  #resumeBtn.show{display:inline-block;}
+
+  .error{
+    margin-top:16px;padding:12px 16px;background:var(--pen-bg);
+    border:1px solid var(--pen-soft);border-radius:5px;color:var(--pen);
+    font-size:13.5px;text-align:center;display:none; font-weight: 500;
+  }
+  .error.show{display:block;}
+  .sidebar-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px dashed var(--paper-line);}
+  .utility-btn{background:var(--paper-card);border:1px solid var(--paper-line);border-radius:4px;color:var(--ink);padding:6px 10px;font:500 12px 'Sarabun',sans-serif;cursor:pointer; transition: all 0.2s;}
+  .utility-btn:hover{border-color:var(--ink);color:var(--ink); background: var(--paper-deep);}
+  .status{min-height:18px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink-soft);margin-top:12px; font-weight: 500;}
+
+  .project-history-bottom{
+    margin-top:28px;
+    background:var(--paper-card);
+    border:1px solid var(--paper-line);
+    border-radius:6px;
+    padding:14px 18px;
+    display:none; min-width: 0;
+    box-shadow: var(--shadow-soft);
+  }
+  .project-history-bottom-head{
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:'Noto Serif Thai',serif;font-size:14.5px;font-weight:700;
+    color:var(--ink);margin-bottom:12px;min-width: 0;
+  }
+  .project-history-bottom-head span{
+    overflow: hidden;text-overflow: ellipsis;white-space: nowrap;
+    min-width: 0;flex: 1;padding-right: 10px;
+  }
+  .bottom-history-controls {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .project-history-bottom-list{
+    display:flex;flex-direction:column;gap:8px;
+    max-height:280px;overflow-y:auto;min-width: 0;
+  }
+  .project-history-bottom-list.collapsed{display:none;}
+  .history-search-input{
+    flex: 1; font-family:'Sarabun',sans-serif;font-size:13px;
+    padding:6px 10px;border:1px solid var(--paper-line);border-radius:4px;
+    background:var(--paper);color:var(--ink);box-sizing:border-box;
+  }
+  .history-search-input:focus{ outline:none; border-color:var(--gold); }
+
+  .app-dialog-overlay{
+    display:none;position:fixed;inset:0;
+    background:rgba(0,0,0,0.65); backdrop-filter: blur(3px);
+    z-index:1100;align-items:center;justify-content:center;padding:20px;
+  }
+  .app-dialog-overlay.show{display:flex;}
+  .app-dialog-panel{
+    background:var(--paper-card);
+    border:1px solid var(--paper-line);
+    border-radius:8px;
+    width:100%;max-width:380px;
+    padding:22px;
+    box-shadow: var(--shadow-card);
+  }
+  .app-dialog-title{
+    font-family:'Noto Serif Thai',serif;font-weight:700;font-size:17px;
+    color:var(--ink);margin-bottom:8px;
+  }
+  .app-dialog-message{
+    font-size:14px;color:var(--ink-soft);line-height:1.6;margin-bottom:14px;
+    white-space:pre-wrap;
+  }
+  .app-dialog-input{
+    width:100%;font-family:'Sarabun',sans-serif;font-size:14px;
+    padding:9px 11px;border:1px solid var(--paper-line);border-radius:4px;
+    background:var(--paper);color:var(--ink);margin-bottom:18px;box-sizing:border-box;
+  }
+  .app-dialog-input:focus{ outline:none; border-color:var(--gold); }
+  .app-dialog-actions{display:flex;justify-content:flex-end;gap:10px;}
+  .app-dialog-btn{
+    font-family:'Sarabun',sans-serif;font-size:13.5px;font-weight:600;
+    padding:9px 18px;border-radius:5px;cursor:pointer;border:1px solid transparent;
+    transition: all 0.2s ease;
+  }
+  .app-dialog-btn.cancel{background:none;border-color:var(--paper-line);color:var(--ink-soft);}
+  .app-dialog-btn.cancel:hover{background:var(--paper-deep);}
+  .app-dialog-btn.confirm{background:var(--gold);color:#fff;}
+  .app-dialog-btn.confirm:hover{background:var(--gold-light);}
+  .app-dialog-btn.confirm.danger{background:var(--pen);}
+  .app-dialog-btn.confirm.danger:hover{background:var(--pen-hover);}
+
+  .diff-overlay{
+    display:none;position:fixed;inset:0;
+    background:rgba(0,0,0,0.65); backdrop-filter: blur(3px);
+    z-index:1000;align-items:center;justify-content:center;padding:20px;
+  }
+  .diff-overlay.show{display:flex;}
+  .diff-panel{
+    background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;width:100%;max-width:840px;max-height:85vh;
+    display:flex;flex-direction:column;overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  }
+  .diff-panel-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:16px 20px;border-bottom:1px solid var(--paper-line);
+    font-family:'Noto Serif Thai',serif;font-weight:700;font-size:16px;
+  }
+  .diff-legend{
+    padding:9px 20px;font-size:12px;color:var(--ink-soft);
+    border-bottom:1px dashed var(--paper-line); background: var(--paper-deep);
+  }
+  .diff-legend .diff-added{background:#DDEFD9;color:#2E5C34;padding:2px 6px;border-radius:3px; font-weight: 600;}
+  .diff-legend .diff-removed{background:var(--pen-bg);color:var(--pen);text-decoration:line-through;padding:2px 6px;border-radius:3px;}
+  .diff-body{
+    padding:18px 20px;overflow-y:auto;
+    font-family:'Sarabun',sans-serif;font-size:15px;line-height:2;
+    white-space:pre-wrap;
+  }
+  .diff-body .diff-added{background:#DDEFD9;color:#2E5C34;border-radius:2px; padding: 1px 2px;}
+  .diff-body .diff-removed{background:var(--pen-bg);color:var(--pen);text-decoration:line-through;border-radius:2px; padding: 1px 2px;}
+  .diff-btn{color:var(--gold) !important; font-weight: 700 !important;}
+  
+  .bottom-history-item{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:9px 12px;background:var(--paper);border:1px solid var(--paper-line);
+    border-radius:4px;gap:8px;min-width: 0; transition: all 0.2s ease;
+  }
+  .bottom-history-item:hover{ background: var(--paper-deep); }
+  .bottom-history-item.active{
+    border-color:var(--pen);background:var(--pen-bg);
+  }
+  .bottom-history-title{
+    flex:1;font-size:13.5px;font-family:'Sarabun',sans-serif;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    cursor:pointer;min-width: 0;
+  }
+  .bottom-history-title:hover{color:var(--pen); font-weight: 500;}
+  .bottom-history-actions{
+    display:flex;align-items:center;gap:6px;flex-shrink:0;
+  }
+
+  .mobile-sidebar-toggle{
+    display:none;width:100%;padding:11px 14px;
+    background:var(--paper-card);border:1px solid var(--paper-line);
+    border-radius:6px;font-family:'Noto Serif Thai',serif;
+    font-size:14.5px;font-weight: 600;color:var(--ink);
+    cursor:pointer;margin-bottom:14px;
+    align-items:center;justify-content:space-between;
+    min-width: 0; box-shadow: var(--shadow-soft);
+  }
+
+  .mobile-sticky-bar {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--paper-card);
+    border-top: 1.5px solid var(--ink);
+    padding: 10px 14px;
+    z-index: 100;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    backdrop-filter: blur(5px);
+  }
+  .mobile-sticky-btn {
+    flex: 1;
+    padding: 11px 8px;
+    border: 1px solid var(--ink);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Sarabun', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+  .mobile-sticky-btn.primary {
+    background: var(--pen);
+    color: #fff;
+    border-color: var(--pen);
+  }
+
+  @media (max-width:900px){
+    body{padding:16px 12px 80px;}
+    .brand h1{font-size:25px;}
+    .brand p{font-size:11px;}
+    .app-layout{grid-template-columns:1fr;gap:16px;}
+    
+    .mobile-sidebar-toggle{display:flex;}
+    .sidebar{
+      border-right:none;
+      border:1px solid var(--paper-line);
+      background:var(--paper-card);
+      padding:14px;
+      border-radius:6px;
+      margin-bottom:16px;
+      display:none;
+      box-shadow: var(--shadow-soft);
+    }
+    .sidebar.open{display:block;}
+
+    .mobile-tabs{
+      display:flex;
+      border:1px solid var(--ink);
+      border-radius:6px 6px 0 0;
+      overflow:hidden;
+      background:var(--paper-card);
+      margin-bottom:-1px;
+      position:relative;
+      z-index:2;
+    }
+    .mobile-tab-btn{
+      flex:1;
+      padding:11px;
+      border:none;
+      background:transparent;
+      font-family:'Noto Serif Thai',serif;
+      font-size:14px;
+      color:var(--ink-soft);
+      cursor:pointer;
+      border-right:1px solid var(--paper-line);
+    }
+    .mobile-tab-btn:last-child{border-right:none;}
+    .mobile-tab-btn.active{
+      background:var(--paper-card);
+      color:var(--ink);
+      font-weight:700;
+    }
+
+    .spread{
+      grid-template-columns:1fr !important;
+      border-radius:0 0 6px 6px;
+    }
+    .spread .page{display:none;}
+    .spread.show-source .source-page{display:block;}
+    .spread.show-output .output-page{display:block;}
+    .spread.result-focus.show-output .output-page{padding-left:16px;padding-right:16px;}
+
+    .source-expand-btn, .source-collapse-btn{display:none !important;}
+
+    .secondary-actions-row {
+      flex-direction: column;
+      gap: 10px;
+    }
+    .process-btn-primary { font-size: 18px; padding: 14px; }
+    .btn-outline { padding: 10px; font-size: 14px; }
+
+    .translation-toolbar{justify-content:stretch;}
+    .translation-settings-btn{width:100%;justify-content:space-between; gap: 5px;}
+    .translation-summary{max-width: none; text-align: right;}
+    
+    .translation-modal{padding:10px;}
+    .translation-modal-card{padding:16px;max-height:92vh;}
+    .controls{gap:14px;}
+    .field select, .field input[type=text], .field input[type=password]{width:100%;min-width:0;}
+
+    .main-col {
+      min-width: 0;
+      overflow: hidden;
+    }
+    .active-project-banner b { font-size: 13px; }
+
+    .mobile-sticky-bar { display: flex; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <button class="exit-zen-floating-btn" id="exitZenBtn" type="button">✖ ออกจากโหมดสมาธิ</button>
+
+  <header>
+    <div class="brand">
+      <h1>ปรุงอักษร</h1>
+      <p>ห้องทำงานนักแปล / บรรณาธิการนิยาย</p>
+    </div>
+    <div class="header-actions">
+      <button class="theme-toggle-btn" id="themeToggleBtn" type="button" title="สลับโหมดสีกระดาษ">☾ โหมดมืด</button>
+      <button class="zen-toggle-btn" id="zenToggleBtn" type="button" title="โหมดสมาธิไร้สิ่งรบกวน">⛶ โหมดสมาธิ</button>
+      <button class="gear-btn" id="gearBtn" title="ตั้งค่า AI" aria-label="ตั้งค่า">
+        ⚙
+        <span class="key-status-dot" id="keyStatusDot" title="สถานะ API Key"></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="settings" id="settingsPanel">
+    <div class="field">
+      <label>ผู้ให้บริการ AI</label>
+      <select id="provider">
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Google Gemini</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>โมเดล</label>
+      <input type="text" id="model" value="gpt-4o-mini">
+    </div>
+    <div class="field" style="flex:1;">
+      <label>API key</label>
+      <input type="password" id="apiKey" placeholder="วางคีย์ของคุณที่นี่" autocomplete="off" data-lpignore="true" data-1p-ignore data-bwignore="true" data-bitwarden-ignore="true" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>ความยาวสูงสุดต่อส่วน (ตัวอักษร)</label>
+      <input type="number" id="chunkLen" value="3000" min="500" max="50000" step="100" style="min-width:100px;">
+    </div>
+    <p class="settings-note">คีย์จะอยู่เฉพาะในหน่วยความจำของเบราว์เซอร์ในขณะเปิดหน้านี้และจะไม่ถูกบันทึกใน localStorage · ใช้ไฟล์นี้แบบส่วนตัวเท่านั้น · โปรเจกต์ ร่างงาน คลังคำ และประวัติจะถูกเก็บในเบราว์เซอร์เครื่องนี้ จึงควรดาวน์โหลดข้อมูลสำรองเป็นระยะ</p>
+  </div>
+
+  <button class="mobile-sidebar-toggle" id="mobileSidebarToggle" type="button">
+    <span>☰ จัดการเรื่องนิยาย & ประวัติ</span>
+    <span id="sidebarToggleIcon">▼</span>
+  </button>
+
+  <div class="app-layout">
+
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <span>เรื่องนิยาย</span>
+        <button class="add-proj-btn" id="addProjBtn">+ เรื่องใหม่</button>
+      </div>
+      <div id="projectList"></div>
+      <div class="sidebar-actions">
+        <button class="utility-btn" id="exportBackupBtn" type="button">สำรองข้อมูล</button>
+        <button class="utility-btn" id="importBackupBtn" type="button">กู้คืนข้อมูล</button>
+        <input id="backupFile" type="file" accept="application/json,.json" hidden>
+      </div>
+    </div>
+
+    <div class="main-col">
+
+      <div class="active-project-banner" id="activeProjectBanner" style="display:none;">
+        <span>กำลังทำงานในเรื่อง: <b id="activeProjectName"></b></span>
+      </div>
+
+      <div class="history-view-banner" id="historyViewBanner">
+        <span id="historyViewLabel"></span>
+        <button class="close-history-btn" type="button">กลับไปแปลใหม่</button>
+      </div>
+
+      <div class="translation-toolbar">
+        <button class="translation-settings-btn" id="translationSettingsBtn" type="button" aria-haspopup="dialog" aria-controls="translationModal" aria-expanded="false">
+          <span>ตั้งค่าการแปล</span><span class="translation-summary" id="translationSummary"></span>
+        </button>
+      </div>
+
+      <div class="translation-modal" id="translationModal" role="dialog" aria-modal="true" aria-labelledby="translationModalTitle" aria-hidden="true">
+        <div class="translation-modal-card">
+          <div class="translation-modal-head">
+            <h2 id="translationModalTitle">ตั้งค่าการแปล</h2>
+            <button class="modal-close" id="translationModalClose" type="button" aria-label="ปิดหน้าตั้งค่าการแปล">✕</button>
+          </div>
+          <div class="controls">
+            <div class="control-group">
+              <span>ต้นฉบับ</span>
+              <div class="seg" id="sourceSeg">
+                <button data-val="translate" class="active">ภาษาอื่น (แปล)</button>
+                <button data-val="polish">ไทยอยู่แล้ว (ขัดสำนวน)</button>
+              </div>
+            </div>
+            <div class="control-group">
+              <span>ระดับการปรับ</span>
+              <div class="seg" id="levelSeg">
+                <button data-val="proof">พิสูจน์อักษร</button>
+                <button data-val="edit" class="active">เรียบเรียง</button>
+                <button data-val="rewrite">ขัดเกลาใหม่</button>
+              </div>
+            </div>
+            <div class="control-group" style="flex:1;">
+              <span>แนวเรื่อง</span>
+              <div class="chips" id="genreChips">
+                <div class="chip active" data-val="ทั่วไป">ทั่วไป</div>
+                <div class="chip" data-val="แฟนตาซี">แฟนตาซี</div>
+                <div class="chip" data-val="โรแมนซ์">โรแมนซ์</div>
+                <div class="chip" data-val="สืบสวน/ระทึกขวัญ">สืบสวน/ระทึกขวัญ</div>
+                <div class="chip" data-val="ไซไฟ">ไซไฟ</div>
+                <div class="chip" data-val="กำลังภายใน">กำลังภายใน</div>
+              </div>
+            </div>
+            <div class="control-group">
+              <span>สำนวนภาษา</span>
+              <div class="seg" id="styleSeg">
+                <button data-val="สำนวนปัจจุบัน" class="active">ปัจจุบัน</button>
+                <button data-val="สำนวนย้อนยุค">ย้อนยุค</button>
+                <button data-val="สำนวนร่วมสมัย">ร่วมสมัย</button>
+                <button data-val="สำนวนทางการ">ทางการ</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mobile-tabs" id="mobileTabs">
+        <button class="mobile-tab-btn active" id="tabSourceBtn" type="button">■ ต้นฉบับ</button>
+        <button class="mobile-tab-btn" id="tabOutputBtn" type="button">≡ ฉบับตรวจแล้ว</button>
+      </div>
+
+      <div class="spread show-source" id="spread">
+        <div class="page source-page">
+          <h2>ต้นฉบับ <button class="source-expand-btn" id="expandSourceBtn" type="button">เปิดต้นฉบับ</button><button class="source-collapse-btn" id="collapseSourceBtn" type="button">ย่อต้นฉบับ</button></h2>
+          <input class="chapter-title" id="chapterTitle" type="text" maxlength="160" placeholder="ชื่อตอนสำหรับประวัติ เช่น ตอนที่ 1: บทนำ">
+          <textarea class="main-input" id="inputText" placeholder="วางข้อความนิยายของคุณที่นี่..."></textarea>
+          <div id="suspiciousBox" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#FFF8DB;border:1px solid #E6C85C;border-radius:4px;font-size:13px;color:#232F3A;"></div>
+          <div class="page-foot">
+            <span id="inCount">0 คำ</span>
+            <span class="save-status-text" id="saveStatusText">⚬ บันทึกร่างแล้ว</span>
+            <span><button class="textbtn" id="importTextBtn" type="button">นำเข้า .txt</button>&nbsp;·&nbsp;<button class="textbtn" id="batchImportBtn" type="button">นำเข้าหลายไฟล์</button>&nbsp;·&nbsp;<button class="textbtn" id="clearBtn" type="button">ล้างข้อความ</button></span>
+            <input id="textFile" type="file" accept="text/plain,.txt" hidden>
+            <input id="batchFileInput" type="file" accept="text/plain,.txt" multiple hidden>
+          </div>
+        </div>
+        <div class="page output-page">
+          <h2 class="output-heading"><span>ฉบับตรวจแล้ว</span><span class="font-size-controls" aria-label="ขนาดตัวอักษรฉบับตรวจแล้ว"><button id="outputFontDown" type="button" aria-label="ลดขนาดตัวอักษร">A−</button><span class="font-size-value" id="outputFontValue">16</span><button id="outputFontUp" type="button" aria-label="เพิ่มขนาดตัวอักษร">A+</button></span></h2>
+          <div class="stamp" id="stamp">ตรวจแล้ว<br>✒</div>
+          <div id="output" role="textbox" aria-label="ฉบับตรวจแล้ว" aria-multiline="true" spellcheck="false"></div>
+          
+          <div class="page-foot">
+            <span id="outCount">0 คำ</span>
+            <span>
+              <button class="textbtn" id="copyBtn" disabled>คัดลอก</button>
+              &nbsp;·&nbsp;
+              <button class="textbtn" id="downloadBtn" disabled>ดาวน์โหลด</button>
+              &nbsp;·&nbsp;
+              <button class="textbtn" id="editOutputBtn" disabled>แก้ไขผลลัพธ์</button>
+              &nbsp;·&nbsp;
+              <button class="textbtn" id="saveRevisionBtn" disabled>บันทึกฉบับแก้ไข</button>
+            </span>
+          </div>
+
+          <div class="history-view-banner history-bottom-banner" id="historyViewBannerBottom">
+            <span id="historyViewLabelBottom"></span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button class="textbtn" id="renameHistoryBtnBottom" type="button" style="color:var(--pen);font-weight:600;">✎ เปลี่ยนชื่อ</button>
+              <button class="textbtn" id="deleteHistoryBtnBottom" type="button" style="color:var(--pen);font-weight:600;">✕ ลบประวัตินี้</button>
+              <button class="close-history-btn" type="button">กลับไปแปลใหม่</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="action-container">
+        <button class="process-btn-primary" id="processBtn">ปรุงอักษร</button>
+        
+        <div class="secondary-actions-row">
+          <button class="btn-outline" id="quickRepairBtn" title="ล้างอักษรซ่อน PUA และสัญลักษณ์ขยะทันที (ไม่ต้องรอ AI)">ซ่อมรวดเร็ว</button>
+          <button class="btn-outline" id="repairBtn" title="ให้ AI ช่วยซ่อมคำผิดจากการสแกน (ใช้ API)">ซ่อม OCR (AI)</button>
+        </div>
+
+        <div class="tertiary-actions-row">
+          <button class="utility-action-btn" id="resumeBtn">แปลต่อจากที่ค้าง</button>
+          <button class="utility-action-btn danger" id="cancelBtn">ยกเลิกการทำงาน</button>
+        </div>
+      </div>
+      
+      <p id="progressText" class="status" role="status" aria-live="polite"></p>
+
+      <div class="error" id="errorBox"></div>
+
+      <div class="project-history-bottom" id="projectHistoryBottom">
+        <div class="project-history-bottom-head">
+          <span id="bottomHistoryProjectTitle">ประวัติการแปลทั้งหมดของเรื่องนี้</span>
+          <button class="utility-btn" id="toggleBottomHistoryBtn" type="button">ซ่อน/แสดง</button>
+        </div>
+        
+        <!-- แถบควบคุม Export และค้นหาในประวัติ -->
+        <div class="bottom-history-controls">
+          <input type="text" id="bottomHistorySearchInput" class="history-search-input" placeholder="ค้นหาในประวัติ (ชื่อตอน)...">
+          <button class="utility-btn" id="exportDocxBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ Word (.docx)">Export .DOCX</button>
+          <button class="utility-btn" id="exportEpubBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ E-Book (.epub)">Export .EPUB</button>
+        </div>
+
+        <div class="project-history-bottom-list" id="bottomHistoryList"></div>
+      </div>
+
+      <div class="app-dialog-overlay" id="appDialogOverlay">
+        <div class="app-dialog-panel">
+          <div class="app-dialog-title" id="appDialogTitle"></div>
+          <div class="app-dialog-message" id="appDialogMessage"></div>
+          <input type="text" class="app-dialog-input" id="appDialogInput" style="display:none;">
+          <div class="app-dialog-actions">
+            <button class="app-dialog-btn cancel" id="appDialogCancelBtn" type="button">ยกเลิก</button>
+            <button class="app-dialog-btn confirm" id="appDialogConfirmBtn" type="button">ตกลง</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="diff-overlay" id="diffOverlay">
+        <div class="diff-panel">
+          <div class="diff-panel-head">
+            <span id="diffTitle">เทียบความต่าง</span>
+            <button class="icon-btn" id="diffCloseBtn" type="button" title="ปิด">✕</button>
+          </div>
+          <div class="diff-legend"><span class="diff-added">เพิ่ม/แก้ใหม่</span> &nbsp; <span class="diff-removed">ของเดิมที่ถูกลบ/แทนที่</span></div>
+          <div class="diff-body" id="diffBody"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="mobile-sticky-bar">
+  <button class="mobile-sticky-btn" id="mobileTabToggleBtn" type="button">≡ ดูผลลัพธ์</button>
+  <button class="mobile-sticky-btn primary" id="mobileProcessBtn" type="button">ปรุงอักษร</button>
+</div>
+
+<script>
+  var STORAGE_KEY = 'prungAksornData';
+  var state = { source: 'translate', level: 'edit', genre: 'ทั่วไป', style: 'สำนวนปัจจุบัน' };
+  var appData = { projects: [], currentProjectId: null };
+  var expandedProjects = {};
+  var viewingHistoryId = null;
+  var activeController = null;
+  var draftSaveTimer = null;
+  var outputFontSize = 15.5;
+
+  var defaultSettings = { provider:'openai', model:'gpt-4o-mini', chunkLen:'3000', source:'translate', level:'edit', genre:'ทั่วไป', style:'สำนวนปัจจุบัน', outputFontSize:15.5, darkMode: false };
+
+  var tabSourceBtn = document.getElementById('tabSourceBtn');
+  var tabOutputBtn = document.getElementById('tabOutputBtn');
+  var mobileTabToggleBtn = document.getElementById('mobileTabToggleBtn');
+  var spread = document.getElementById('spread');
+  
+  function switchMobileTab(tab){
+    if(tab === 'source'){
+      spread.classList.add('show-source');
+      spread.classList.remove('show-output');
+      tabSourceBtn.classList.add('active');
+      tabOutputBtn.classList.remove('active');
+      if(mobileTabToggleBtn) mobileTabToggleBtn.textContent = '≡ ดูผลลัพธ์';
+    }else{
+      spread.classList.remove('show-source');
+      spread.classList.add('show-output');
+      tabSourceBtn.classList.remove('active');
+      tabOutputBtn.classList.add('active');
+      if(mobileTabToggleBtn) mobileTabToggleBtn.textContent = '■ ดูต้นฉบับ';
+    }
+  }
+  tabSourceBtn.addEventListener('click', function(){ switchMobileTab('source'); });
+  tabOutputBtn.addEventListener('click', function(){ switchMobileTab('output'); });
+  if(mobileTabToggleBtn){
+    mobileTabToggleBtn.addEventListener('click', function(){
+      if(spread.classList.contains('show-source')) switchMobileTab('output');
+      else switchMobileTab('source');
+    });
+  }
+
+  var touchStartX = 0;
+  spread.addEventListener('touchstart', function(e){ touchStartX = e.changedTouches[0].screenX; }, {passive:true});
+  spread.addEventListener('touchend', function(e){
+    if(window.innerWidth <= 900){
+      var touchEndX = e.changedTouches[0].screenX;
+      if(touchStartX - touchEndX > 70) switchMobileTab('output');
+      else if(touchEndX - touchStartX > 70) switchMobileTab('source');
+    }
+  }, {passive:true});
+
+  var zenToggleBtn = document.getElementById('zenToggleBtn');
+  var exitZenBtn = document.getElementById('exitZenBtn');
+
+  function toggleZenMode(enable){
+    var isZen = (typeof enable === 'boolean') ? enable : !document.body.classList.contains('zen-mode');
+    document.body.classList.toggle('zen-mode', isZen);
+    zenToggleBtn.textContent = isZen ? '✖ ออกจากโหมดสมาธิ' : '⛶ โหมดสมาธิ';
+  }
+  zenToggleBtn.addEventListener('click', function(){ toggleZenMode(); });
+  exitZenBtn.addEventListener('click', function(){ toggleZenMode(false); });
+
+  var themeToggleBtn = document.getElementById('themeToggleBtn');
+  themeToggleBtn.addEventListener('click', function(){
+    var isDark = document.documentElement.classList.toggle('dark-mode');
+    themeToggleBtn.textContent = isDark ? '☼ โหมดสว่าง' : '☾ โหมดมืด';
+    appData.settings.darkMode = isDark;
+    saveData();
+  });
+
+  function updateKeyStatusBadge(){
+    var key = document.getElementById('apiKey').value.trim();
+    var dot = document.getElementById('keyStatusDot');
+    if(dot){
+      if(key) dot.classList.add('ready');
+      else dot.classList.remove('ready');
+    }
+  }
+  document.getElementById('apiKey').addEventListener('input', updateKeyStatusBadge);
+
+  var mainInput = document.getElementById('inputText');
+  var outputBox = document.getElementById('output');
+  var isSyncingScroll = false;
+
+  function syncScroll(source, target){
+    if(window.innerWidth > 900 && source.scrollHeight > source.clientHeight){
+      if(isSyncingScroll) return;
+      isSyncingScroll = true;
+      var percentage = source.scrollTop / (source.scrollHeight - source.clientHeight || 1);
+      target.scrollTop = percentage * (target.scrollHeight - target.clientHeight);
+      setTimeout(function(){ isSyncingScroll = false; }, 40);
+    }
+  }
+  mainInput.addEventListener('scroll', function(){ syncScroll(mainInput, outputBox); });
+  outputBox.addEventListener('scroll', function(){ syncScroll(outputBox, mainInput); });
+
+  var mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+  var sidebar = document.getElementById('sidebar');
+  var sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
+  mobileSidebarToggle.addEventListener('click', function(){
+    var isOpen = sidebar.classList.toggle('open');
+    sidebarToggleIcon.textContent = isOpen ? '▲' : '▼';
+  });
+
+  var toggleBottomHistoryBtn = document.getElementById('toggleBottomHistoryBtn');
+  var bottomHistoryList = document.getElementById('bottomHistoryList');
+  toggleBottomHistoryBtn.addEventListener('click', function(){
+    bottomHistoryList.classList.toggle('collapsed');
+  });
+
+  function scrollToTopTarget(){
+    setTimeout(function(){
+      var target = document.getElementById('mobileTabs') || document.getElementById('spread');
+      if (target && window.innerWidth <= 900) {
+        var topPos = target.getBoundingClientRect().top + window.pageYOffset - 12;
+        window.scrollTo({ top: Math.max(0, topPos), behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 60);
+  }
+
+  function getActiveBook(proj){
+    if(!proj) return null;
+    if(!proj.currentBookId && proj.books && proj.books.length > 0){
+      proj.currentBookId = proj.books[0].id;
+    }
+    return (proj.books || []).find(function(b){ return b.id === proj.currentBookId; }) || null;
+  }
+
+  function getActiveHistoryList(proj){
+    var book = getActiveBook(proj);
+    return book ? (book.history || []) : (proj.history || []);
+  }
+
+  function renderBottomHistory(){
+    var container = document.getElementById('bottomHistoryList');
+    var box = document.getElementById('projectHistoryBottom');
+    var titleEl = document.getElementById('bottomHistoryProjectTitle');
+    if(!container || !box) return;
+
+    var proj = getCurrentProject();
+    if(!proj){
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = 'block';
+
+    var activeBook = getActiveBook(proj);
+    var bookSuffix = activeBook ? (' [' + activeBook.title + ']') : '';
+    titleEl.textContent = 'ประวัติเรื่อง "' + proj.name + '"' + bookSuffix;
+    container.innerHTML = '';
+
+    var historyList = getActiveHistoryList(proj);
+
+    if(!historyList || historyList.length === 0){
+      var empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = 'ยังไม่มีประวัติการแปลสำหรับเล่มนี้';
+      container.appendChild(empty);
+      return;
+    }
+
+    historyList.forEach(function(entry, idx){
+      var item = document.createElement('div');
+      item.className = 'bottom-history-item' + (viewingHistoryId === entry.id ? ' active' : '');
+
+      var title = document.createElement('div');
+      title.className = 'bottom-history-title';
+      title.textContent = (entry.label || ('แปล' + (idx + 1))) + ' · ' + fmtTime(entry.ts);
+      title.addEventListener('click', function(){
+        viewHistoryEntry(proj, entry, idx);
+      });
+      item.appendChild(title);
+
+      var actions = document.createElement('div');
+      actions.className = 'bottom-history-actions';
+
+      var renameBtn = document.createElement('button');
+      renameBtn.className = 'icon-btn';
+      renameBtn.title = 'เปลี่ยนชื่อ';
+      renameBtn.textContent = '✎';
+      renameBtn.addEventListener('click', async function(e){
+        e.stopPropagation();
+        var currentLabel = entry.label || ('แปล' + (idx + 1));
+        var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
+        if(newLabel && newLabel.trim()){
+          entry.label = newLabel.trim();
+          saveData();
+          renderProjects();
+          renderBottomHistory();
+          if(viewingHistoryId === entry.id){
+            historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+            historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
+          }
+        }
+      });
+      actions.appendChild(renameBtn);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'icon-btn';
+      delBtn.title = 'ลบประวัติ';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', async function(e){
+        e.stopPropagation();
+        var itemLabel = entry.label || ('แปล' + (idx + 1));
+        var ok = await showConfirmDialog('ลบประวัติการแปล', 'ต้องการลบ "' + itemLabel + '" หรือไม่? การลบไม่สามารถย้อนกลับได้', true);
+        if(ok){
+          var currentHistory = getActiveHistoryList(proj);
+          var filtered = currentHistory.filter(function(h){ return h.id !== entry.id; });
+          if(activeBook) activeBook.history = filtered;
+          else proj.history = filtered;
+
+          if(viewingHistoryId === entry.id){
+            viewingHistoryId = null;
+            historyViewBanner.classList.remove('show');
+            historyViewBannerBottom.classList.remove('show');
+            loadProjectDraft(proj);
+          }
+          saveData();
+          renderProjects();
+          renderBottomHistory();
+        }
+      });
+      actions.appendChild(delBtn);
+
+      if(entry.parentId){
+        var diffBtnEl = document.createElement('button');
+        diffBtnEl.className = 'icon-btn diff-btn';
+        diffBtnEl.title = 'เทียบความต่างกับต้นฉบับที่แก้มาจาก';
+        diffBtnEl.textContent = 'Δ';
+        diffBtnEl.addEventListener('click', async function(e){
+          e.stopPropagation();
+          var parentEntry = findEntryById(proj, entry.parentId);
+          if(!parentEntry){ await showAlertDialog('ไม่พบต้นทาง', 'ไม่พบฉบับต้นทางที่ใช้เทียบ (อาจถูกลบไปแล้ว)'); return; }
+          openDiff(parentEntry.output, entry.output, 'เทียบ "' + (parentEntry.label || 'ต้นทาง') + '" กับ "' + (entry.label || 'ฉบับแก้ไข') + '"');
+        });
+        actions.appendChild(diffBtnEl);
+      }
+
+      item.appendChild(actions);
+      container.appendChild(item);
+    });
+
+    applyBottomHistorySearchFilter();
+  }
+
+  var bottomHistorySearchInput = document.getElementById('bottomHistorySearchInput');
+  function applyBottomHistorySearchFilter(){
+    var term = (bottomHistorySearchInput.value || '').trim().toLowerCase();
+    document.querySelectorAll('#bottomHistoryList .bottom-history-item').forEach(function(item){
+      var txt = item.textContent.toLowerCase();
+      item.style.display = (!term || txt.indexOf(term) !== -1) ? '' : 'none';
+    });
+  }
+  bottomHistorySearchInput.addEventListener('input', applyBottomHistorySearchFilter);
+
+  /* โหลดข้อมูลและแปลง Schema ย้ายประวัติเก่าเข้า books[] อัตโนมัติ (100% Backward Compatible) */
+  function loadData(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) appData = JSON.parse(raw);
+    }catch(e){}
+    if(!appData || typeof appData !== 'object') appData = { projects: [], currentProjectId: null };
+    if(!Array.isArray(appData.projects)) appData.projects = [];
+    appData.projects = appData.projects.filter(function(p){ return p && typeof p === 'object' && p.id && p.name; }).map(function(p){
+      // แปลงข้อมูลโปรเจกต์เวอร์ชันเก่าที่มีแค่ history[] ให้ย้ายเข้า books[0]
+      if(!Array.isArray(p.books) || p.books.length === 0){
+        var oldHistory = Array.isArray(p.history) ? p.history : [];
+        p.books = [{ id: makeId('b'), title: 'เล่ม 1', history: oldHistory }];
+        p.currentBookId = p.books[0].id;
+      } else {
+        p.books.forEach(function(b){
+          b.history = Array.isArray(b.history) ? b.history : [];
+        });
+      }
+      if(!p.currentBookId && p.books.length > 0){
+        p.currentBookId = p.books[0].id;
+      }
+      p.glossary = typeof p.glossary === 'string' ? p.glossary : '';
+      p.context = typeof p.context === 'string' ? p.context : '';
+      p.draft = typeof p.draft === 'string' ? p.draft : '';
+      p.chapterTitle = typeof p.chapterTitle === 'string' ? p.chapterTitle : '';
+      return p;
+    });
+    appData.settings = Object.assign({}, defaultSettings, appData.settings || {});
+  }
+
+  function saveSettings(){
+    appData.settings = {
+      provider: providerSel.value,
+      model: modelInput.value,
+      chunkLen: document.getElementById('chunkLen').value,
+      source: state.source, level: state.level, genre: state.genre, style: state.style,
+      outputFontSize: outputFontSize,
+      darkMode: document.documentElement.classList.contains('dark-mode')
+    };
+    saveData();
+  }
+
+  function applySettingsToUI(){
+    var s = appData.settings;
+    providerSel.value = s.provider;
+    modelInput.value = s.model;
+    document.getElementById('chunkLen').value = s.chunkLen;
+    state.source = s.source; state.level = s.level; state.genre = s.genre; state.style = s.style;
+    outputFontSize = Number(s.outputFontSize) || defaultSettings.outputFontSize;
+
+    if(s.darkMode){
+      document.documentElement.classList.add('dark-mode');
+      themeToggleBtn.textContent = '☼ โหมดสว่าง';
+    }else{
+      document.documentElement.classList.remove('dark-mode');
+      themeToggleBtn.textContent = '☾ โหมดมืด';
+    }
+
+    function setSegActive(id, val){
+      var seg = document.getElementById(id);
+      seg.querySelectorAll('button').forEach(function(b){
+        b.classList.toggle('active', b.dataset.val === val);
+      });
+    }
+    setSegActive('sourceSeg', s.source);
+    setSegActive('levelSeg', s.level);
+    setSegActive('styleSeg', s.style);
+    document.getElementById('genreChips').querySelectorAll('.chip').forEach(function(c){
+      c.classList.toggle('active', c.dataset.val === s.genre);
+    });
+    setOutputFontSize(outputFontSize, false);
+    updateTranslationSummary();
+    updateKeyStatusBadge();
+  }
+
+  var STORAGE_WARN_BYTES = 4 * 1024 * 1024; // เตือนล่วงหน้าเมื่อข้อมูลใกล้ 4MB (เบราว์เซอร์ส่วนใหญ่จำกัดราว 5-10MB ต่อโดเมน)
+  var storageWarnShown = false;
+  var storageFailWarnShown = false;
+
+  function saveData(){
+    var json;
+    try{
+      json = JSON.stringify(appData);
+      localStorage.setItem(STORAGE_KEY, json);
+    }catch(e){
+      if(saveStatusText){
+        saveStatusText.textContent = '⚠ บันทึกไม่สำเร็จ (พื้นที่เต็ม)';
+        saveStatusText.classList.remove('saving');
+      }
+      if(!storageFailWarnShown){
+        storageFailWarnShown = true;
+        showAlertDialog('บันทึกข้อมูลไม่สำเร็จ', 'พื้นที่จัดเก็บของเบราว์เซอร์เต็มแล้ว ข้อมูลล่าสุดอาจไม่ถูกบันทึกไว้ กรุณากดสำรองข้อมูล (Export) แล้วลบตอนเก่าที่ไม่จำเป็นบางส่วนออกเพื่อเพิ่มพื้นที่ว่าง');
+      }
+      return false;
+    }
+    if(!storageWarnShown && json && json.length * 2 >= STORAGE_WARN_BYTES){
+      storageWarnShown = true;
+      var mb = ((json.length * 2) / (1024 * 1024)).toFixed(1);
+      showAlertDialog('พื้นที่จัดเก็บใกล้เต็ม', 'ข้อมูลของคุณมีขนาดประมาณ ' + mb + ' MB ซึ่งใกล้เต็มพื้นที่จัดเก็บของเบราว์เซอร์ (โดยทั่วไปจำกัดราว 5-10MB ต่อโดเมน) แนะนำให้กดสำรองข้อมูล (Export) และพิจารณาลบตอนเก่าที่ไม่ใช้แล้ว เพื่อป้องกันข้อมูลใหม่ในอนาคตไม่ถูกบันทึก');
+    }
+    return true;
+  }
+
+  function getCurrentProject(){
+    return appData.projects.find(function(p){ return p.id === appData.currentProjectId; }) || null;
+  }
+
+  function makeId(prefix){
+    return prefix + '_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random().toString(16).slice(2));
+  }
+
+  function safeFilename(name){
+    return (name || 'prung-aksorn').replace(/[\\/:*?"<>|]/g, '_').trim().slice(0, 80) || 'prung-aksorn';
+  }
+
+  function escapeHtml(str){
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function fmtTime(ts){
+    var d = new Date(ts);
+    return d.toLocaleDateString('th-TH', {day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit'});
+  }
+
+  function levelDesc(l){
+    if(l === 'proof') return 'พิสูจน์อักษรเบาๆ แก้เฉพาะจุดที่สะดุดหรือผิดหลักภาษา คงสำนวนและคำเดิมไว้ให้มากที่สุด';
+    if(l === 'rewrite') return 'ขัดเกลาใหม่อย่างเต็มที่ ปรับจังหวะประโยคและสำนวนให้อ่านลื่นไหลสนุกที่สุดเท่าที่จะทำได้ โดยยังคงเนื้อเรื่องและความหมายเดิม';
+    return 'เรียบเรียงระดับกลาง ปรับประโยคให้ลื่นไหลขึ้นอย่างเป็นธรรมชาติ แต่ยังคงลีลาและน้ำเสียงของผู้เขียนไว้';
+  }
+  function styleDesc(s){
+    if(s === 'สำนวนย้อนยุค') return 'ใช้สำนวนภาษาไทยแบบย้อนยุค มีกลิ่นอายคำโบราณหรือคำที่ใช้ในนิยายพื้นบ้าน/กำลังภายใน/ยุคเก่า เพิ่มความขลังและบรรยากาศแบบดั้งเดิม';
+    if(s === 'สำนวนร่วมสมัย') return 'ใช้สำนวนภาษาไทยร่วมสมัย อ่านลื่นเหมือนนิยายที่ตีพิมพ์ในปัจจุบัน จังหวะกระชับทันสมัย';
+    if(s === 'สำนวนทางการ') return 'ใช้สำนวนภาษาไทยที่เป็นทางการ สุภาพ เรียบร้อย เหมาะกับงานเขียนเชิงวรรณกรรมหรือทางการ';
+    return 'ใช้สำนวนภาษาไทยแบบปัจจุบันทั่วไปที่ผู้อ่านคุ้นเคย เป็นธรรมชาติในชีวิตประจำวัน';
+  }
+  function buildTranslatePrompt(proj, previousTail){
+    var glossaryPart = proj.glossary ? (' ใช้คำศัพท์เฉพาะต่อไปนี้อย่างสม่ำเสมอตลอดทั้งเรื่อง (รูปแบบ "ต้นฉบับ = คำแปล"): ' + proj.glossary.replace(/\n+/g, '; ')) : '';
+    var contextPart = proj.context ? (' บริบทของเรื่อง: ' + proj.context) : '';
+    var tailPart = previousTail ? (' นี่คือข้อความท้ายส่วนก่อนหน้าที่ทำเสร็จไปแล้ว (แค่ให้ดูเพื่อต่อเนื้อความให้ลื่นไหลเป็นธรรมชาติ ห้ามทำซ้ำข้อความนี้อีกในคำตอบ): "' + previousTail + '"') : '';
+    var base = state.source === 'translate'
+      ? ('คุณเป็นนักแปลนิยายมืออาชีพ ผู้เชี่ยวชาญงานแปลแนว' + state.genre + 'เป็นภาษาไทย หน้าที่ของคุณคือแปลข้อความที่ได้รับเป็นภาษาไทยที่อ่านลื่นไหล เป็นธรรมชาติ เหมาะกับนิยาย รักษาโทนอารมณ์ น้ำเสียง และความหมายดั้งเดิมของต้นฉบับให้ครบถ้วน')
+      : ('คุณเป็นบรรณาธิการต้นฉบับนิยายมืออาชีพ ผู้เชี่ยวชาญงานแนว' + state.genre + ' หน้าที่ของคุณคือปรับสำนวนภาษาไทยของข้อความต่อไปนี้ให้ลื่นไหลและเป็นธรรมชาติมากขึ้น โดยไม่เปลี่ยนเนื้อเรื่องหรือความหมายเดิม');
+    return base +
+      ' ระดับการปรับสำนวน: ' + levelDesc(state.level) +
+      ' สำนวนภาษาที่ต้องการ: ' + styleDesc(state.style) + '.' +
+      glossaryPart + contextPart + tailPart +
+      ' หมายเหตุ: ข้อความที่ได้รับอาจเป็นเพียงส่วนหนึ่งของเรื่องยาว ให้ทำงานต่อเนื่องเสมือนเป็นส่วนหนึ่งของทั้งเรื่อง' +
+      ' ตอบกลับเฉพาะข้อความที่ทำเสร็จแล้วเท่านั้น ห้ามใส่คำอธิบาย คำนำ หรือหมายเหตุใดๆ เพิ่มเติม';
+  }
+
+  function getTail(text, maxLen){
+    text = (text || '').trim();
+    if(text.length <= maxLen) return text;
+    return text.slice(-maxLen);
+  }
+
+  function diffTokens(oldArr, newArr){
+    var n = oldArr.length, m = newArr.length;
+    var dp = new Array(n + 1);
+    for(var i = 0; i <= n; i++) dp[i] = new Int32Array(m + 1);
+    for(var i = n - 1; i >= 0; i--){
+      for(var j = m - 1; j >= 0; j--){
+        dp[i][j] = oldArr[i] === newArr[j] ? dp[i+1][j+1] + 1 : Math.max(dp[i+1][j], dp[i][j+1]);
+      }
+    }
+    var result = [];
+    var i = 0, j = 0;
+    while(i < n && j < m){
+      if(oldArr[i] === newArr[j]){ result.push({type:'same', text:oldArr[i]}); i++; j++; }
+      else if(dp[i+1][j] >= dp[i][j+1]){ result.push({type:'removed', text:oldArr[i]}); i++; }
+      else { result.push({type:'added', text:newArr[j]}); j++; }
+    }
+    while(i < n){ result.push({type:'removed', text:oldArr[i]}); i++; }
+    while(j < m){ result.push({type:'added', text:newArr[j]}); j++; }
+    return result;
+  }
+
+  function diffTexts(oldText, newText){
+    var oldWords = (oldText || '').split(/(\s+)/).filter(function(s){ return s.length; });
+    var newWords = (newText || '').split(/(\s+)/).filter(function(s){ return s.length; });
+    if(oldWords.length * newWords.length > 3000000){
+      oldWords = (oldText || '').split(/\n+/);
+      newWords = (newText || '').split(/\n+/);
+      if(oldWords.length * newWords.length > 3000000) return null;
+    }
+    return diffTokens(oldWords, newWords);
+  }
+
+  function renderDiffHtml(diffResult){
+    var frag = document.createDocumentFragment();
+    diffResult.forEach(function(part){
+      if(part.type === 'same'){
+        frag.appendChild(document.createTextNode(part.text));
+      } else {
+        var span = document.createElement('span');
+        span.className = part.type === 'added' ? 'diff-added' : 'diff-removed';
+        span.textContent = part.text;
+        frag.appendChild(span);
+      }
+    });
+    return frag;
+  }
+
+  // ---- กล่องโต้ตอบธีมของแอปเอง (แทน alert/prompt/confirm มาตรฐานของเบราว์เซอร์) ----
+  var appDialogOverlay = document.getElementById('appDialogOverlay');
+  var appDialogTitle = document.getElementById('appDialogTitle');
+  var appDialogMessage = document.getElementById('appDialogMessage');
+  var appDialogInput = document.getElementById('appDialogInput');
+  var appDialogCancelBtn = document.getElementById('appDialogCancelBtn');
+  var appDialogConfirmBtn = document.getElementById('appDialogConfirmBtn');
+  var appDialogResolver = null;
+  var appDialogMode = null;
+
+  function closeAppDialog(result){
+    appDialogOverlay.classList.remove('show');
+    if(appDialogResolver){
+      var r = appDialogResolver;
+      appDialogResolver = null;
+      r(result);
+    }
+  }
+  appDialogCancelBtn.addEventListener('click', function(){
+    closeAppDialog(appDialogMode === 'prompt' ? null : false);
+  });
+  appDialogConfirmBtn.addEventListener('click', function(){
+    if(appDialogMode === 'prompt') closeAppDialog(appDialogInput.value);
+    else closeAppDialog(true);
+  });
+  appDialogOverlay.addEventListener('click', function(e){
+    if(e.target !== appDialogOverlay) return;
+    closeAppDialog(appDialogMode === 'prompt' ? null : false);
+  });
+  appDialogInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); appDialogConfirmBtn.click(); }
+    else if(e.key === 'Escape'){ appDialogCancelBtn.click(); }
+  });
+  // ให้ Escape ปิดกล่อง alert/confirm ได้ด้วย ไม่ใช่แค่ตอนโฟกัสอยู่ที่ช่อง input (โหมด prompt)
+  // เพราะ alert/confirm โฟกัสไปที่ปุ่มยืนยันแทน ไม่ใช่ input
+  appDialogOverlay.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && appDialogOverlay.classList.contains('show')){
+      appDialogCancelBtn.click();
+    }
+  });
+
+  function showPromptDialog(title, defaultValue){
+    return new Promise(function(resolve){
+      appDialogMode = 'prompt';
+      appDialogResolver = resolve;
+      appDialogTitle.textContent = title;
+      appDialogMessage.style.display = 'none';
+      appDialogInput.style.display = 'block';
+      appDialogInput.value = defaultValue || '';
+      appDialogConfirmBtn.textContent = 'ตกลง';
+      appDialogConfirmBtn.classList.remove('danger');
+      appDialogCancelBtn.style.display = 'inline-block';
+      appDialogOverlay.classList.add('show');
+      setTimeout(function(){ appDialogInput.focus(); appDialogInput.select(); }, 50);
+    });
+  }
+
+  function showConfirmDialog(title, message, danger){
+    return new Promise(function(resolve){
+      appDialogMode = 'confirm';
+      appDialogResolver = resolve;
+      appDialogTitle.textContent = title;
+      appDialogMessage.textContent = message;
+      appDialogMessage.style.display = 'block';
+      appDialogInput.style.display = 'none';
+      appDialogConfirmBtn.textContent = danger ? 'ลบ' : 'ตกลง';
+      appDialogConfirmBtn.classList.toggle('danger', !!danger);
+      appDialogCancelBtn.style.display = 'inline-block';
+      appDialogOverlay.classList.add('show');
+      setTimeout(function(){ appDialogConfirmBtn.focus(); }, 50);
+    });
+  }
+
+  function showAlertDialog(title, message){
+    return new Promise(function(resolve){
+      appDialogMode = 'alert';
+      appDialogResolver = resolve;
+      appDialogTitle.textContent = title;
+      appDialogMessage.textContent = message;
+      appDialogMessage.style.display = 'block';
+      appDialogInput.style.display = 'none';
+      appDialogConfirmBtn.textContent = 'ตกลง';
+      appDialogConfirmBtn.classList.remove('danger');
+      appDialogCancelBtn.style.display = 'none';
+      appDialogOverlay.classList.add('show');
+      setTimeout(function(){ appDialogConfirmBtn.focus(); }, 50);
+    });
+  }
+
+  var diffOverlay = document.getElementById('diffOverlay');
+  var diffBody = document.getElementById('diffBody');
+  var diffTitleEl = document.getElementById('diffTitle');
+  function openDiff(oldText, newText, titleText){
+    diffTitleEl.textContent = titleText || 'เทียบความต่าง';
+    diffBody.innerHTML = '';
+    var result = diffTexts(oldText, newText);
+    if(!result){
+      diffBody.textContent = 'ข้อความยาวเกินไปสำหรับเทียบความต่างแบบละเอียด ลองเทียบทีละส่วนที่สั้นกว่านี้';
+    } else {
+      diffBody.appendChild(renderDiffHtml(result));
+    }
+    diffOverlay.classList.add('show');
+  }
+  document.getElementById('diffCloseBtn').addEventListener('click', function(){
+    diffOverlay.classList.remove('show');
+  });
+  diffOverlay.addEventListener('click', function(e){
+    if(e.target === diffOverlay) diffOverlay.classList.remove('show');
+  });
+
+  function findEntryById(proj, id){
+    if(!proj || !id) return null;
+    var allHist = [];
+    (proj.books || []).forEach(function(b){ allHist = allHist.concat(b.history || []); });
+    if(proj.history) allHist = allHist.concat(proj.history);
+    return allHist.find(function(h){ return h.id === id; }) || null;
+  }
+
+  function sleep(ms){
+    return new Promise(function(resolve){ setTimeout(resolve, ms); });
+  }
+
+  function isRetryableError(err){
+    if(!err) return false;
+    if(err.status === 429) return true;
+    if(err.status >= 500 && err.status < 600) return true;
+    if(!err.status) return true;
+    return false;
+  }
+
+  async function callAIWithRetry(sys, text, key, model, signal, maxRetries){
+    var lastErr;
+    for(var attempt = 0; attempt <= maxRetries; attempt++){
+      try{
+        return await (providerSel.value === 'openai'
+          ? callOpenAI(sys, text, key, model, signal)
+          : callGemini(sys, text, key, model, signal));
+      }catch(err){
+        if(err.name === 'AbortError') throw err;
+        lastErr = err;
+        if(!isRetryableError(err) || attempt === maxRetries) throw err;
+        progressText.textContent = 'เจอปัญหาชั่วคราว (' + (err.message || '') + ') กำลังลองใหม่ (' + (attempt + 1) + '/' + maxRetries + ')...';
+        await sleep(1000 * Math.pow(2, attempt));
+      }
+    }
+    throw lastErr;
+  }
+
+  function countWords(text){
+    text = (text || '').trim();
+    if(!text) return 0;
+    try{
+      if(typeof Intl !== 'undefined' && Intl.Segmenter){
+        var seg = new Intl.Segmenter('th', { granularity: 'word' });
+        var count = 0;
+        var iter = seg.segment(text)[Symbol.iterator]();
+        var r = iter.next();
+        while(!r.done){
+          if(r.value.isWordLike) count++;
+          r = iter.next();
+        }
+        return count;
+      }
+    }catch(e){}
+    return text.split(/\s+/).filter(Boolean).length;
+  }
+
+  var projectList = document.getElementById('projectList');
+  var activeProjectBanner = document.getElementById('activeProjectBanner');
+  var activeProjectName = document.getElementById('activeProjectName');
+
+  function renderProjects(){
+    projectList.innerHTML = '';
+    if(appData.projects.length === 0){
+      var empty = document.createElement('p');
+      empty.className = 'sidebar-empty';
+      empty.textContent = 'ยังไม่มีเรื่องนิยาย กด "+ เรื่องใหม่" เพื่อเริ่มต้น';
+      projectList.appendChild(empty);
+    }
+    appData.projects.forEach(function(proj){
+      var item = document.createElement('div');
+      item.className = 'project-item';
+
+      var row = document.createElement('div');
+      row.className = 'project-row' + (proj.id === appData.currentProjectId ? ' active' : '');
+
+      var name = document.createElement('span');
+      name.className = 'project-name';
+      name.textContent = proj.name;
+      row.appendChild(name);
+
+      var renameProjBtn = document.createElement('button');
+      renameProjBtn.className = 'icon-btn';
+      renameProjBtn.title = 'เปลี่ยนชื่อเรื่อง';
+      renameProjBtn.textContent = '✎';
+      renameProjBtn.addEventListener('click', async function(e){
+        e.stopPropagation();
+        var newName = await showPromptDialog('เปลี่ยนชื่อเรื่องนิยาย', proj.name);
+        if(newName && newName.trim()){
+          proj.name = newName.trim();
+          saveData();
+          renderProjects();
+          renderBottomHistory();
+          updateActiveBanner();
+        }
+      });
+      row.appendChild(renameProjBtn);
+
+      var glossBtn = document.createElement('button');
+      glossBtn.className = 'icon-btn';
+      glossBtn.title = 'คลังคำ & บริบท';
+      glossBtn.textContent = '⚙';
+      glossBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        gp.classList.toggle('open');
+      });
+      row.appendChild(glossBtn);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'icon-btn';
+      delBtn.title = 'ลบเรื่องนี้';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', async function(e){
+        e.stopPropagation();
+        var ok = await showConfirmDialog('ลบเรื่องนิยาย', 'ลบเรื่อง "' + proj.name + '" พร้อมประวัติทั้งหมด? การลบไม่สามารถย้อนกลับได้', true);
+        if(ok){
+          appData.projects = appData.projects.filter(function(p){ return p !== proj; });
+          if(appData.currentProjectId === proj.id) appData.currentProjectId = null;
+          saveData();
+          renderProjects();
+          renderBottomHistory();
+          updateActiveBanner();
+        }
+      });
+      row.appendChild(delBtn);
+
+      row.addEventListener('click', function(){
+        appData.currentProjectId = proj.id;
+        expandedProjects[proj.id] = !expandedProjects[proj.id];
+        saveData();
+        renderProjects();
+        updateActiveBanner();
+        loadProjectDraft(proj);
+      });
+
+      item.appendChild(row);
+
+      var gp = document.createElement('div');
+      gp.className = 'glossary-panel';
+      var gpTextarea = document.createElement('textarea');
+      gpTextarea.rows = 3;
+      gpTextarea.placeholder = 'ต้นฉบับ = คำแปล';
+      gpTextarea.value = proj.glossary || '';
+      gpTextarea.addEventListener('input', function(){
+        proj.glossary = gpTextarea.value;
+        saveData();
+      });
+      gp.appendChild(gpTextarea);
+
+      var aiGlossBtn = document.createElement('button');
+      aiGlossBtn.className = 'ai-glossary-btn';
+      aiGlossBtn.type = 'button';
+      aiGlossBtn.innerHTML = '<svg class="ic" viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M10 2.2l1.5 5.3L17 9l-5.5 1.5L10 15.8l-1.5-5.3L3 9l5.5-1.5L10 2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> ให้ AI แนะนำคลังคำจากข้อความ';
+      aiGlossBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        runAiGlossaryExtract(proj, gpTextarea);
+      });
+      gp.appendChild(aiGlossBtn);
+      
+      var contextTextarea = document.createElement('textarea');
+      contextTextarea.rows = 3;
+      contextTextarea.placeholder = 'บริบทของเรื่อง';
+      contextTextarea.style.marginTop = '8px';
+      contextTextarea.value = proj.context || '';
+      contextTextarea.addEventListener('input', function(){
+        proj.context = contextTextarea.value;
+        saveData();
+      });
+      gp.appendChild(contextTextarea);
+      item.appendChild(gp);
+
+      var bookContainer = document.createElement('div');
+      bookContainer.className = 'book-list' + (expandedProjects[proj.id] ? ' open' : '');
+      if(expandedProjects[proj.id]){
+        (proj.books || []).forEach(function(book){
+          var brow = document.createElement('div');
+          brow.className = 'book-item-row' + (proj.currentBookId === book.id ? ' active' : '');
+          
+          var btitle = document.createElement('span');
+          btitle.className = 'book-title-text';
+          btitle.innerHTML = '<svg class="ic" viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M2.5 4.2c2.2-1 5-1 7 .2v11.4c-2-1.2-4.8-1.2-7-.2V4.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M17.5 4.2c-2.2-1-5-1-7 .2v11.4c2-1.2 4.8-1.2 7-.2V4.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg> ' + escapeHtml(book.title);
+          btitle.addEventListener('click', function(e){
+            e.stopPropagation();
+            proj.currentBookId = book.id;
+            saveData();
+            renderProjects();
+            renderBottomHistory();
+          });
+          brow.appendChild(btitle);
+
+          var bdel = document.createElement('button');
+          bdel.className = 'icon-btn';
+          bdel.textContent = '✕';
+          bdel.title = 'ลบเล่มนี้';
+          bdel.addEventListener('click', async function(e){
+            e.stopPropagation();
+            if(proj.books.length <= 1){ await showAlertDialog('ทำไม่ได้', 'ต้องมีอย่างน้อย 1 เล่มในเรื่องนี้'); return; }
+            var ok = await showConfirmDialog('ลบเล่ม', 'ต้องการลบเล่ม "' + book.title + '" พร้อมประวัติในเล่มหรือไม่? การลบไม่สามารถย้อนกลับได้', true);
+            if(ok){
+              proj.books = proj.books.filter(function(b){ return b.id !== book.id; });
+              proj.currentBookId = proj.books[0].id;
+              saveData();
+              renderProjects();
+              renderBottomHistory();
+            }
+          });
+          brow.appendChild(bdel);
+
+          var brename = document.createElement('button');
+          brename.className = 'icon-btn';
+          brename.textContent = '✎';
+          brename.title = 'เปลี่ยนชื่อเล่ม';
+          brename.addEventListener('click', async function(e){
+            e.stopPropagation();
+            var newTitle = await showPromptDialog('เปลี่ยนชื่อเล่ม/โฟลเดอร์', book.title);
+            if(newTitle && newTitle.trim()){
+              book.title = newTitle.trim();
+              saveData();
+              renderProjects();
+              renderBottomHistory();
+            }
+          });
+          brow.appendChild(brename);
+
+          bookContainer.appendChild(brow);
+
+          if(proj.currentBookId === book.id){
+            var hist = document.createElement('div');
+            hist.className = 'history-list open';
+            var histLabel = document.createElement('div');
+            histLabel.className = 'history-list-label';
+            histLabel.textContent = 'ตอนที่แปลแล้ว';
+            hist.appendChild(histLabel);
+
+            var bookHistory = book.history || [];
+            var SIDEBAR_HISTORY_LIMIT = 8;
+            if(bookHistory.length === 0){
+              var hEmpty = document.createElement('div');
+              hEmpty.className = 'history-empty';
+              hEmpty.textContent = 'ยังไม่มีตอนที่แปลในเล่มนี้';
+              hist.appendChild(hEmpty);
+            } else {
+              var startIdx = Math.max(0, bookHistory.length - SIDEBAR_HISTORY_LIMIT);
+              var visibleHistory = bookHistory.slice(startIdx);
+              visibleHistory.forEach(function(entry, visIdx){
+                var idx = startIdx + visIdx;
+                var erow = document.createElement('div');
+                erow.className = 'history-entry-row';
+
+                var eb = document.createElement('button');
+                eb.className = 'history-entry';
+                eb.textContent = (entry.label || ('แปล' + (idx + 1))) + ' · ' + fmtTime(entry.ts);
+                eb.addEventListener('click', function(ev){
+                  ev.stopPropagation();
+                  viewHistoryEntry(proj, entry, idx);
+                });
+                erow.appendChild(eb);
+
+                var erename = document.createElement('button');
+                erename.className = 'icon-btn';
+                erename.title = 'เปลี่ยนชื่อตอนนี้';
+                erename.textContent = '✎';
+                erename.addEventListener('click', async function(ev){
+                  ev.stopPropagation();
+                  var currentLabel = entry.label || ('แปล' + (idx + 1));
+                  var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
+                  if(newLabel && newLabel.trim()){
+                    entry.label = newLabel.trim();
+                    saveData();
+                    renderProjects();
+                    renderBottomHistory();
+                    if(viewingHistoryId === entry.id){
+                      historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+                      historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
+                    }
+                  }
+                });
+                erow.appendChild(erename);
+
+                if(entry.parentId){
+                  var ediff = document.createElement('button');
+                  ediff.className = 'icon-btn diff-btn';
+                  ediff.title = 'เทียบความต่างกับต้นฉบับที่แก้มาจาก';
+                  ediff.textContent = 'Δ';
+                  ediff.addEventListener('click', async function(ev){
+                    ev.stopPropagation();
+                    var parentEntry = findEntryById(proj, entry.parentId);
+                    if(!parentEntry){ await showAlertDialog('ไม่พบต้นทาง', 'ไม่พบฉบับต้นทางที่ใช้เทียบ (อาจถูกลบไปแล้ว)'); return; }
+                    openDiff(parentEntry.output, entry.output, 'เทียบ "' + (parentEntry.label || 'ต้นทาง') + '" กับ "' + (entry.label || 'ฉบับแก้ไข') + '"');
+                  });
+                  erow.appendChild(ediff);
+                }
+
+                hist.appendChild(erow);
+              });
+
+              if(bookHistory.length > SIDEBAR_HISTORY_LIMIT){
+                var viewAllLink = document.createElement('button');
+                viewAllLink.className = 'textbtn history-view-all-link';
+                viewAllLink.style.display = 'block';
+                viewAllLink.style.marginTop = '6px';
+                viewAllLink.type = 'button';
+                viewAllLink.textContent = 'ดูทั้งหมด (' + bookHistory.length + ' ตอน) ที่แผงด้านล่าง ↓';
+                viewAllLink.addEventListener('click', function(ev){
+                  ev.stopPropagation();
+                  var panel = document.getElementById('projectHistoryBottom');
+                  if(panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+                hist.appendChild(viewAllLink);
+              }
+            }
+            bookContainer.appendChild(hist);
+          }
+        });
+
+        var addBookBtn = document.createElement('button');
+        addBookBtn.className = 'utility-btn';
+        addBookBtn.style.marginTop = '4px';
+        addBookBtn.style.fontSize = '11px';
+        addBookBtn.textContent = '+ เพิ่มเล่ม/โฟลเดอร์';
+        addBookBtn.addEventListener('click', async function(e){
+          e.stopPropagation();
+          var bname = await showPromptDialog('ตั้งชื่อเล่ม/โฟลเดอร์ใหม่', 'เล่มที่ ' + (proj.books.length + 1));
+          if(bname && bname.trim()){
+            var newBook = { id: makeId('b'), title: bname.trim(), history: [] };
+            proj.books.push(newBook);
+            proj.currentBookId = newBook.id;
+            saveData();
+            renderProjects();
+            renderBottomHistory();
+          }
+        });
+        bookContainer.appendChild(addBookBtn);
+      }
+      item.appendChild(bookContainer);
+
+      projectList.appendChild(item);
+    });
+  }
+
+  function updateActiveBanner(){
+    var proj = getCurrentProject();
+    if(proj){
+      activeProjectBanner.style.display = 'flex';
+      var activeBook = getActiveBook(proj);
+      var bookInfo = activeBook ? (' (' + activeBook.title + ')') : '';
+      activeProjectName.textContent = proj.name + bookInfo;
+    } else {
+      activeProjectBanner.style.display = 'none';
+    }
+  }
+
+  document.getElementById('addProjBtn').addEventListener('click', async function(){
+    var name = await showPromptDialog('ตั้งชื่อเรื่องนิยาย', '');
+    if(!name || !name.trim()) return;
+    var proj = { id: makeId('p'), name: name.trim(), glossary: '', context: '', draft: '', chapterTitle: '', books: [] };
+    var defaultBook = { id: makeId('b'), title: 'เล่ม 1', history: [] };
+    proj.books.push(defaultBook);
+    proj.currentBookId = defaultBook.id;
+    appData.projects.push(proj);
+    appData.currentProjectId = proj.id;
+    expandedProjects[proj.id] = true;
+    saveData();
+    renderProjects();
+    renderBottomHistory();
+    updateActiveBanner();
+    loadProjectDraft(proj);
+  });
+
+  function dedupeGlossary(existingText, newText){
+    // รวมคลังคำเดิม + คำใหม่ โดยตัดคำซ้ำออก (เทียบจากส่วน "ต้นฉบับ" ก่อนเครื่องหมาย =)
+    // ใช้ Object.create(null) แทน {} ธรรมดา กัน key อย่าง "__proto__" ชนกับ prototype chain
+    var seen = Object.create(null);
+    var lines = [];
+    function addLine(line){
+      line = line.trim();
+      if(!line) return;
+      var key = line.split('=')[0].trim().toLowerCase();
+      if(!key || seen[key]) return;
+      seen[key] = true;
+      lines.push(line);
+    }
+    (existingText || '').split('\n').forEach(addLine);
+    (newText || '').split('\n').forEach(addLine);
+    return lines.join('\n');
+  }
+
+  async function runAiGlossaryExtract(proj, textareaEl){
+    var text = inputText.value.trim();
+    var key = document.getElementById('apiKey').value.trim();
+    if(!text){ await showAlertDialog('ยังไม่มีข้อความ', 'กรุณาวางข้อความต้นฉบับก่อนให้ AI วิเคราะห์คลังคำ'); return; }
+    if(!key){ await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน'); return; }
+    if(warnIfAiBusy()) return;
+
+    var sys = "คุณคือบรรณาธิการตรวจนิยาย อ่านข้อความต่อไปนี้แล้วดึงเฉพาะ 'ชื่อตัวละคร, สถานที่, หรือศัพท์เฉพาะ' ออกมา จัดรูปแบบเป็น 'ต้นฉบับ = คำแปลไทย' บรรทัดละ 1 คำ ตอบกลับเฉพาะรายการคำศัพท์เท่านั้น ห้ามมีคำอธิบายเพิ่มเติม";
+    // สแกนทั้งข้อความ ไม่ใช่แค่ 3000 ตัวอักษรแรก โดยแบ่งเป็นส่วนๆ เหมือนตอนแปลจริง
+    var chunks = splitIntoChunks(text, 4000);
+    var aggregated = proj.glossary || '';
+
+    activeController = new AbortController();
+    setAiBusy(true);
+    cancelBtn.classList.add('show');
+    try {
+      for(var i = 0; i < chunks.length; i++){
+        progressText.textContent = chunks.length > 1
+          ? ('กำลังให้ AI วิเคราะห์คำศัพท์เฉพาะ ส่วนที่ ' + (i + 1) + '/' + chunks.length + '...')
+          : 'กำลังให้ AI วิเคราะห์คำศัพท์เฉพาะและชื่อตัวละคร...';
+        var result = await callAIWithRetry(sys, chunks[i], key, modelInput.value, activeController.signal, 1);
+        if(result && result.trim()){
+          aggregated = dedupeGlossary(aggregated, result.trim());
+        }
+      }
+      proj.glossary = aggregated;
+      textareaEl.value = proj.glossary;
+      saveData();
+      await showAlertDialog('เสร็จแล้ว', 'ดึงคลังคำจากทั้งข้อความเรียบร้อยแล้ว (ตัดคำซ้ำออกให้อัตโนมัติ)');
+    } catch(err){
+      if(err.name !== 'AbortError'){
+        await showAlertDialog('ทำไม่สำเร็จ', 'ไม่สามารถดึงคลังคำได้: ' + (err.message || ''));
+      }
+    } finally {
+      setAiBusy(false);
+      cancelBtn.classList.remove('show');
+      progressText.textContent = '';
+    }
+  }
+
+  var historyViewBanner = document.getElementById('historyViewBanner');
+  var historyViewBannerBottom = document.getElementById('historyViewBannerBottom');
+  var historyViewLabel = document.getElementById('historyViewLabel');
+  var historyViewLabelBottom = document.getElementById('historyViewLabelBottom');
+  var chapterTitle = document.getElementById('chapterTitle');
+  var inputText = document.getElementById('inputText');
+  var inCount = document.getElementById('inCount');
+  var outCount = document.getElementById('outCount');
+  var output = document.getElementById('output');
+  var stamp = document.getElementById('stamp');
+  var outputFontValue = document.getElementById('outputFontValue');
+  var saveStatusText = document.getElementById('saveStatusText');
+
+  function setResultFocus(enabled){
+    spread.classList.toggle('result-focus', !!enabled);
+  }
+
+  function setOutputFontSize(size, persist){
+    outputFontSize = Math.max(13, Math.min(26, Math.round(Number(size) * 2) / 2 || 15.5));
+    output.style.fontSize = outputFontSize + 'px';
+    outputFontValue.textContent = outputFontSize;
+    if(persist) saveSettings();
+  }
+
+  function updateTranslationSummary(){
+    var source = document.querySelector('#sourceSeg button.active');
+    var level = document.querySelector('#levelSeg button.active');
+    var genre = document.querySelector('#genreChips .chip.active');
+    var style = document.querySelector('#styleSeg button.active');
+    document.getElementById('translationSummary').textContent = [source, level, genre, style].filter(Boolean).map(function(el){ return el.textContent.trim(); }).join(' · ');
+  }
+
+  function setOutput(text){
+    output.textContent = text || '';
+    outCount.textContent = countWords(output.textContent) + ' คำ';
+    var hasOutput = !!output.textContent.trim();
+    spread.classList.toggle('has-result', hasOutput);
+    if(!hasOutput) stamp.classList.remove('show');
+    copyBtn.disabled = !hasOutput;
+    downloadBtn.disabled = !hasOutput;
+    editOutputBtn.disabled = !hasOutput;
+    saveRevisionBtn.disabled = !hasOutput;
+  }
+  
+  function loadProjectDraft(proj){
+    if(!proj) return;
+    viewingHistoryId = null;
+    pendingResume = null;
+    if(resumeBtn) resumeBtn.classList.remove('show');
+    document.body.classList.remove('history-mode');
+    historyViewBanner.classList.remove('show');
+    historyViewBannerBottom.classList.remove('show');
+    chapterTitle.value = proj.chapterTitle || '';
+    inputText.value = proj.draft || '';
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    highlightSuspicious(inputText.value);
+    stamp.classList.remove('show');
+    setOutput('');
+    output.contentEditable = 'false';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
+    setResultFocus(false);
+    switchMobileTab('source');
+    renderBottomHistory();
+  }
+  
+  function saveDraftSoon(){
+    var proj = getCurrentProject();
+    if(!proj) return;
+    if(saveStatusText){
+      saveStatusText.textContent = '⋯ กำลังบันทึก';
+      saveStatusText.classList.add('saving');
+    }
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = setTimeout(function(){
+      proj.draft = inputText.value;
+      proj.chapterTitle = chapterTitle.value.trim();
+      saveData();
+      if(saveStatusText){
+        saveStatusText.textContent = '⚬ บันทึกร่างแล้ว';
+        saveStatusText.classList.remove('saving');
+      }
+    }, 450);
+  }
+
+  function viewHistoryEntry(proj, entry, idx){
+    viewingHistoryId = entry.id;
+    document.body.classList.add('history-mode');
+    chapterTitle.value = entry.label || '';
+    inputText.value = entry.input;
+    inCount.textContent = countWords(entry.input) + ' คำ';
+    highlightSuspicious('');
+    setOutput(entry.output);
+    output.contentEditable = 'false';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
+    setResultFocus(true);
+    stamp.classList.remove('show');
+    requestAnimationFrame(function(){ stamp.classList.add('show'); });
+    var label = entry.label || ('แปล' + (idx + 1));
+    historyViewLabel.textContent = 'ดูประวัติ: ' + label;
+    historyViewLabelBottom.textContent = 'ประวัติ: ' + label;
+    historyViewBanner.classList.add('show');
+    historyViewBannerBottom.classList.add('show');
+    switchMobileTab('output');
+    renderBottomHistory();
+    scrollToTopTarget();
+  }
+  
+  document.querySelectorAll('.close-history-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      viewingHistoryId = null;
+      document.body.classList.remove('history-mode');
+      historyViewBanner.classList.remove('show');
+      historyViewBannerBottom.classList.remove('show');
+      loadProjectDraft(getCurrentProject());
+    });
+  });
+
+  document.getElementById('renameHistoryBtnBottom').addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    if(!proj || !viewingHistoryId) return;
+    var historyList = getActiveHistoryList(proj);
+    var entry = historyList.find(function(h){ return h.id === viewingHistoryId; });
+    if(!entry) return;
+    var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', entry.label || '');
+    if(newLabel && newLabel.trim()){
+      entry.label = newLabel.trim();
+      saveData();
+      renderProjects();
+      renderBottomHistory();
+      historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+      historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
+    }
+  });
+
+  document.getElementById('deleteHistoryBtnBottom').addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    if(!proj || !viewingHistoryId) return;
+    var activeBook = getActiveBook(proj);
+    var historyList = getActiveHistoryList(proj);
+    var entry = historyList.find(function(h){ return h.id === viewingHistoryId; });
+    if(!entry) return;
+    var ok = await showConfirmDialog('ลบประวัติการแปล', 'ต้องการลบ "' + (entry.label || 'ตอนนี้') + '" หรือไม่? การลบไม่สามารถย้อนกลับได้', true);
+    if(ok){
+      var filtered = historyList.filter(function(h){ return h.id !== entry.id; });
+      if(activeBook) activeBook.history = filtered;
+      else proj.history = filtered;
+
+      saveData();
+      renderProjects();
+      renderBottomHistory();
+      viewingHistoryId = null;
+      document.body.classList.remove('history-mode');
+      historyViewBanner.classList.remove('show');
+      historyViewBannerBottom.classList.remove('show');
+      loadProjectDraft(proj);
+    }
+  });
+
+  var gearBtn = document.getElementById('gearBtn');
+  var settingsPanel = document.getElementById('settingsPanel');
+  gearBtn.addEventListener('click', function(){ settingsPanel.classList.toggle('open'); });
+
+  var translationModal = document.getElementById('translationModal');
+  var translationSettingsBtn = document.getElementById('translationSettingsBtn');
+  var translationModalClose = document.getElementById('translationModalClose');
+  function closeTranslationModal(){
+    translationModal.classList.remove('open');
+    translationModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+  }
+  function openTranslationModal(){
+    translationModal.classList.add('open');
+    translationModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+  }
+  translationSettingsBtn.addEventListener('click', openTranslationModal);
+  translationModalClose.addEventListener('click', closeTranslationModal);
+
+  var providerSel = document.getElementById('provider');
+  var modelInput = document.getElementById('model');
+  providerSel.addEventListener('change', function(){
+    modelInput.value = providerSel.value === 'openai' ? 'gpt-4o-mini' : 'gemini-flash-latest';
+    saveSettings();
+  });
+  modelInput.addEventListener('change', saveSettings);
+  document.getElementById('chunkLen').addEventListener('change', saveSettings);
+
+  function wireSeg(id, key){
+    var seg = document.getElementById(id);
+    seg.addEventListener('click', function(e){
+      var btn = e.target.closest('button');
+      if(!btn) return;
+      seg.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state[key] = btn.dataset.val;
+      saveSettings();
+      updateTranslationSummary();
+    });
+  }
+  wireSeg('sourceSeg', 'source');
+  wireSeg('levelSeg', 'level');
+  wireSeg('styleSeg', 'style');
+
+  var chips = document.getElementById('genreChips');
+  chips.addEventListener('click', function(e){
+    var chip = e.target.closest('.chip');
+    if(!chip) return;
+    chips.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('active'); });
+    chip.classList.add('active');
+    state.genre = chip.dataset.val;
+    saveSettings();
+    updateTranslationSummary();
+  });
+
+  var errorBox = document.getElementById('errorBox');
+  var processBtn = document.getElementById('processBtn');
+  var copyBtn = document.getElementById('copyBtn');
+  var downloadBtn = document.getElementById('downloadBtn');
+  var editOutputBtn = document.getElementById('editOutputBtn');
+  var saveRevisionBtn = document.getElementById('saveRevisionBtn');
+  var clearBtn = document.getElementById('clearBtn');
+  var cancelBtn = document.getElementById('cancelBtn');
+  var resumeBtn = document.getElementById('resumeBtn');
+  var repairBtn = document.getElementById('repairBtn');
+  var quickRepairBtn = document.getElementById('quickRepairBtn');
+  var progressText = document.getElementById('progressText');
+  var mobileProcessBtn = document.getElementById('mobileProcessBtn');
+
+  if(mobileProcessBtn){
+    mobileProcessBtn.addEventListener('click', function(){ processBtn.click(); });
+  }
+
+  document.addEventListener('keydown', function(e){
+    if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+      e.preventDefault();
+      processBtn.click();
+    }
+    if((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'r' || e.key === 'R')){
+      e.preventDefault();
+      repairBtn.click();
+    }
+    if(e.key === 'Escape'){
+      if(document.body.classList.contains('zen-mode')) toggleZenMode(false);
+      else if(translationModal.classList.contains('open')) closeTranslationModal();
+      else if(settingsPanel.classList.contains('open')) settingsPanel.classList.remove('open');
+    }
+  });
+
+  document.getElementById('outputFontDown').addEventListener('click', function(){ setOutputFontSize(outputFontSize - 1, true); });
+  document.getElementById('outputFontUp').addEventListener('click', function(){ setOutputFontSize(outputFontSize + 1, true); });
+  document.getElementById('expandSourceBtn').addEventListener('click', function(){ setResultFocus(false); inputText.focus(); });
+  document.getElementById('collapseSourceBtn').addEventListener('click', function(){ setResultFocus(true); });
+
+  chapterTitle.addEventListener('input', saveDraftSoon);
+  inputText.addEventListener('input', function(){
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    highlightSuspicious(inputText.value);
+    saveDraftSoon();
+  });
+  clearBtn.addEventListener('click', function(){
+    inputText.value = '';
+    inCount.textContent = '0 คำ';
+    highlightSuspicious('');
+    saveDraftSoon();
+  });
+  output.addEventListener('input', function(){
+    outCount.textContent = countWords(output.textContent) + ' คำ';
+    saveRevisionBtn.disabled = !output.textContent.trim();
+  });
+  editOutputBtn.addEventListener('click', function(){
+    var editing = output.contentEditable === 'true';
+    output.contentEditable = editing ? 'false' : 'true';
+    editOutputBtn.textContent = editing ? 'แก้ไขผลลัพธ์' : 'เสร็จสิ้น';
+    if(!editing) output.focus();
+  });
+
+  saveRevisionBtn.addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    var revised = output.textContent.trim();
+    if(!proj || !revised) return;
+    var label = await showPromptDialog('ตั้งชื่อฉบับแก้ไข', (chapterTitle.value || 'ฉบับแก้ไข'));
+    if(!label) return;
+    var newEntry = {
+      id: makeId('h'), ts: Date.now(), label: label.trim(),
+      input: inputText.value, output: revised,
+      source: state.source, level: state.level, genre: state.genre, style: state.style,
+      parentId: viewingHistoryId || null
+    };
+    var activeBook = getActiveBook(proj);
+    if(activeBook) activeBook.history.push(newEntry);
+    else (proj.history = proj.history || []).push(newEntry);
+
+    viewingHistoryId = newEntry.id;
+    saveData();
+    renderProjects();
+    renderBottomHistory();
+    progressText.textContent = 'บันทึกเรียบร้อย';
+    setTimeout(function(){ progressText.textContent = ''; }, 1500);
+  });
+
+  document.getElementById('importTextBtn').addEventListener('click', function(){ document.getElementById('textFile').click(); });
+  var batchImportBtn = document.getElementById('batchImportBtn');
+  var batchFileInput = document.getElementById('batchFileInput');
+  batchImportBtn.addEventListener('click', function(){ batchFileInput.click(); });
+  batchFileInput.addEventListener('change', function(e){
+    var files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if(files.length) runBatchImport(files);
+  });
+  document.getElementById('textFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      inputText.value = String(reader.result || '');
+      inCount.textContent = countWords(inputText.value) + ' คำ';
+      highlightSuspicious(inputText.value);
+      saveDraftSoon();
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  });
+
+  document.getElementById('exportBackupBtn').addEventListener('click', function(){
+    saveData();
+    var payload = { format: 'prung-aksorn-backup', version: 1, exportedAt: new Date().toISOString(), data: appData };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'prung-aksorn-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 0);
+  });
+
+  /* [ปรับปรุง] รองรับการกู้คืนไฟล์ทั้งเวอร์ชันเก่า ( history[] ) และเวอร์ชันใหม่ ( books[] ) ได้ 100% */
+  document.getElementById('importBackupBtn').addEventListener('click', function(){ document.getElementById('backupFile').click(); });
+  document.getElementById('backupFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = async function(){
+      try {
+        var rawParsed = JSON.parse(String(reader.result || ''));
+        var importedData = (rawParsed && rawParsed.data && Array.isArray(rawParsed.data.projects)) ? rawParsed.data : rawParsed;
+
+        if(!importedData || !Array.isArray(importedData.projects)){
+          await showAlertDialog('ไฟล์ไม่ถูกต้อง', 'ไฟล์สำรองไม่ถูกต้อง ไม่พบรายการเรื่องนิยาย');
+          return;
+        }
+
+        if(await showConfirmDialog('ยืนยันการกู้คืนข้อมูล', 'กู้คืนข้อมูลนี้และแทนที่ข้อมูลเดิมทั้งหมดหรือไม่?', true)){
+          appData = importedData;
+          saveData();
+          loadData(); // <--- ตัวย้ายข้อมูลเก่าอัตโนมัติจะทำงานทันทีตรงนี้!
+          applySettingsToUI();
+          renderProjects();
+          renderBottomHistory();
+          updateActiveBanner();
+          loadProjectDraft(getCurrentProject());
+          await showAlertDialog('สำเร็จ', 'กู้คืนข้อมูลสำรองเรียบร้อยแล้ว');
+        }
+      } catch(err){ 
+        await showAlertDialog('ทำไม่สำเร็จ', 'ไม่สามารถอ่านไฟล์สำรองได้ หรือรูปแบบไฟล์ไม่ถูกต้อง'); 
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  });
+
+  function normalizeOCR(text){
+    if(!text) return '';
+    var puaMap = {
+      '\uE200': 'ก', '\uE201': 'ง', '\uE202': 'จ', '\uE203': 'ด',
+      '\uE204': 'ค', '\uE205': 'น', '\uE206': 'ม', '\uE207': 'ร'
+    };
+    text = text.replace(/[\uE200-\uE207]/g, function(m){ return puaMap[m] || m; });
+    return text
+      .replace(/\r/g,'')
+      .replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
+      .replace(/[□■◆◇※¤]/g,'')
+      .replace(/â€œ/g,'"').replace(/â€ /g,'"');
+  }
+
+  function highlightSuspicious(text){
+    var box = document.getElementById('suspiciousBox');
+    if(!box) return;
+    var lines = text.split('\n');
+    var bad = [];
+    lines.forEach(function(line, idx){
+      if(/[□■◆◇]/.test(line) || /(.)\1\1/.test(line)) bad.push((idx+1) + ': ' + line);
+    });
+    if(bad.length){
+      box.style.display = 'block';
+      box.innerHTML = '';
+      var heading = document.createElement('b');
+      heading.textContent = 'พบข้อความน่าสงสัย (' + bad.length + ' จุด)';
+      box.appendChild(heading);
+      bad.slice(0,5).forEach(function(line){
+        box.appendChild(document.createElement('br'));
+        box.appendChild(document.createTextNode(line));
+      });
+    }else box.style.display = 'none';
+  }
+
+  quickRepairBtn.addEventListener('click', function(){
+    hideError();
+    var text = inputText.value.trim();
+    if(!text){ showError('กรุณาใส่ข้อความต้นฉบับก่อน'); return; }
+    
+    inputText.value = normalizeOCR(text);
+    highlightSuspicious(inputText.value);
+    saveDraftSoon();
+    
+    progressText.textContent = 'ซ่อมข้อความรวดเร็วเสร็จสิ้น';
+    setTimeout(function(){ progressText.textContent = ''; }, 2000);
+  });
+
+  function buildOCRRepairPrompt(){
+    return `คุณคือหุ่นยนต์ตรวจสอบและซ่อมแซมคำผิดจากระบบสแกนหนังสือ (OCR Corrector)
+
+หน้าที่ของคุณคือ: แก้ไขตัวอักษรที่เพี้ยนจากระบบสแกน ให้เป็นคำภาษาไทยที่สะกดถูกต้องและมีความหมายสมบูรณ์ตามบริบท
+
+[ตารางรูปแบบคำผิดที่มักพบใน OCR ภาษาไทย]
+- สระแอเพี้ยนเป็นสระเอสองตัว: "เเ" -> "แ"
+- สระเออเพี้ยน: "มอ" -> "มือ", "ส่อ" -> "ส่อง", "ชวง" -> "ช่วง"
+- คำเพี้ยนจากการสแกน: "กะบี่" -> "กระบี่", "ตอดต้ง" -> "ติดตั้ง", "แสมวง" -> "แสง", "เขยว" -> "เขียว"
+- วรรณยุกต์/สระหลุดหาย: ให้เติมไม้เอก ไม้โท สระอึ สระอือ สระอุ สระอู ที่หายไปตามบริบทภาษาไทย
+
+[ข้อห้ามเด็ดขาด - Strict Constraints]
+1. ห้ามเรียบเรียงประโยคใหม่เด็ดขาด!
+2. ห้ามตัดคำ ห้ามเพิ่มเนื้อหา ห้ามแต่งเรื่องต่อ!
+3. คำไหนที่ถูกต้องอยู่แล้ว ให้คงไว้เหมือนเดิม 100%
+4. ตอบกลับเฉพาะข้อความภาษาไทยที่ซ่อมเสร็จแล้วเท่านั้น ห้ามมีคำอธิบายเปิด/ปิดเด็ดขาด`;
+  }
+
+  function splitIntoChunks(text, maxLen){
+    if(text.length <= maxLen) return [text];
+    var paras = text.split(/\n\s*\n/);
+    var chunks = [], current = '';
+    function pushCurrent(){
+      if(current){ chunks.push(current); current = ''; }
+    }
+    // ตัดย่อหน้าที่ยาวเกิน maxLen เดี่ยวๆ ต่อด้วยประโยค/บรรทัด ก่อนค่อยตัดดิบตามความยาวถ้ายังเกิน
+    function splitOversizedParagraph(para){
+      var parts = [];
+      var sentences = para.split(/(?<=[.!?。！？\n])\s*/).filter(Boolean);
+      var buf = '';
+      sentences.forEach(function(sen){
+        if((buf + sen).length > maxLen){
+          if(buf) parts.push(buf);
+          if(sen.length > maxLen){
+            // ประโยคเดียวก็ยังยาวเกิน ตัดดิบตามความยาวตัวอักษร
+            for(var k = 0; k < sen.length; k += maxLen) parts.push(sen.slice(k, k + maxLen));
+            buf = '';
+          } else {
+            buf = sen;
+          }
+        } else {
+          buf += sen;
+        }
+      });
+      if(buf) parts.push(buf);
+      return parts;
+    }
+    for(var i=0; i<paras.length; i++){
+      var p = paras[i];
+      if(p.length > maxLen){
+        pushCurrent();
+        splitOversizedParagraph(p).forEach(function(part){ chunks.push(part); });
+        continue;
+      }
+      if((current + '\n\n' + p).length > maxLen){
+        pushCurrent();
+        current = p;
+      } else current = current ? current + '\n\n' + p : p;
+    }
+    pushCurrent();
+    return chunks;
+  }
+
+  function showError(msg){ errorBox.textContent = msg; errorBox.classList.add('show'); }
+  function hideError(){ errorBox.classList.remove('show'); }
+
+  async function callOpenAI(sys, text, key, model, signal){
+    var res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model: model,
+        messages: [{role:'system', content:sys}, {role:'user', content:text}],
+        temperature: 0.1
+      }),
+      signal: signal
+    });
+    if(!res.ok){
+      var errData = await res.json().catch(function(){ return {}; });
+      var e1 = new Error(errData.error && errData.error.message ? errData.error.message : ('OpenAI error: ' + res.status));
+      e1.status = res.status;
+      throw e1;
+    }
+    var data = await res.json();
+    return data.choices[0].message.content;
+  }
+
+  async function callGemini(sys, text, key, model, signal){
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key;
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: sys }] },
+        contents: [{ parts: [{ text: text }] }],
+        generationConfig: {
+          temperature: 0.0,
+          topP: 0.1
+        }
+      }),
+      signal: signal
+    });
+    if(!res.ok){
+      var errData = await res.json().catch(function(){ return {}; });
+      var e2 = new Error(errData.error && errData.error.message ? errData.error.message : ('Gemini error: ' + res.status));
+      e2.status = res.status;
+      throw e2;
+    }
+    var data = await res.json();
+    return data.candidates[0].content.parts[0].text;
+  }
+
+  var pendingResume = null;
+
+  // ป้องกันไม่ให้เรียกใช้ AI พร้อมกันหลายงาน (แปล/ซ่อม OCR/นำเข้าเป็นชุด) ซึ่งจะแย่งกันใช้
+  // activeController ตัวเดียวกัน จนปุ่มยกเลิกไปยกเลิกงานผิดตัว หรือยกเลิกงานเดิมไม่ได้อีกต่อไป
+  var aiBusy = false;
+  function setAiBusy(busy){
+    aiBusy = busy;
+    processBtn.disabled = busy;
+    if(resumeBtn) resumeBtn.disabled = busy;
+    repairBtn.disabled = busy;
+    if(batchImportBtn) batchImportBtn.disabled = busy;
+  }
+  function warnIfAiBusy(){
+    if(aiBusy){
+      showError('กำลังมีงาน AI อีกอย่างทำงานอยู่ กรุณารอให้เสร็จหรือกดยกเลิกก่อน');
+      return true;
+    }
+    return false;
+  }
+
+  async function runTranslation(chunks, proj, key, model, startIndex, existingResults, originalText){
+    activeController = new AbortController();
+    setAiBusy(true);
+    if(resumeBtn) resumeBtn.classList.remove('show');
+    cancelBtn.classList.add('show');
+
+    var results = existingResults.slice();
+    setOutput(results.join('\n\n'));
+    var previousTail = results.length ? getTail(results[results.length - 1], 300) : '';
+
+    try {
+      for(var i = startIndex; i < chunks.length; i++){
+        progressText.textContent = 'กำลังปรุงส่วนที่ ' + (i + 1) + '/' + chunks.length;
+        var sys = buildTranslatePrompt(proj, previousTail);
+        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2);
+        var partTrim = part.trim();
+        results.push(partTrim);
+        previousTail = getTail(partTrim, 300);
+        setOutput(results.join('\n\n'));
+      }
+      pendingResume = null;
+      stamp.classList.add('show');
+      setResultFocus(true);
+      switchMobileTab('output');
+      scrollToTopTarget();
+
+      var newEntry = { id: makeId('h'), ts: Date.now(), label: (chapterTitle.value || 'แปลใหม่'), input: originalText, output: output.textContent };
+      var activeBook = getActiveBook(proj);
+      if(activeBook) activeBook.history.push(newEntry);
+      else (proj.history = proj.history || []).push(newEntry);
+
+      viewingHistoryId = newEntry.id;
+      saveData();
+      renderProjects();
+      renderBottomHistory();
+    } catch(err){
+      if(err.name !== 'AbortError'){
+        pendingResume = { chunks: chunks, proj: proj, key: key, model: model, startIndex: i, results: results, originalText: originalText };
+        showError((err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)');
+        if(resumeBtn) resumeBtn.classList.add('show');
+      } else {
+        pendingResume = null;
+      }
+    } finally {
+      setAiBusy(false);
+      cancelBtn.classList.remove('show');
+      progressText.textContent = '';
+    }
+  }
+
+  var batchInProgress = false;
+  var batchCancelled = false;
+
+  function readFileAsText(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){ resolve(String(reader.result || '')); };
+      reader.onerror = function(){ reject(new Error('อ่านไฟล์ไม่สำเร็จ: ' + file.name)); };
+      reader.readAsText(file, 'UTF-8');
+    });
+  }
+
+  async function runSingleTranslationForBatch(chunks, proj, key, model, label, originalText){
+    var results = [];
+    var previousTail = '';
+    for(var i = 0; i < chunks.length; i++){
+      var sys = buildTranslatePrompt(proj, previousTail);
+      var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2);
+      var partTrim = part.trim();
+      results.push(partTrim);
+      previousTail = getTail(partTrim, 300);
+    }
+    var outputText = results.join('\n\n');
+    var newEntry = { id: makeId('h'), ts: Date.now(), label: label, input: originalText, output: outputText };
+    var activeBook = getActiveBook(proj);
+    if(activeBook) activeBook.history.push(newEntry);
+    else (proj.history = proj.history || []).push(newEntry);
+  }
+
+  async function runBatchImport(files){
+    var proj = getCurrentProject();
+    var key = document.getElementById('apiKey').value.trim();
+    if(!proj){ showError('กรุณาเลือกหรือสร้างเรื่องนิยายก่อน'); return; }
+    if(!key){ showError('กรุณาใส่ API Key ก่อน'); return; }
+    if(batchInProgress || warnIfAiBusy()) return;
+
+    hideError();
+    var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
+    batchInProgress = true;
+    batchCancelled = false;
+    setAiBusy(true);
+    cancelBtn.classList.add('show');
+
+    var succeeded = [];
+    var failed = [];
+
+    for(var idx = 0; idx < files.length; idx++){
+      if(batchCancelled) break;
+      var f = files[idx];
+      progressText.textContent = 'กำลังแปลไฟล์ ' + (idx + 1) + '/' + files.length + ': ' + f.name;
+      try{
+        activeController = new AbortController();
+        var raw = await readFileAsText(f);
+        var text = normalizeOCR(raw);
+        var chunks = splitIntoChunks(text, maxLen);
+        var label = f.name.replace(/\.[^.]+$/, '');
+        await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text);
+        succeeded.push(f.name);
+        saveData();
+        renderProjects();
+        renderBottomHistory();
+      }catch(err){
+        if(err.name === 'AbortError'){ batchCancelled = true; break; }
+        failed.push(f.name + ' (' + (err.message || 'เกิดข้อผิดพลาด') + ')');
+      }
+    }
+
+    batchInProgress = false;
+    setAiBusy(false);
+    cancelBtn.classList.remove('show');
+    progressText.textContent = '';
+
+    var summary = 'นำเข้าเสร็จสิ้น: สำเร็จ ' + succeeded.length + '/' + files.length + ' ไฟล์';
+    if(batchCancelled) summary += ' (ยกเลิกก่อนครบ)';
+    if(failed.length) summary += '\n\nล้มเหลว:\n- ' + failed.join('\n- ');
+    await showAlertDialog('สรุปผลการนำเข้า', summary);
+  }
+
+  processBtn.addEventListener('click', async function(){
+    hideError();
+    if(warnIfAiBusy()) return;
+    var proj = getCurrentProject();
+    var text = inputText.value.trim();
+    var key = document.getElementById('apiKey').value.trim();
+    if(!proj || !text || !key){ showError('กรุณาเลือกเรื่อง ใส่เนื้อหา และ API Key'); return; }
+
+    var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
+    var chunks = splitIntoChunks(normalizeOCR(text), maxLen);
+    pendingResume = null;
+    if(resumeBtn) resumeBtn.classList.remove('show');
+    await runTranslation(chunks, proj, key, modelInput.value, 0, [], text);
+  });
+
+  if(resumeBtn){
+    resumeBtn.addEventListener('click', async function(){
+      if(!pendingResume) return;
+      hideError();
+      if(warnIfAiBusy()) return;
+      var key = document.getElementById('apiKey').value.trim() || pendingResume.key;
+      await runTranslation(pendingResume.chunks, pendingResume.proj, key, modelInput.value, pendingResume.startIndex, pendingResume.results, pendingResume.originalText);
+    });
+  }
+
+  repairBtn.addEventListener('click', async function(){
+    hideError();
+    if(warnIfAiBusy()) return;
+    var text = inputText.value.trim();
+    var key = document.getElementById('apiKey').value.trim();
+    if(!text || !key){ showError('กรุณาใส่เนื้อหาและ API Key'); return; }
+
+    text = normalizeOCR(text);
+    var chunks = splitIntoChunks(text, 1200);
+
+    activeController = new AbortController();
+    setAiBusy(true);
+    cancelBtn.classList.add('show');
+    progressText.textContent = 'กำลังซ่อม OCR ด้วย AI...';
+    var sys = buildOCRRepairPrompt();
+    var repairedParts = [];
+
+    try {
+      for(var i=0; i<chunks.length; i++){
+        progressText.textContent = chunks.length > 1 ? ('กำลังซ่อมส่วนที่ ' + (i+1) + '/' + chunks.length) : 'กำลังซ่อม OCR ด้วย AI...';
+        var repaired = await callAIWithRetry(sys, chunks[i], key, modelInput.value, activeController.signal, 2);
+        repairedParts.push(repaired.trim());
+      }
+      inputText.value = repairedParts.join('\n\n');
+      highlightSuspicious(inputText.value);
+      saveDraftSoon();
+      progressText.textContent = 'ซ่อม OCR ด้วย AI เรียบร้อย';
+    } catch(err){ 
+      if(err.name !== 'AbortError') showError(err.message); 
+    } finally { 
+      setAiBusy(false);
+      cancelBtn.classList.remove('show');
+      setTimeout(function(){ progressText.textContent = ''; }, 2000);
+    }
+  });
+
+  cancelBtn.addEventListener('click', function(){
+    batchCancelled = true;
+    if(activeController) activeController.abort();
+  });
+
+  copyBtn.addEventListener('click', function(){
+    navigator.clipboard.writeText(output.textContent).then(function(){
+      copyBtn.textContent = 'คัดลอกแล้ว';
+      setTimeout(function(){ copyBtn.textContent = 'คัดลอก'; }, 1500);
+    });
+  });
+
+  downloadBtn.addEventListener('click', function(){
+    var blob = new Blob([output.textContent], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = safeFilename(getCurrentProject() ? getCurrentProject().name : '') + '-ผลลัพธ์.txt';
+    a.click();
+  });
+
+  function loadScript(src, integrity){
+    return new Promise(function(resolve, reject){
+      if(document.querySelector('script[src="' + src + '"]')) return resolve();
+      var s = document.createElement('script');
+      s.src = src;
+      if(integrity){
+        // ตรวจสอบว่าไฟล์ที่โหลดมาจาก CDN ตรงกับ hash ที่ระบุไว้ (Subresource Integrity)
+        // กันกรณี CDN ถูกแฮ็ก/ถูกแทรกโค้ดระหว่างทาง — ถ้า hash ไม่ตรง เบราว์เซอร์จะบล็อกสคริปต์นี้ทันที
+        s.integrity = integrity;
+        s.crossOrigin = 'anonymous';
+        s.referrerPolicy = 'no-referrer';
+      }
+      s.onload = resolve;
+      s.onerror = function(){ reject(new Error('โหลดไฟล์ ' + src + ' ไม่สำเร็จ')); };
+      document.head.appendChild(s);
+    });
+  }
+  // hash SRI ของไลบรารีที่ pin เวอร์ชันไว้ (ยืนยันแล้วว่าตรงกับไฟล์จริงบน CDN)
+  /* รหัส SRI Hash มาตรฐานสำหรับตรวจสอบความถูกต้องของสคริปต์ภายนอก */
+  var SRI_MAP = {
+    'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js': 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==',
+    'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js': 'sha512-Qlv6VSKh1gDKGoJbnyA5RMXYcvnpIqhO++MhIM2fStMcGT9i2T//tSwYFlcyoRRDcDZ+TYHpH8azBBCyhpSeqw=='
+  };
+
+  function loadScript(src, integrity){
+    return new Promise(function(resolve, reject){
+      if(document.querySelector('script[src="' + src + '"]')) return resolve();
+      var s = document.createElement('script');
+      s.src = src;
+      var hash = integrity || (typeof SRI_MAP !== 'undefined' ? SRI_MAP[src] : null);
+      if(hash){
+        s.integrity = hash;
+        s.crossOrigin = 'anonymous';
+      }
+      s.onload = resolve;
+      s.onerror = function(){
+        if(s.parentNode) s.parentNode.removeChild(s);
+        reject(new Error('โหลดไฟล์ ' + src + ' ไม่สำเร็จ'));
+      };
+      document.head.appendChild(s);
+    });
+  }
+
+  document.getElementById('exportDocxBtn').addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    var historyList = getActiveHistoryList(proj);
+    if(!proj || !historyList || historyList.length === 0){
+      await showAlertDialog('ไม่พบข้อมูล', 'ไม่พบประวัติการแปลในเล่มนี้สำหรับสร้างไฟล์ Word');
+      return;
+    }
+    if(navigator.onLine === false){
+      await showAlertDialog('ต้องใช้อินเทอร์เน็ต', 'การส่งออกไฟล์ Word ต้องโหลดระบบแปลงไฟล์จากอินเทอร์เน็ตก่อนใช้งานครั้งแรก แต่ตอนนี้ดูเหมือนอุปกรณ์ของคุณออฟไลน์อยู่ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+      return;
+    }
+
+    progressText.textContent = 'กำลังเตรียมระบบแปลงไฟล์ Word (.docx)...';
+    try {
+      /* พยายามโหลดจาก jsDelivr หลักก่อน หากไม่ได้จะสลับไป unpkg อัตโนมัติ */
+      try {
+        await loadScript('https://cdn.jsdelivr.net/npm/docx@8.2.3/build/index.umd.js');
+      } catch(e1) {
+        try {
+          await loadScript('https://unpkg.com/docx@8.2.3/build/index.umd.js');
+        } catch(e2) {
+          await loadScript('https://unpkg.com/docx@8.2.3/build/index.iife.js');
+        }
+      }
+
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js');
+      } catch(e1) {
+        await loadScript('https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js');
+      }
+
+      var docxLib = window.docx;
+      if(!docxLib){ await showAlertDialog('ไม่พร้อมใช้งาน', 'ระบบแปลงไฟล์ Word ไม่พร้อมใช้งาน'); return; }
+
+      progressText.textContent = 'กำลังสร้างเอกสาร Word...';
+      var activeBook = getActiveBook(proj);
+      var bookTitle = activeBook ? activeBook.title : 'นิยาย';
+
+      var children = [];
+      children.push(new docxLib.Paragraph({
+        children: [new docxLib.TextRun({ text: proj.name + ' — ' + bookTitle, bold: true, size: 36, font: 'Sarabun' })],
+        space: { after: 400 }
+      }));
+
+      historyList.forEach(function(entry, idx){
+        var titleText = entry.label || ('ตอนที่ ' + (idx + 1));
+        children.push(new docxLib.Paragraph({
+          children: [new docxLib.TextRun({ text: titleText, bold: true, size: 28, font: 'Sarabun' })],
+          heading: docxLib.HeadingLevel.HEADING_1,
+          space: { before: 300, after: 200 },
+          pageBreakBefore: idx > 0
+        }));
+
+        var lines = (entry.output || '').split('\n');
+        lines.forEach(function(line){
+          if(line.trim()){
+            children.push(new docxLib.Paragraph({
+              children: [new docxLib.TextRun({ text: line, size: 24, font: 'Sarabun' })],
+              space: { after: 120 },
+              lineSpacing: { line: 360 }
+            }));
+          }
+        });
+      });
+
+      var doc = new docxLib.Document({
+        sections: [{ properties: {}, children: children }]
+      });
+
+      var blob = await docxLib.Packer.toBlob(doc);
+      saveAs(blob, safeFilename(proj.name + '-' + bookTitle) + '.docx');
+      progressText.textContent = 'ส่งออกไฟล์ Word สำเร็จ!';
+    } catch(err){
+      var msg = 'เกิดข้อผิดพลาดในการสร้างไฟล์ Word: ' + (err.message || '');
+      if(navigator.onLine === false || /โหลดไฟล์/.test(err.message || '')){
+        msg += '\n\n(อาจเกิดจากไม่มีการเชื่อมต่ออินเทอร์เน็ต การส่งออกไฟล์ Word ต้องใช้อินเทอร์เน็ตเพื่อโหลดระบบแปลงไฟล์)';
+      }
+      await showAlertDialog('เกิดข้อผิดพลาด', msg);
+    } finally {
+      setTimeout(function(){ progressText.textContent = ''; }, 2000);
+    }
+  });
+
+  document.getElementById('exportEpubBtn').addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    var historyList = getActiveHistoryList(proj);
+    if(!proj || !historyList || historyList.length === 0){
+      await showAlertDialog('ไม่พบข้อมูล', 'ไม่พบประวัติการแปลในเล่มนี้สำหรับสร้าง E-Book');
+      return;
+    }
+    if(navigator.onLine === false){
+      await showAlertDialog('ต้องใช้อินเทอร์เน็ต', 'การส่งออกไฟล์ E-Book ต้องโหลดระบบบีบอัดไฟล์จากอินเทอร์เน็ตก่อนใช้งานครั้งแรก แต่ตอนนี้ดูเหมือนอุปกรณ์ของคุณออฟไลน์อยู่ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+      return;
+    }
+
+    progressText.textContent = 'กำลังเตรียมระบบสร้างไฟล์ E-Book (.epub)...';
+    try {
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+      } catch(e1) {
+        await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+      }
+
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js');
+      } catch(e1) {
+        await loadScript('https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js');
+      }
+
+      if(!window.JSZip){ await showAlertDialog('ไม่พร้อมใช้งาน', 'ระบบบีบอัดไฟล์ไม่พร้อมใช้งาน'); return; }
+
+      progressText.textContent = 'กำลังสร้างไฟล์ E-Book...';
+      var activeBook = getActiveBook(proj);
+      var bookTitle = activeBook ? activeBook.title : 'นิยาย';
+      var zip = new JSZip();
+
+      zip.file('mimetype', 'application/epub+zip', { compression: "STORE" });
+      var containerXml = '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>';
+      zip.file('META-INF/container.xml', containerXml);
+
+      var manifestItems = '';
+      var spineItems = '';
+      var tocNav = '';
+
+      historyList.forEach(function(entry, idx){
+        var chId = 'chap_' + (idx + 1);
+        var chFileName = chId + '.xhtml';
+        var chTitle = entry.label || ('ตอนที่ ' + (idx + 1));
+        
+        var paras = (entry.output || '').split('\n').map(function(p){
+          return p.trim() ? ('<p>' + p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>') : '';
+        }).join('\n');
+
+        var xhtmlContent = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>' + chTitle + '</title><style>body{font-family:serif;line-height:1.8;padding:5%;} h1{text-align:center;margin-bottom:1.5em;}</style></head><body><h1>' + chTitle + '</h1>' + paras + '</body></html>';
+        
+        zip.file('OEBPS/' + chFileName, xhtmlContent);
+        manifestItems += '<item id="' + chId + '" href="' + chFileName + '" media-type="application/xhtml+xml"/>\n';
+        spineItems += '<itemref idref="' + chId + '"/>\n';
+        tocNav += '<li><a href="' + chFileName + '">' + chTitle + '</a></li>\n';
+      });
+
+      var opfContent = '<?xml version="1.0" encoding="utf-8"?><package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>' + proj.name + ' - ' + bookTitle + '</dc:title><dc:language>th</dc:language></metadata><manifest>' + manifestItems + '</manifest><spine>' + spineItems + '</spine></package>';
+      zip.file('OEBPS/content.opf', opfContent);
+
+      var blob = await zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
+      saveAs(blob, safeFilename(proj.name + '-' + bookTitle) + '.epub');
+      progressText.textContent = 'ส่งออกไฟล์ E-Book (.epub) สำเร็จ!';
+    } catch(err){
+      var msg = 'เกิดข้อผิดพลาดในการสร้างไฟล์ EPUB: ' + (err.message || '');
+      if(navigator.onLine === false || /โหลดไฟล์/.test(err.message || '')){
+        msg += '\n\n(อาจเกิดจากไม่มีการเชื่อมต่ออินเทอร์เน็ต การส่งออกไฟล์ E-Book ต้องใช้อินเทอร์เน็ตเพื่อโหลดระบบบีบอัดไฟล์)';
+      }
+      await showAlertDialog('เกิดข้อผิดพลาด', msg);
+    } finally {
+      setTimeout(function(){ progressText.textContent = ''; }, 2000);
+    }
+  });
+
+  loadData();
+  applySettingsToUI();
+  renderProjects();
+  renderBottomHistory();
+  updateActiveBanner();
+  loadProjectDraft(getCurrentProject());
+  
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(() => {
+      console.log('Service Worker Registered');
+    }).catch(err => {
+      console.warn('Service Worker registration failed:', err);
+    });
+  }
+</script>
+</body>
+</html>
