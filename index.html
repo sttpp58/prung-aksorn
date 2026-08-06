@@ -1575,7 +1575,7 @@
     });
   }
 
-  function showConfirmDialog(title, message, danger){
+  function showConfirmDialog(title, message, danger, confirmLabel){
     return new Promise(function(resolve){
       appDialogMode = 'confirm';
       appDialogResolver = resolve;
@@ -1583,7 +1583,7 @@
       appDialogMessage.textContent = message;
       appDialogMessage.style.display = 'block';
       appDialogInput.style.display = 'none';
-      appDialogConfirmBtn.textContent = danger ? 'ลบ' : 'ตกลง';
+      appDialogConfirmBtn.textContent = confirmLabel || (danger ? 'ลบ' : 'ตกลง');
       appDialogConfirmBtn.classList.toggle('danger', !!danger);
       appDialogCancelBtn.style.display = 'inline-block';
       appDialogOverlay.classList.add('show');
@@ -2405,7 +2405,7 @@
           return;
         }
 
-        if(await showConfirmDialog('ยืนยันการกู้คืนข้อมูล', 'กู้คืนข้อมูลนี้และแทนที่ข้อมูลเดิมทั้งหมดหรือไม่?', true)){
+        if(await showConfirmDialog('ยืนยันการกู้คืนข้อมูล', 'กู้คืนข้อมูลนี้และแทนที่ข้อมูลเดิมทั้งหมดหรือไม่?', true, 'ตกลง')){
           appData = importedData;
           saveData();
           loadData(); // <--- ตัวย้ายข้อมูลเก่าอัตโนมัติจะทำงานทันทีตรงนี้!
@@ -2813,28 +2813,16 @@
     a.click();
   });
 
-  function loadScript(src, integrity){
-    return new Promise(function(resolve, reject){
-      if(document.querySelector('script[src="' + src + '"]')) return resolve();
-      var s = document.createElement('script');
-      s.src = src;
-      if(integrity){
-        // ตรวจสอบว่าไฟล์ที่โหลดมาจาก CDN ตรงกับ hash ที่ระบุไว้ (Subresource Integrity)
-        // กันกรณี CDN ถูกแฮ็ก/ถูกแทรกโค้ดระหว่างทาง — ถ้า hash ไม่ตรง เบราว์เซอร์จะบล็อกสคริปต์นี้ทันที
-        s.integrity = integrity;
-        s.crossOrigin = 'anonymous';
-        s.referrerPolicy = 'no-referrer';
-      }
-      s.onload = resolve;
-      s.onerror = function(){ reject(new Error('โหลดไฟล์ ' + src + ' ไม่สำเร็จ')); };
-      document.head.appendChild(s);
-    });
-  }
   // hash SRI ของไลบรารีที่ pin เวอร์ชันไว้ (ยืนยันแล้วว่าตรงกับไฟล์จริงบน CDN)
   /* รหัส SRI Hash มาตรฐานสำหรับตรวจสอบความถูกต้องของสคริปต์ภายนอก */
   var SRI_MAP = {
     'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js': 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==',
-    'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js': 'sha512-Qlv6VSKh1gDKGoJbnyA5RMXYcvnpIqhO++MhIM2fStMcGT9i2T//tSwYFlcyoRRDcDZ+TYHpH8azBBCyhpSeqw=='
+    'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js': 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==',
+    'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js': 'sha512-Qlv6VSKh1gDKGoJbnyA5RMXYcvnpIqhO++MhIM2fStMcGT9i2T//tSwYFlcyoRRDcDZ+TYHpH8azBBCyhpSeqw==',
+    'https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js': 'sha512-Qlv6VSKh1gDKGoJbnyA5RMXYcvnpIqhO++MhIM2fStMcGT9i2T//tSwYFlcyoRRDcDZ+TYHpH8azBBCyhpSeqw==',
+    'https://cdn.jsdelivr.net/npm/docx@8.2.3/build/index.umd.js': 'sha512-erFzi4xuyr2QqWOecuCJdsIqdTiv8o6z9kEfX0IM8zw8DfDjSV4bS42S9S7AqDyuORJmV6/VOCc4GRbkmWfKvg==',
+    'https://unpkg.com/docx@8.2.3/build/index.umd.js': 'sha512-erFzi4xuyr2QqWOecuCJdsIqdTiv8o6z9kEfX0IM8zw8DfDjSV4bS42S9S7AqDyuORJmV6/VOCc4GRbkmWfKvg==',
+    'https://unpkg.com/docx@8.2.3/build/index.iife.js': 'sha512-2mTPer9hvSxXSdLrNwaASIey5V9Tnb0D39T2wRHsNyt3PAsDUTEZK3PMNqqyFHzHkPK5z7X/yCieCEFMj9Cd3Q=='
   };
 
   function loadScript(src, integrity){
@@ -2844,8 +2832,11 @@
       s.src = src;
       var hash = integrity || (typeof SRI_MAP !== 'undefined' ? SRI_MAP[src] : null);
       if(hash){
+        // ตรวจสอบว่าไฟล์ที่โหลดมาจาก CDN ตรงกับ hash ที่ระบุไว้ (Subresource Integrity)
+        // กันกรณี CDN ถูกแฮ็ก/ถูกแทรกโค้ดระหว่างทาง — ถ้า hash ไม่ตรง เบราว์เซอร์จะบล็อกสคริปต์นี้ทันที
         s.integrity = hash;
         s.crossOrigin = 'anonymous';
+        s.referrerPolicy = 'no-referrer';
       }
       s.onload = resolve;
       s.onerror = function(){
