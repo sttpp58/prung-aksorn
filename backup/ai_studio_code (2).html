@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ปรุงอักษร — ห้องทำงานนักแปล</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Thai:wght@500;700&family=Sarabun:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E9E2CE;
+    --paper-deep:#DBD1B3;
+    --paper-line:#C9BE9C;
+    --ink:#232F3A;
+    --ink-soft:#57636E;
+    --ink-faint:#8A9199;
+    --pen:#9F3A38;
+    --pen-soft:#C07C79;
+    --pen-bg:#F1DEDB;
+    --gold:#8C6F2E;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0; width:100%; overflow-x:hidden;}
+  body.modal-open{overflow:hidden;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Sarabun',sans-serif;
+    min-height:100vh;
+    padding:32px 24px 60px;
+  }
+  .wrap{max-width:1280px;margin:0 auto; min-width: 0;}
+
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:14px;margin-bottom:22px;
+  }
+  .brand h1{
+    font-family:'Noto Serif Thai',serif;font-weight:700;
+    font-size:34px;margin:0;letter-spacing:.5px;
+  }
+  .brand p{
+    margin:4px 0 0;font-size:13px;color:var(--ink-soft);
+    letter-spacing:1px;
+  }
+  .gear-btn{
+    background:none;border:1.5px solid var(--ink);border-radius:50%;
+    width:38px;height:38px;cursor:pointer;color:var(--ink);
+    font-size:16px;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .gear-btn:hover{background:var(--paper-deep);}
+
+  .settings{
+    background:var(--paper-deep);border:1px solid var(--paper-line);
+    border-radius:4px;padding:16px 18px;margin-bottom:20px;
+    display:none;gap:14px;flex-wrap:wrap;align-items:flex-end;
+  }
+  .settings.open{display:flex;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:12px;color:var(--ink-soft);letter-spacing:.3px;}
+  .field select, .field input[type=text], .field input[type=password]{
+    font-family:'IBM Plex Mono',monospace;font-size:13px;
+    padding:7px 9px;border:1px solid var(--ink-faint);border-radius:3px;
+    background:#fff;color:var(--ink);min-width:190px;
+  }
+  .settings-note{font-size:12px;color:var(--ink-soft);flex-basis:100%;margin-top:2px;}
+
+  .app-layout{display:grid;grid-template-columns:260px 1fr;gap:28px;align-items:start;}
+
+  .sidebar{border-right:1px dashed var(--paper-line);padding-right:20px; min-width:0;}
+  .sidebar-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .sidebar-head span{
+    font-size:11px;letter-spacing:1.5px;color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;text-transform:uppercase;
+  }
+  .add-proj-btn{
+    background:none;border:1px solid var(--ink);border-radius:3px;
+    font-size:12px;padding:4px 9px;cursor:pointer;color:var(--ink);
+    font-family:'Sarabun',sans-serif;
+  }
+  .add-proj-btn:hover{background:var(--paper-deep);}
+
+  .project-item{margin-bottom:6px;}
+  .project-row{
+    display:flex;align-items:center;gap:6px;padding:8px 8px;
+    border:1px solid transparent;border-radius:3px;cursor:pointer;
+  }
+  .project-row:hover{background:var(--paper-deep);}
+  .project-row.active{border-color:var(--ink);background:var(--paper-deep);}
+  .project-name{
+    flex:1;font-family:'Noto Serif Thai',serif;font-size:14.5px;font-weight:500;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .icon-btn{
+    background:none;border:none;color:var(--ink-soft);cursor:pointer;
+    font-size:13px;padding:2px 3px;line-height:1;flex-shrink:0;
+  }
+  .icon-btn:hover{color:var(--pen);}
+
+  .glossary-panel{
+    display:none;margin:6px 0 10px;padding:10px;background:#F4EEDD;
+    border:1px solid var(--paper-line);border-radius:3px;
+  }
+  .glossary-panel.open{display:block;}
+  .glossary-panel textarea{
+    width:100%;font-family:'IBM Plex Mono',monospace;font-size:12.5px;
+    padding:7px 8px;border:1px solid var(--ink-faint);border-radius:3px;
+    background:#fff;color:var(--ink);resize:vertical;
+  }
+  .glossary-panel p{font-size:11px;color:var(--ink-soft);margin:6px 0 0;}
+
+  .history-list{display:none;margin:2px 0 10px 6px;border-left:1px dashed var(--paper-line);padding-left:12px;}
+  .history-list.open{display:block;}
+  .history-list-label{font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;margin-bottom:4px;letter-spacing:.5px;}
+  .history-entry-row{
+    display:flex;align-items:center;gap:4px;
+    border-bottom:1px dotted var(--paper-line);
+  }
+  .history-entry{
+    flex:1;text-align:left;background:none;border:none;
+    padding:5px 0;font-size:12.5px;color:var(--ink-soft);cursor:pointer;
+    font-family:'Sarabun',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .history-entry:hover{color:var(--pen);}
+  .history-empty{font-size:12px;color:var(--ink-faint);padding:4px 0;}
+  .sidebar-empty{font-size:12.5px;color:var(--ink-faint);padding:8px 0;}
+
+  .translation-toolbar{display:flex;justify-content:flex-end;margin-bottom:20px; min-width:0;}
+  .translation-settings-btn{display:flex;align-items:center;gap:10px;background:var(--paper-deep);border:1px solid var(--ink);border-radius:4px;color:var(--ink);padding:9px 12px;font:500 13px 'Sarabun',sans-serif;cursor:pointer; overflow:hidden;}
+  .translation-settings-btn:hover{background:#F4EEDD;}
+  .translation-summary{color:var(--ink-soft);font:11px 'IBM Plex Mono',monospace;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; flex:1; text-align:right;}
+  .translation-modal{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(35,47,58,.42);}
+  .translation-modal.open{display:flex;}
+  .translation-modal-card{width:min(860px,100%);max-height:calc(100vh - 48px);overflow:auto;background:var(--paper);border:1px solid var(--ink);border-radius:5px;box-shadow:0 18px 60px rgba(35,47,58,.3);padding:22px;}
+  .translation-modal-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding-bottom:14px;margin-bottom:18px;border-bottom:1px dashed var(--paper-line);}
+  .translation-modal-head h2{margin:0;font:500 19px 'Noto Serif Thai',serif;color:var(--ink);}
+  .modal-close{width:32px;height:32px;border:1px solid var(--ink-faint);background:transparent;border-radius:50%;color:var(--ink);font-size:18px;cursor:pointer;}
+  .modal-close:hover{background:var(--paper-deep);}
+  .controls{display:flex;flex-wrap:wrap;gap:22px;}
+  .control-group{display:flex;flex-direction:column;gap:8px;}
+  .control-group>span{
+    font-size:11px;letter-spacing:1.5px;color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;text-transform:uppercase;
+  }
+  .seg{display:flex;border:1px solid var(--ink);border-radius:3px;overflow:hidden;}
+  .seg button{
+    background:var(--paper);border:none;padding:8px 14px;font-size:13px;
+    font-family:'Sarabun',sans-serif;color:var(--ink-soft);cursor:pointer;
+    border-right:1px solid var(--ink);
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--ink);color:var(--paper);font-weight:500;}
+
+  .chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{
+    background:var(--paper);border:1px solid var(--ink-faint);
+    border-radius:3px;padding:7px 12px;font-size:12.5px;color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .chip.active{
+    background:var(--gold);border-color:var(--gold);color:#fff;font-weight:500;
+  }
+
+  .active-project-banner{
+    display:flex;justify-content:flex-start;align-items:center;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);
+    margin-bottom:14px;padding:8px 12px;background:var(--paper-deep);
+    border-radius:3px;
+    overflow:hidden;
+    min-width: 0;
+  }
+  .active-project-banner span{
+    display: flex;
+    align-items: baseline;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    width: 100%;
+  }
+  .active-project-banner b{
+    color:var(--ink);
+    font-family:'Noto Serif Thai',serif;
+    font-size:14px;
+    margin-left: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .history-view-banner{
+    display:none;justify-content:space-between;align-items:center;
+    font-size:12.5px;color:var(--pen);background:var(--pen-bg);
+    border:1px solid var(--pen-soft);border-radius:3px;padding:8px 12px;margin-bottom:14px;
+    flex-wrap:wrap;gap:8px;
+    min-width: 0;
+  }
+  .history-view-banner.show{display:flex;}
+  .history-view-banner span{
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+  .history-view-banner button{
+    background:none;border:1px solid var(--pen);color:var(--pen);border-radius:3px;
+    padding:4px 10px;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;
+    white-space: nowrap;
+  }
+  .history-view-banner.history-bottom-banner{
+    margin-top:16px;
+    margin-bottom:6px;
+  }
+
+  .mobile-tabs{display:none;}
+
+  .spread{
+    display:grid;grid-template-columns:1fr 1fr;gap:0;
+    border:1px solid var(--ink);border-radius:4px;overflow:hidden;background:#F4EEDD;
+    transition:grid-template-columns .35s ease;
+  }
+  .page{padding:20px 22px 16px;position:relative;min-width:0;transition:padding .35s ease, opacity .25s ease;}
+  .page + .page{border-left:1px dashed var(--paper-line);}
+  .page h2{
+    font-family:'Noto Serif Thai',serif;font-size:16px;font-weight:500;
+    margin:0 0 10px;color:var(--ink-soft);display:flex;align-items:center;gap:8px;
+  }
+  .output-heading{justify-content:space-between;}
+  .font-size-controls{display:inline-flex;align-items:center;gap:3px;font:11px 'IBM Plex Mono',monospace;color:var(--ink-soft);}
+  .font-size-controls button{width:27px;height:25px;border:1px solid var(--ink-faint);border-radius:3px;background:transparent;color:var(--ink);font:500 12px 'IBM Plex Mono',monospace;cursor:pointer;}
+  .font-size-controls button:hover{background:var(--paper-deep);}
+  .font-size-value{min-width:27px;text-align:center;}
+  .source-expand-btn,.source-collapse-btn{display:none;border:1px solid var(--ink-faint);border-radius:3px;background:transparent;color:var(--ink-soft);font:11px 'Sarabun',sans-serif;padding:3px 5px;cursor:pointer;}
+  .source-expand-btn:hover,.source-collapse-btn:hover{background:var(--paper-deep);color:var(--ink);}
+  textarea.main-input{
+    width:100%;min-height:340px;resize:vertical;border:none;background:transparent;
+    font-family:'Sarabun',sans-serif;font-size:15.5px;line-height:1.9;color:var(--ink);
+    outline:none;
+  }
+  textarea.main-input::placeholder{color:var(--ink-faint);}
+  .chapter-title{width:100%;margin:0 0 10px;padding:7px 9px;border:1px solid var(--paper-line);border-radius:3px;background:#FFFDF7;color:var(--ink);font:14px 'Sarabun',sans-serif;}
+  .chapter-title:focus{outline:1px solid var(--gold);border-color:var(--gold);}
+  #output{
+    white-space:pre-wrap;font-size:15.5px;line-height:1.9;min-height:340px;
+    font-family:'Sarabun',sans-serif;color:var(--ink);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  #output[contenteditable="true"]{outline:1px dashed var(--gold);outline-offset:6px;}
+  #output:empty::before{content:"ผลลัพธ์จะปรากฏที่นี่";color:var(--ink-faint);}
+  
+  .spread.result-focus{grid-template-columns:138px minmax(0,1fr);}
+  .spread.result-focus .source-page{padding:20px 10px;overflow:hidden;}
+  .spread.result-focus .source-page h2{font-size:13px;line-height:1.25;flex-direction:column;align-items:flex-start;}
+  .spread.result-focus .source-page .main-input,
+  .spread.result-focus .source-page .chapter-title,
+  .spread.result-focus .source-page #suspiciousBox,
+  .spread.result-focus .source-page .page-foot{display:none !important;}
+  .spread.result-focus .source-expand-btn{display:inline-block;}
+  .spread.has-result:not(.result-focus) .source-collapse-btn{display:inline-block;}
+  .spread.result-focus .output-page{padding-left:30px;padding-right:30px;}
+
+  #suspiciousBox{
+    max-width:100%;
+    box-sizing:border-box;
+    overflow-x:hidden;
+    overflow-y:auto;
+    max-height:220px;
+    word-break:break-word;
+    overflow-wrap:anywhere;
+    white-space:pre-wrap;
+  }
+  .ocr-warning-title{display:block;margin-bottom:8px;}
+  .ocr-warning-list{max-height:260px;overflow:auto;padding:8px;background:rgba(255,255,255,.42);border:1px solid rgba(230,200,92,.8);border-radius:3px;}
+  .ocr-warning-line{
+    margin:0 0 7px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    line-height:1.55;
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+  }
+  .ocr-warning-line:last-child{margin-bottom:0;}
+  
+  .page-foot{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-top:8px;font-size:12px;color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;
+    min-width: 0;
+  }
+  .textbtn{
+    background:none;border:none;color:var(--pen);cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;padding:0;
+    text-decoration:underline;text-underline-offset:2px;
+  }
+  .textbtn:disabled{color:var(--ink-faint);cursor:default;text-decoration:none;}
+
+  .stamp{
+    position:absolute;top:14px;right:18px;
+    border:2.5px solid var(--pen);color:var(--pen);
+    border-radius:50%;width:74px;height:74px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Noto Serif Thai',serif;font-weight:700;font-size:13px;
+    transform:rotate(-14deg) scale(0);text-align:center;line-height:1.3;
+    opacity:0;transition:transform .35s cubic-bezier(.34,1.56,.64,1), opacity .35s;
+    pointer-events:none;
+  }
+  .stamp.show{transform:rotate(-14deg) scale(1);opacity:.88;}
+
+  .action-row{display:flex;justify-content:center;margin-top:26px;}
+  .seal-btn{
+    background:var(--pen);color:#fff;border:none;border-radius:50%;
+    width:118px;height:118px;cursor:pointer;
+    font-family:'Noto Serif Thai',serif;font-weight:700;font-size:16px;
+    letter-spacing:1px;
+    box-shadow:0 0 0 3px var(--paper), 0 0 0 4px var(--pen);
+  }
+  .seal-btn:hover{background:#8a302e;}
+  .seal-btn:disabled{background:var(--ink-faint);box-shadow:0 0 0 3px var(--paper), 0 0 0 4px var(--ink-faint);cursor:default;}
+
+  .error{
+    margin-top:16px;padding:10px 14px;background:var(--pen-bg);
+    border:1px solid var(--pen-soft);border-radius:3px;color:var(--pen);
+    font-size:13px;text-align:center;display:none;
+  }
+  .error.show{display:block;}
+  .sidebar-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px dashed var(--paper-line);}
+  .utility-btn{background:transparent;border:1px solid var(--ink-faint);border-radius:3px;color:var(--ink-soft);padding:5px 8px;font:12px 'Sarabun',sans-serif;cursor:pointer;}
+  .utility-btn:hover{border-color:var(--ink);color:var(--ink);}
+  #cancelBtn{display:none;background:#6B7280;}
+  #cancelBtn.show{display:inline-flex;align-items:center;justify-content:center;}
+  .status{min-height:18px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);margin-top:10px;}
+
+  .project-history-bottom{
+    margin-top:26px;
+    background:var(--paper-deep);
+    border:1px solid var(--paper-line);
+    border-radius:4px;
+    padding:12px 16px;
+    display:none;
+    min-width: 0;
+  }
+  .project-history-bottom-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:'Noto Serif Thai',serif;
+    font-size:14px;
+    font-weight:700;
+    color:var(--ink);
+    margin-bottom:10px;
+    min-width: 0;
+  }
+  .project-history-bottom-head span{
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+    padding-right: 10px;
+  }
+  .project-history-bottom-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:260px;
+    overflow-y:auto;
+    min-width: 0;
+  }
+  .project-history-bottom-list.collapsed{display:none;}
+  .bottom-history-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:8px 10px;
+    background:#FFFDF7;
+    border:1px solid var(--paper-line);
+    border-radius:3px;
+    gap:8px;
+    min-width: 0;
+  }
+  .bottom-history-item.active{
+    border-color:var(--pen);
+    background:var(--pen-bg);
+  }
+  .bottom-history-title{
+    flex:1;
+    font-size:13px;
+    font-family:'Sarabun',sans-serif;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    cursor:pointer;
+    min-width: 0;
+  }
+  .bottom-history-title:hover{color:var(--pen);}
+  .bottom-history-actions{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-shrink:0;
+  }
+
+  .mobile-sidebar-toggle{
+    display:none;
+    width:100%;
+    padding:10px;
+    background:var(--paper-deep);
+    border:1px solid var(--ink-faint);
+    border-radius:4px;
+    font-family:'Noto Serif Thai',serif;
+    font-size:14px;
+    color:var(--ink);
+    cursor:pointer;
+    margin-bottom:12px;
+    align-items:center;
+    justify-content:space-between;
+    min-width: 0;
+  }
+
+  @media (max-width:900px){
+    body{padding:16px 12px 40px;}
+    .brand h1{font-size:26px;}
+    .brand p{font-size:11px;}
+    .app-layout{grid-template-columns:1fr;gap:16px;}
+    
+    .mobile-sidebar-toggle{display:flex;}
+    .sidebar{
+      border-right:none;
+      border:1px solid var(--paper-line);
+      background:#F4EEDD;
+      padding:12px;
+      border-radius:4px;
+      margin-bottom:16px;
+      display:none;
+    }
+    .sidebar.open{display:block;}
+
+    .mobile-tabs{
+      display:flex;
+      border:1px solid var(--ink);
+      border-radius:4px 4px 0 0;
+      overflow:hidden;
+      background:var(--paper-deep);
+      margin-bottom:-1px;
+      position:relative;
+      z-index:2;
+    }
+    .mobile-tab-btn{
+      flex:1;
+      padding:10px;
+      border:none;
+      background:transparent;
+      font-family:'Noto Serif Thai',serif;
+      font-size:14px;
+      color:var(--ink-soft);
+      cursor:pointer;
+      border-right:1px solid var(--paper-line);
+    }
+    .mobile-tab-btn:last-child{border-right:none;}
+    .mobile-tab-btn.active{
+      background:#F4EEDD;
+      color:var(--ink);
+      font-weight:700;
+    }
+
+    .spread{
+      grid-template-columns:1fr !important;
+      border-radius:0 0 4px 4px;
+    }
+    .spread .page{display:none;}
+    .spread.show-source .source-page{display:block;}
+    .spread.show-output .output-page{display:block;}
+    .spread.result-focus .source-page{display:none;}
+    .spread.result-focus .output-page{display:block;padding-left:20px;padding-right:20px;}
+
+    .source-expand-btn, .source-collapse-btn{display:none !important;}
+
+    .action-row{
+      gap:10px;
+      flex-direction:column;
+      align-items:stretch;
+    }
+    .seal-btn{
+      width:100% !important;
+      height:50px !important;
+      border-radius:25px !important;
+      font-size:15px !important;
+      box-shadow:none !important;
+    }
+
+    .translation-toolbar{justify-content:stretch;}
+    .translation-settings-btn{width:100%;justify-content:space-between; gap: 5px;}
+    .translation-summary{max-width: none; text-align: right;}
+    
+    .translation-modal{padding:10px;}
+    .translation-modal-card{padding:16px;max-height:92vh;}
+    .controls{gap:14px;}
+    .field select, .field input[type=text], .field input[type=password]{width:100%;min-width:0;}
+
+    .main-col {
+      min-width: 0;
+      overflow: hidden;
+    }
+    .active-project-banner b { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1>ปรุงอักษร</h1>
+      <p>ห้องทำงานนักแปล / บรรณาธิการนิยาย</p>
+    </div>
+    <button class="gear-btn" id="gearBtn" title="ตั้งค่า AI" aria-label="ตั้งค่า">⚙</button>
+  </header>
+
+  <div class="settings" id="settingsPanel">
+    <div class="field">
+      <label>ผู้ให้บริการ AI</label>
+      <select id="provider">
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Google Gemini</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>โมเดล</label>
+      <input type="text" id="model" value="gpt-5.6-luna">
+    </div>
+    <div class="field" style="flex:1;">
+      <label>API key</label>
+      <input type="password" id="apiKey" placeholder="วางคีย์ของคุณที่นี่">
+    </div>
+    <div class="field">
+      <label>ความยาวสูงสุดต่อส่วน (ตัวอักษร)</label>
+      <input type="number" id="chunkLen" value="3000" min="500" max="50000" step="100" style="min-width:100px;">
+    </div>
+    <p class="settings-note">คีย์จะอยู่เฉพาะในหน่วยความจำของเบราว์เซอร์ในขณะเปิดหน้านี้และจะไม่ถูกบันทึกใน localStorage · ใช้ไฟล์นี้แบบส่วนตัวเท่านั้น · โปรเจกต์ ร่างงาน คลังคำ และประวัติจะถูกเก็บในเบราว์เซอร์เครื่องนี้ จึงควรดาวน์โหลดข้อมูลสำรองเป็นระยะ</p>
+  </div>
+
+  <button class="mobile-sidebar-toggle" id="mobileSidebarToggle" type="button">
+    <span>📂 จัดการเรื่องนิยาย & ประวัติ</span>
+    <span id="sidebarToggleIcon">▼</span>
+  </button>
+
+  <div class="app-layout">
+
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <span>เรื่องนิยาย</span>
+        <button class="add-proj-btn" id="addProjBtn">+ เรื่องใหม่</button>
+      </div>
+      <div id="projectList"></div>
+      <div class="sidebar-actions">
+        <button class="utility-btn" id="exportBackupBtn" type="button">สำรองข้อมูล</button>
+        <button class="utility-btn" id="importBackupBtn" type="button">กู้คืนข้อมูล</button>
+        <input id="backupFile" type="file" accept="application/json,.json" hidden>
+      </div>
+    </div>
+
+    <div class="main-col">
+
+      <div class="active-project-banner" id="activeProjectBanner" style="display:none;">
+        <span>กำลังทำงานในเรื่อง: <b id="activeProjectName"></b></span>
+      </div>
+
+      <div class="history-view-banner" id="historyViewBanner">
+        <span id="historyViewLabel"></span>
+        <button class="close-history-btn" type="button">กลับไปแปลใหม่</button>
+      </div>
+
+      <div class="translation-toolbar">
+        <button class="translation-settings-btn" id="translationSettingsBtn" type="button" aria-haspopup="dialog" aria-controls="translationModal" aria-expanded="false">
+          <span>ตั้งค่าการแปล</span><span class="translation-summary" id="translationSummary"></span>
+        </button>
+      </div>
+
+      <div class="translation-modal" id="translationModal" role="dialog" aria-modal="true" aria-labelledby="translationModalTitle" aria-hidden="true">
+        <div class="translation-modal-card">
+          <div class="translation-modal-head">
+            <h2 id="translationModalTitle">ตั้งค่าการแปล</h2>
+            <button class="modal-close" id="translationModalClose" type="button" aria-label="ปิดหน้าตั้งค่าการแปล">×</button>
+          </div>
+          <div class="controls">
+            <div class="control-group">
+              <span>ต้นฉบับ</span>
+              <div class="seg" id="sourceSeg">
+                <button data-val="translate" class="active">ภาษาอื่น (แปล)</button>
+                <button data-val="polish">ไทยอยู่แล้ว (ขัดสำนวน)</button>
+              </div>
+            </div>
+            <div class="control-group">
+              <span>ระดับการปรับ</span>
+              <div class="seg" id="levelSeg">
+                <button data-val="proof">พิสูจน์อักษร</button>
+                <button data-val="edit" class="active">เรียบเรียง</button>
+                <button data-val="rewrite">ขัดเกลาใหม่</button>
+              </div>
+            </div>
+            <div class="control-group" style="flex:1;">
+              <span>แนวเรื่อง</span>
+              <div class="chips" id="genreChips">
+                <div class="chip active" data-val="ทั่วไป">ทั่วไป</div>
+                <div class="chip" data-val="แฟนตาซี">แฟนตาซี</div>
+                <div class="chip" data-val="โรแมนซ์">โรแมนซ์</div>
+                <div class="chip" data-val="สืบสวน/ระทึกขวัญ">สืบสวน/ระทึกขวัญ</div>
+                <div class="chip" data-val="ไซไฟ">ไซไฟ</div>
+                <div class="chip" data-val="กำลังภายใน">กำลังภายใน</div>
+              </div>
+            </div>
+            <div class="control-group">
+              <span>สำนวนภาษา</span>
+              <div class="seg" id="styleSeg">
+                <button data-val="สำนวนปัจจุบัน" class="active">ปัจจุบัน</button>
+                <button data-val="สำนวนย้อนยุค">ย้อนยุค</button>
+                <button data-val="สำนวนร่วมสมัย">ร่วมสมัย</button>
+                <button data-val="สำนวนทางการ">ทางการ</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mobile-tabs" id="mobileTabs">
+        <button class="mobile-tab-btn active" id="tabSourceBtn" type="button">📖 ต้นฉบับ</button>
+        <button class="mobile-tab-btn" id="tabOutputBtn" type="button">✨ ฉบับตรวจแล้ว</button>
+      </div>
+
+      <div class="spread show-source" id="spread">
+        <div class="page source-page">
+          <h2>ต้นฉบับ <button class="source-expand-btn" id="expandSourceBtn" type="button">เปิดต้นฉบับ</button><button class="source-collapse-btn" id="collapseSourceBtn" type="button">ย่อต้นฉบับ</button></h2>
+          <input class="chapter-title" id="chapterTitle" type="text" maxlength="160" placeholder="ชื่อตอนสำหรับประวัติ เช่น ตอนที่ 1: บทนำ">
+          <textarea class="main-input" id="inputText" placeholder="วางข้อความนิยายของคุณที่นี่..."></textarea>
+          <div id="suspiciousBox" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#FFF8DB;border:1px solid #E6C85C;border-radius:4px;font-size:13px;"></div>
+          <div class="page-foot">
+            <span id="inCount">0 คำ</span>
+            <span><button class="textbtn" id="importTextBtn" type="button">นำเข้า .txt</button>&nbsp;·&nbsp;<button class="textbtn" id="clearBtn" type="button">ล้างข้อความ</button></span>
+            <input id="textFile" type="file" accept="text/plain,.txt" hidden>
+          </div>
+        </div>
+        <div class="page output-page">
+          <h2 class="output-heading"><span>ฉบับตรวจแล้ว</span><span class="font-size-controls" aria-label="ขนาดตัวอักษรฉบับตรวจแล้ว"><button id="outputFontDown" type="button" aria-label="ลดขนาดตัวอักษร">A−</button><span class="font-size-value" id="outputFontValue">16</span><button id="outputFontUp" type="button" aria-label="เพิ่มขนาดตัวอักษร">A+</button></span></h2>
+          <div class="stamp" id="stamp">ตรวจแล้ว<br>✒</div>
+          <div id="output" role="textbox" aria-label="ฉบับตรวจแล้ว" aria-multiline="true" spellcheck="false"></div>
+          
+          <div class="page-foot">
+            <span id="outCount">0 คำ</span>
+            <span>
+              <button class="textbtn" id="copyBtn" disabled>คัดลอก</button>
+              &nbsp;·&nbsp;
+              <button class="textbtn" id="downloadBtn" disabled>ดาวน์โหลด</button>
+              &nbsp;·&nbsp;
+              <button class="textbtn" id="editOutputBtn" disabled>แก้ไขผลลัพธ์</button>
+              &nbsp;·&nbsp;
+              <button class="textbtn" id="saveRevisionBtn" disabled>บันทึกฉบับแก้ไข</button>
+            </span>
+          </div>
+
+          <div class="history-view-banner history-bottom-banner" id="historyViewBannerBottom">
+            <span id="historyViewLabelBottom"></span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button class="textbtn" id="renameHistoryBtnBottom" type="button" style="color:var(--pen);font-weight:600;">✎ เปลี่ยนชื่อ</button>
+              <button class="textbtn" id="deleteHistoryBtnBottom" type="button" style="color:var(--pen);font-weight:600;">✕ ลบประวัตินี้</button>
+              <button class="close-history-btn" type="button">กลับไปแปลใหม่</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="action-row" style="gap:16px;flex-wrap:wrap;">
+        <button class="seal-btn" id="repairBtn" style="background:#6B7280;">ซ่อม OCR</button>
+        <button class="seal-btn" id="processBtn">ปรุงอักษร</button>
+        <button class="seal-btn" id="cancelBtn" type="button">ยกเลิก</button>
+      </div>
+      <p id="progressText" class="status" role="status" aria-live="polite"></p>
+
+      <div class="error" id="errorBox"></div>
+
+      <div class="project-history-bottom" id="projectHistoryBottom">
+        <div class="project-history-bottom-head">
+          <span id="bottomHistoryProjectTitle">📜 ประวัติการแปลทั้งหมดของเรื่องนี้</span>
+          <button class="utility-btn" id="toggleBottomHistoryBtn" type="button">ซ่อน/แสดง</button>
+        </div>
+        <div class="project-history-bottom-list" id="bottomHistoryList"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  var STORAGE_KEY = 'prungAksornData';
+  var state = { source: 'translate', level: 'edit', genre: 'ทั่วไป', style: 'สำนวนปัจจุบัน' };
+  var appData = { projects: [], currentProjectId: null };
+  var expandedProjects = {};
+  var viewingHistoryId = null;
+  var activeController = null;
+  var draftSaveTimer = null;
+  var outputFontSize = 15.5;
+
+  var defaultSettings = { provider:'openai', model:'gpt-5.6-luna', chunkLen:'3000', source:'translate', level:'edit', genre:'ทั่วไป', style:'สำนวนปัจจุบัน', outputFontSize:15.5 };
+
+  var tabSourceBtn = document.getElementById('tabSourceBtn');
+  var tabOutputBtn = document.getElementById('tabOutputBtn');
+  var spread = document.getElementById('spread');
+  
+  function switchMobileTab(tab){
+    if(tab === 'source'){
+      spread.classList.add('show-source');
+      spread.classList.remove('show-output');
+      tabSourceBtn.classList.add('active');
+      tabOutputBtn.classList.remove('active');
+    }else{
+      spread.classList.remove('show-source');
+      spread.classList.add('show-output');
+      tabSourceBtn.classList.remove('active');
+      tabOutputBtn.classList.add('active');
+    }
+  }
+  tabSourceBtn.addEventListener('click', function(){ switchMobileTab('source'); });
+  tabOutputBtn.addEventListener('click', function(){ switchMobileTab('output'); });
+
+  var mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+  var sidebar = document.getElementById('sidebar');
+  var sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
+  mobileSidebarToggle.addEventListener('click', function(){
+    var isOpen = sidebar.classList.toggle('open');
+    sidebarToggleIcon.textContent = isOpen ? '▲' : '▼';
+  });
+
+  var toggleBottomHistoryBtn = document.getElementById('toggleBottomHistoryBtn');
+  var bottomHistoryList = document.getElementById('bottomHistoryList');
+  toggleBottomHistoryBtn.addEventListener('click', function(){
+    bottomHistoryList.classList.toggle('collapsed');
+  });
+
+  function scrollToTopTarget(){
+    setTimeout(function(){
+      var target = document.getElementById('mobileTabs') || document.getElementById('spread');
+      if (target && window.innerWidth <= 900) {
+        var topPos = target.getBoundingClientRect().top + window.pageYOffset - 12;
+        window.scrollTo({ top: Math.max(0, topPos), behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 60);
+  }
+
+  function renderBottomHistory(){
+    var container = document.getElementById('bottomHistoryList');
+    var box = document.getElementById('projectHistoryBottom');
+    var titleEl = document.getElementById('bottomHistoryProjectTitle');
+    if(!container || !box) return;
+
+    var proj = getCurrentProject();
+    if(!proj){
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = 'block';
+    titleEl.textContent = '📜 ประวัติเรื่อง "' + proj.name + '"';
+    container.innerHTML = '';
+
+    if(!proj.history || proj.history.length === 0){
+      var empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = 'ยังไม่มีประวัติการแปลสำหรับเรื่องนี้';
+      container.appendChild(empty);
+      return;
+    }
+
+    proj.history.forEach(function(entry, idx){
+      var item = document.createElement('div');
+      item.className = 'bottom-history-item' + (viewingHistoryId === entry.id ? ' active' : '');
+
+      var title = document.createElement('div');
+      title.className = 'bottom-history-title';
+      title.textContent = (entry.label || ('แปล' + (idx + 1))) + ' · ' + fmtTime(entry.ts);
+      title.addEventListener('click', function(){
+        viewHistoryEntry(proj, entry, idx);
+      });
+      item.appendChild(title);
+
+      var actions = document.createElement('div');
+      actions.className = 'bottom-history-actions';
+
+      var renameBtn = document.createElement('button');
+      renameBtn.className = 'icon-btn';
+      renameBtn.title = 'เปลี่ยนชื่อ';
+      renameBtn.textContent = '✎';
+      renameBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var currentLabel = entry.label || ('แปล' + (idx + 1));
+        var newLabel = prompt('ตั้งชื่อตอนแปลนี้:', currentLabel);
+        if(newLabel && newLabel.trim()){
+          entry.label = newLabel.trim();
+          saveData();
+          renderProjects();
+          renderBottomHistory();
+          if(viewingHistoryId === entry.id){
+            historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+            historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
+          }
+        }
+      });
+      actions.appendChild(renameBtn);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'icon-btn';
+      delBtn.title = 'ลบประวัติ';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var itemLabel = entry.label || ('แปล' + (idx + 1));
+        if(confirm('ต้องการลบประวัติการแปล "' + itemLabel + '" หรือไม่?')){
+          proj.history = proj.history.filter(function(h){ return h.id !== entry.id; });
+          if(viewingHistoryId === entry.id){
+            viewingHistoryId = null;
+            historyViewBanner.classList.remove('show');
+            historyViewBannerBottom.classList.remove('show');
+            loadProjectDraft(proj);
+          }
+          saveData();
+          renderProjects();
+          renderBottomHistory();
+        }
+      });
+      actions.appendChild(delBtn);
+
+      item.appendChild(actions);
+      container.appendChild(item);
+    });
+  }
+
+  function loadData(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) appData = JSON.parse(raw);
+    }catch(e){}
+    if(!appData || typeof appData !== 'object') appData = { projects: [], currentProjectId: null };
+    if(!Array.isArray(appData.projects)) appData.projects = [];
+    appData.projects = appData.projects.filter(function(p){ return p && typeof p === 'object' && p.id && p.name; }).map(function(p){
+      p.history = Array.isArray(p.history) ? p.history : [];
+      p.glossary = typeof p.glossary === 'string' ? p.glossary : '';
+      p.context = typeof p.context === 'string' ? p.context : '';
+      p.draft = typeof p.draft === 'string' ? p.draft : '';
+      p.chapterTitle = typeof p.chapterTitle === 'string' ? p.chapterTitle : '';
+      return p;
+    });
+    appData.settings = Object.assign({}, defaultSettings, appData.settings || {});
+  }
+
+  function saveSettings(){
+    appData.settings = {
+      provider: providerSel.value,
+      model: modelInput.value,
+      chunkLen: document.getElementById('chunkLen').value,
+      source: state.source, level: state.level, genre: state.genre, style: state.style,
+      outputFontSize: outputFontSize
+    };
+    saveData();
+  }
+
+  function applySettingsToUI(){
+    var s = appData.settings;
+    providerSel.value = s.provider;
+    modelInput.value = s.model;
+    document.getElementById('chunkLen').value = s.chunkLen;
+    state.source = s.source; state.level = s.level; state.genre = s.genre; state.style = s.style;
+    outputFontSize = Number(s.outputFontSize) || defaultSettings.outputFontSize;
+
+    function setSegActive(id, val){
+      var seg = document.getElementById(id);
+      seg.querySelectorAll('button').forEach(function(b){
+        b.classList.toggle('active', b.dataset.val === val);
+      });
+    }
+    setSegActive('sourceSeg', s.source);
+    setSegActive('levelSeg', s.level);
+    setSegActive('styleSeg', s.style);
+    document.getElementById('genreChips').querySelectorAll('.chip').forEach(function(c){
+      c.classList.toggle('active', c.dataset.val === s.genre);
+    });
+    setOutputFontSize(outputFontSize, false);
+    updateTranslationSummary();
+  }
+
+  function saveData(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }catch(e){}
+  }
+
+  function getCurrentProject(){
+    return appData.projects.find(function(p){ return p.id === appData.currentProjectId; }) || null;
+  }
+
+  function makeId(prefix){
+    return prefix + '_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random().toString(16).slice(2));
+  }
+
+  function safeFilename(name){
+    return (name || 'prung-aksorn').replace(/[\\/:*?"<>|]/g, '_').trim().slice(0, 80) || 'prung-aksorn';
+  }
+
+  function fmtTime(ts){
+    var d = new Date(ts);
+    return d.toLocaleDateString('th-TH', {day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit'});
+  }
+
+  function countWords(text){
+    text = (text || '').trim();
+    if(!text) return 0;
+    try{
+      if(typeof Intl !== 'undefined' && Intl.Segmenter){
+        var seg = new Intl.Segmenter('th', { granularity: 'word' });
+        var count = 0;
+        var iter = seg.segment(text)[Symbol.iterator]();
+        var r = iter.next();
+        while(!r.done){
+          if(r.value.isWordLike) count++;
+          r = iter.next();
+        }
+        return count;
+      }
+    }catch(e){}
+    return text.split(/\s+/).filter(Boolean).length;
+  }
+
+  var projectList = document.getElementById('projectList');
+  var activeProjectBanner = document.getElementById('activeProjectBanner');
+  var activeProjectName = document.getElementById('activeProjectName');
+
+  function renderProjects(){
+    projectList.innerHTML = '';
+    if(appData.projects.length === 0){
+      var empty = document.createElement('p');
+      empty.className = 'sidebar-empty';
+      empty.textContent = 'ยังไม่มีเรื่องนิยาย กด "+ เรื่องใหม่" เพื่อเริ่มต้น';
+      projectList.appendChild(empty);
+    }
+    appData.projects.forEach(function(proj){
+      var item = document.createElement('div');
+      item.className = 'project-item';
+
+      var row = document.createElement('div');
+      row.className = 'project-row' + (proj.id === appData.currentProjectId ? ' active' : '');
+
+      var name = document.createElement('span');
+      name.className = 'project-name';
+      name.textContent = proj.name;
+      row.appendChild(name);
+
+      var glossBtn = document.createElement('button');
+      glossBtn.className = 'icon-btn';
+      glossBtn.title = 'คลังคำ';
+      glossBtn.textContent = '✎';
+      glossBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        gp.classList.toggle('open');
+      });
+      row.appendChild(glossBtn);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'icon-btn';
+      delBtn.title = 'ลบเรื่องนี้';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(confirm('ลบเรื่อง "' + proj.name + '" พร้อมประวัติทั้งหมด?')){
+          appData.projects = appData.projects.filter(function(p){ return p.id !== proj.id; });
+          if(appData.currentProjectId === proj.id) appData.currentProjectId = null;
+          saveData();
+          renderProjects();
+          renderBottomHistory();
+          updateActiveBanner();
+        }
+      });
+      row.appendChild(delBtn);
+
+      row.addEventListener('click', function(){
+        appData.currentProjectId = proj.id;
+        expandedProjects[proj.id] = !expandedProjects[proj.id];
+        saveData();
+        renderProjects();
+        updateActiveBanner();
+        loadProjectDraft(proj);
+      });
+
+      item.appendChild(row);
+
+      var gp = document.createElement('div');
+      gp.className = 'glossary-panel';
+      var gpTextarea = document.createElement('textarea');
+      gpTextarea.rows = 3;
+      gpTextarea.placeholder = 'ต้นฉบับ = คำแปล';
+      gpTextarea.value = proj.glossary || '';
+      gpTextarea.addEventListener('input', function(){
+        proj.glossary = gpTextarea.value;
+        saveData();
+      });
+      gp.appendChild(gpTextarea);
+      
+      var contextTextarea = document.createElement('textarea');
+      contextTextarea.rows = 3;
+      contextTextarea.placeholder = 'บริบทของเรื่อง';
+      contextTextarea.value = proj.context || '';
+      contextTextarea.addEventListener('input', function(){
+        proj.context = contextTextarea.value;
+        saveData();
+      });
+      gp.appendChild(contextTextarea);
+      item.appendChild(gp);
+
+      var hist = document.createElement('div');
+      hist.className = 'history-list' + (expandedProjects[proj.id] ? ' open' : '');
+      if(proj.history && proj.history.length > 0){
+        proj.history.forEach(function(entry, idx){
+          var erow = document.createElement('div');
+          erow.className = 'history-entry-row';
+          var eb = document.createElement('button');
+          eb.className = 'history-entry';
+          eb.textContent = (entry.label || ('แปล' + (idx + 1)));
+          eb.addEventListener('click', function(ev){
+            ev.stopPropagation();
+            viewHistoryEntry(proj, entry, idx);
+          });
+          erow.appendChild(eb);
+          hist.appendChild(erow);
+        });
+      }
+      item.appendChild(hist);
+
+      projectList.appendChild(item);
+    });
+  }
+
+  function updateActiveBanner(){
+    var proj = getCurrentProject();
+    if(proj){
+      activeProjectBanner.style.display = 'flex';
+      activeProjectName.textContent = proj.name;
+    } else {
+      activeProjectBanner.style.display = 'none';
+    }
+  }
+
+  document.getElementById('addProjBtn').addEventListener('click', function(){
+    var name = prompt('ตั้งชื่อเรื่องนิยาย:');
+    if(!name || !name.trim()) return;
+    var proj = { id: makeId('p'), name: name.trim(), glossary: '', context: '', draft: '', chapterTitle: '', history: [] };
+    appData.projects.push(proj);
+    appData.currentProjectId = proj.id;
+    expandedProjects[proj.id] = true;
+    saveData();
+    renderProjects();
+    renderBottomHistory();
+    updateActiveBanner();
+    loadProjectDraft(proj);
+  });
+
+  var historyViewBanner = document.getElementById('historyViewBanner');
+  var historyViewBannerBottom = document.getElementById('historyViewBannerBottom');
+  var historyViewLabel = document.getElementById('historyViewLabel');
+  var historyViewLabelBottom = document.getElementById('historyViewLabelBottom');
+  var chapterTitle = document.getElementById('chapterTitle');
+  var inputText = document.getElementById('inputText');
+  var inCount = document.getElementById('inCount');
+  var outCount = document.getElementById('outCount');
+  var output = document.getElementById('output');
+  var stamp = document.getElementById('stamp');
+  var outputFontValue = document.getElementById('outputFontValue');
+
+  function setResultFocus(enabled){
+    spread.classList.toggle('result-focus', !!enabled);
+  }
+
+  function setOutputFontSize(size, persist){
+    outputFontSize = Math.max(13, Math.min(26, Math.round(Number(size) * 2) / 2 || 15.5));
+    output.style.fontSize = outputFontSize + 'px';
+    outputFontValue.textContent = outputFontSize;
+    if(persist) saveSettings();
+  }
+
+  function updateTranslationSummary(){
+    var source = document.querySelector('#sourceSeg button.active');
+    var level = document.querySelector('#levelSeg button.active');
+    var genre = document.querySelector('#genreChips .chip.active');
+    var style = document.querySelector('#styleSeg button.active');
+    document.getElementById('translationSummary').textContent = [source, level, genre, style].filter(Boolean).map(function(el){ return el.textContent.trim(); }).join(' · ');
+  }
+
+  function setOutput(text){
+    output.textContent = text || '';
+    outCount.textContent = countWords(output.textContent) + ' คำ';
+    var hasOutput = !!output.textContent.trim();
+    spread.classList.toggle('has-result', hasOutput);
+    if(!hasOutput) stamp.classList.remove('show');
+    copyBtn.disabled = !hasOutput;
+    downloadBtn.disabled = !hasOutput;
+    editOutputBtn.disabled = !hasOutput;
+    saveRevisionBtn.disabled = !hasOutput;
+  }
+  
+  function loadProjectDraft(proj){
+    if(!proj) return;
+    viewingHistoryId = null;
+    historyViewBanner.classList.remove('show');
+    historyViewBannerBottom.classList.remove('show');
+    chapterTitle.value = proj.chapterTitle || '';
+    inputText.value = proj.draft || '';
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    highlightSuspicious(inputText.value);
+    stamp.classList.remove('show');
+    setOutput('');
+    output.contentEditable = 'false';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
+    setResultFocus(false);
+    switchMobileTab('source');
+    renderBottomHistory();
+  }
+  
+  function saveDraftSoon(){
+    var proj = getCurrentProject();
+    if(!proj) return;
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = setTimeout(function(){
+      proj.draft = inputText.value;
+      proj.chapterTitle = chapterTitle.value.trim();
+      saveData();
+    }, 500);
+  }
+
+  function viewHistoryEntry(proj, entry, idx){
+    viewingHistoryId = entry.id;
+    chapterTitle.value = entry.label || '';
+    inputText.value = entry.input;
+    inCount.textContent = countWords(entry.input) + ' คำ';
+    highlightSuspicious('');
+    setOutput(entry.output);
+    output.contentEditable = 'false';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
+    setResultFocus(true);
+    stamp.classList.remove('show');
+    requestAnimationFrame(function(){ stamp.classList.add('show'); });
+    var label = entry.label || ('แปล' + (idx + 1));
+    historyViewLabel.textContent = 'ดูประวัติ: ' + label;
+    historyViewLabelBottom.textContent = 'ประวัติ: ' + label;
+    historyViewBanner.classList.add('show');
+    historyViewBannerBottom.classList.add('show');
+    switchMobileTab('output');
+    renderBottomHistory();
+    scrollToTopTarget();
+  }
+  
+  document.querySelectorAll('.close-history-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      viewingHistoryId = null;
+      historyViewBanner.classList.remove('show');
+      historyViewBannerBottom.classList.remove('show');
+      loadProjectDraft(getCurrentProject());
+    });
+  });
+
+  document.getElementById('renameHistoryBtnBottom').addEventListener('click', function(){
+    var proj = getCurrentProject();
+    if(!proj || !viewingHistoryId) return;
+    var entry = proj.history.find(function(h){ return h.id === viewingHistoryId; });
+    if(!entry) return;
+    var newLabel = prompt('ตั้งชื่อตอนแปลนี้:', entry.label || '');
+    if(newLabel && newLabel.trim()){
+      entry.label = newLabel.trim();
+      saveData();
+      renderProjects();
+      renderBottomHistory();
+      historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+      historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
+    }
+  });
+
+  document.getElementById('deleteHistoryBtnBottom').addEventListener('click', function(){
+    var proj = getCurrentProject();
+    if(!proj || !viewingHistoryId) return;
+    var entry = proj.history.find(function(h){ return h.id === viewingHistoryId; });
+    if(!entry) return;
+    if(confirm('ต้องการลบประวัติการแปล "' + (entry.label || 'ตอนนี้') + '" หรือไม่?')){
+      proj.history = proj.history.filter(function(h){ return h.id !== viewingHistoryId; });
+      saveData();
+      renderProjects();
+      renderBottomHistory();
+      viewingHistoryId = null;
+      historyViewBanner.classList.remove('show');
+      historyViewBannerBottom.classList.remove('show');
+      loadProjectDraft(proj);
+    }
+  });
+
+  var gearBtn = document.getElementById('gearBtn');
+  var settingsPanel = document.getElementById('settingsPanel');
+  gearBtn.addEventListener('click', function(){ settingsPanel.classList.toggle('open'); });
+
+  var translationModal = document.getElementById('translationModal');
+  var translationSettingsBtn = document.getElementById('translationSettingsBtn');
+  var translationModalClose = document.getElementById('translationModalClose');
+  function closeTranslationModal(){
+    translationModal.classList.remove('open');
+    translationModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+  }
+  function openTranslationModal(){
+    translationModal.classList.add('open');
+    translationModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+  }
+  translationSettingsBtn.addEventListener('click', openTranslationModal);
+  translationModalClose.addEventListener('click', closeTranslationModal);
+
+  var providerSel = document.getElementById('provider');
+  var modelInput = document.getElementById('model');
+  providerSel.addEventListener('change', function(){
+    modelInput.value = providerSel.value === 'openai' ? 'gpt-5.6-luna' : 'gemini-flash-latest';
+    saveSettings();
+  });
+  modelInput.addEventListener('change', saveSettings);
+  document.getElementById('chunkLen').addEventListener('change', saveSettings);
+
+  function wireSeg(id, key){
+    var seg = document.getElementById(id);
+    seg.addEventListener('click', function(e){
+      var btn = e.target.closest('button');
+      if(!btn) return;
+      seg.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state[key] = btn.dataset.val;
+      saveSettings();
+      updateTranslationSummary();
+    });
+  }
+  wireSeg('sourceSeg', 'source');
+  wireSeg('levelSeg', 'level');
+  wireSeg('styleSeg', 'style');
+
+  var chips = document.getElementById('genreChips');
+  chips.addEventListener('click', function(e){
+    var chip = e.target.closest('.chip');
+    if(!chip) return;
+    chips.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('active'); });
+    chip.classList.add('active');
+    state.genre = chip.dataset.val;
+    saveSettings();
+    updateTranslationSummary();
+  });
+
+  var errorBox = document.getElementById('errorBox');
+  var processBtn = document.getElementById('processBtn');
+  var copyBtn = document.getElementById('copyBtn');
+  var downloadBtn = document.getElementById('downloadBtn');
+  var editOutputBtn = document.getElementById('editOutputBtn');
+  var saveRevisionBtn = document.getElementById('saveRevisionBtn');
+  var clearBtn = document.getElementById('clearBtn');
+  var cancelBtn = document.getElementById('cancelBtn');
+  var progressText = document.getElementById('progressText');
+
+  document.getElementById('outputFontDown').addEventListener('click', function(){ setOutputFontSize(outputFontSize - 1, true); });
+  document.getElementById('outputFontUp').addEventListener('click', function(){ setOutputFontSize(outputFontSize + 1, true); });
+  document.getElementById('expandSourceBtn').addEventListener('click', function(){ setResultFocus(false); inputText.focus(); });
+  document.getElementById('collapseSourceBtn').addEventListener('click', function(){ setResultFocus(true); });
+
+  chapterTitle.addEventListener('input', saveDraftSoon);
+  inputText.addEventListener('input', function(){
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    highlightSuspicious(inputText.value);
+    saveDraftSoon();
+  });
+  clearBtn.addEventListener('click', function(){
+    inputText.value = '';
+    inCount.textContent = '0 คำ';
+    highlightSuspicious('');
+    saveDraftSoon();
+  });
+  output.addEventListener('input', function(){
+    outCount.textContent = countWords(output.textContent) + ' คำ';
+    saveRevisionBtn.disabled = !output.textContent.trim();
+  });
+  editOutputBtn.addEventListener('click', function(){
+    var editing = output.contentEditable === 'true';
+    output.contentEditable = editing ? 'false' : 'true';
+    editOutputBtn.textContent = editing ? 'แก้ไขผลลัพธ์' : 'เสร็จสิ้น';
+    if(!editing) output.focus();
+  });
+
+  saveRevisionBtn.addEventListener('click', function(){
+    var proj = getCurrentProject();
+    var revised = output.textContent.trim();
+    if(!proj || !revised) return;
+    var label = prompt('ตั้งชื่อฉบับแก้ไข:', (chapterTitle.value || 'ฉบับแก้ไข'));
+    if(!label) return;
+    proj.history.push({
+      id: makeId('h'), ts: Date.now(), label: label.trim(),
+      input: inputText.value, output: revised,
+      source: state.source, level: state.level, genre: state.genre, style: state.style
+    });
+    saveData();
+    renderProjects();
+    renderBottomHistory();
+    progressText.textContent = 'บันทึกเรียบร้อย';
+    setTimeout(function(){ progressText.textContent = ''; }, 1500);
+  });
+
+  document.getElementById('importTextBtn').addEventListener('click', function(){ document.getElementById('textFile').click(); });
+  document.getElementById('textFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      inputText.value = String(reader.result || '');
+      inCount.textContent = countWords(inputText.value) + ' คำ';
+      highlightSuspicious(inputText.value);
+      saveDraftSoon();
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  });
+
+  document.getElementById('exportBackupBtn').addEventListener('click', function(){
+    saveData();
+    var payload = { format: 'prung-aksorn-backup', version: 1, exportedAt: new Date().toISOString(), data: appData };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'prung-aksorn-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 0);
+  });
+
+  document.getElementById('importBackupBtn').addEventListener('click', function(){ document.getElementById('backupFile').click(); });
+  document.getElementById('backupFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try {
+        var rawParsed = JSON.parse(String(reader.result || ''));
+        var importedData = (rawParsed && rawParsed.data && Array.isArray(rawParsed.data.projects)) ? rawParsed.data : rawParsed;
+
+        if(!importedData || !Array.isArray(importedData.projects)){
+          alert('ไฟล์สำรองไม่ถูกต้อง ไม่พบรายการเรื่องนิยาย');
+          return;
+        }
+
+        if(confirm('กู้คืนข้อมูลนี้และแทนที่ข้อมูลเดิมทั้งหมดหรือไม่?')){
+          appData = importedData;
+          saveData();
+          loadData();
+          applySettingsToUI();
+          renderProjects();
+          renderBottomHistory();
+          updateActiveBanner();
+          loadProjectDraft(getCurrentProject());
+          alert('กู้คืนข้อมูลสำรองเรียบร้อยแล้ว');
+        }
+      } catch(err){ 
+        alert('ไม่สามารถอ่านไฟล์สำรองได้ หรือรูปแบบไฟล์ไม่ถูกต้อง'); 
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  });
+
+  /* [ปรับปรุงฟังก์ชันถอดรหัสอักขระ PUA ซ่อนในไฟล์สแกน PDF/E-Book ให้ครอบคลุมทุกรหัส] */
+  function normalizeOCR(text){
+    if(!text) return '';
+    
+    // ตารางถอดรหัส PUA Font Mapping ที่พบบ่อยในนิยายสแกนภาษาไทย
+    var puaMap = {
+      '\uE200': 'ก',
+      '\uE201': 'ง',
+      '\uE202': 'จ',
+      '\uE203': 'ด',
+      '\uE204': 'ค',
+      '\uE205': 'น',
+      '\uE206': 'ม',
+      '\uE207': 'ร'
+    };
+    
+    // แทนที่อักขระ PUA ซ่อนด้วยตัวอักษรไทยที่ถูกต้องก่อน
+    text = text.replace(/[\uE200-\uE207]/g, function(m){ return puaMap[m] || m; });
+
+    return text
+      .replace(/\r/g,'')
+      .replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
+      .replace(/[□■◆◇※¤]/g,'')
+      .replace(/â€œ/g,'"').replace(/â€ /g,'"');
+  }
+
+  function highlightSuspicious(text){
+    var box = document.getElementById('suspiciousBox');
+    if(!box) return;
+    var lines = text.split('\n');
+    var bad = [];
+    lines.forEach(function(line, idx){
+      if(/[□■◆◇]/.test(line) || /(.)\1\1/.test(line)) bad.push((idx+1) + ': ' + line);
+    });
+    if(bad.length){
+      box.style.display = 'block';
+      box.innerHTML = '<b>พบข้อความน่าสงสัย ('+bad.length+' จุด)</b><br>' + bad.slice(0,5).join('<br>');
+    }else box.style.display = 'none';
+  }
+
+  function buildOCRRepairPrompt(){
+    return `คุณคือหุ่นยนต์ตรวจสอบและซ่อมแซมคำผิดจากระบบสแกนหนังสือ (OCR Corrector)
+
+หน้าที่ของคุณคือ: แก้ไขตัวอักษรที่เพี้ยนจากระบบสแกน ให้เป็นคำภาษาไทยที่สะกดถูกต้องและมีความหมายสมบูรณ์ตามบริบท
+
+[ตารางรูปแบบคำผิดที่มักพบใน OCR ภาษาไทย]
+- สระแอเพี้ยนเป็นสระเอสองตัว: "เเ" -> "แ"
+- สระเออเพี้ยน: "มอ" -> "มือ", "ส่อ" -> "ส่อง", "ชวง" -> "ช่วง"
+- คำเพี้ยนจากการสแกน: "กะบี่" -> "กระบี่", "ตอดต้ง" -> "ติดตั้ง", "แสมวง" -> "แสง", "เขยว" -> "เขียว"
+- วรรณยุกต์/สระหลุดหาย: ให้เติมไม้เอก ไม้โท สระอึ สระอือ สระอุ สระอู ที่หายไปตามบริบทภาษาไทย
+- อักษรขยะ: ลบ □, ■, ◆, ◇, â€œ ออกให้หมด
+
+[ข้อห้ามเด็ดขาด - Strict Constraints]
+1. ห้ามเรียบเรียงประโยคใหม่เด็ดขาด!
+2. ห้ามตัดคำ ห้ามเพิ่มเนื้อหา ห้ามแต่งเรื่องต่อ!
+3. คำไหนที่ถูกต้องอยู่แล้ว ให้คงไว้เหมือนเดิม 100%
+4. ตอบกลับเฉพาะข้อความภาษาไทยที่ซ่อมเสร็จแล้วเท่านั้น ห้ามมีคำอธิบายเปิด/ปิดเด็ดขาด`;
+  }
+
+  function splitIntoChunks(text, maxLen){
+    if(text.length <= maxLen) return [text];
+    var paras = text.split(/\n\s*\n/);
+    var chunks = [], current = '';
+    for(var i=0; i<paras.length; i++){
+      if((current + '\n\n' + paras[i]).length > maxLen){
+        if(current) chunks.push(current);
+        current = paras[i];
+      } else current = current ? current + '\n\n' + paras[i] : paras[i];
+    }
+    if(current) chunks.push(current);
+    return chunks;
+  }
+
+  function showError(msg){ errorBox.textContent = msg; errorBox.classList.add('show'); }
+  function hideError(){ errorBox.classList.remove('show'); }
+
+  async function callOpenAI(sys, text, key, model, signal){
+    var res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model: model,
+        messages: [{role:'system', content:sys}, {role:'user', content:text}],
+        temperature: 0.1
+      }),
+      signal: signal
+    });
+    if(!res.ok) throw new Error('API Error: ' + res.status);
+    var data = await res.json();
+    return data.choices[0].message.content;
+  }
+
+  async function callGemini(sys, text, key, model, signal){
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key;
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: sys }] },
+        contents: [{ parts: [{ text: text }] }],
+        generationConfig: {
+          temperature: 0.0,
+          topP: 0.1
+        }
+      }),
+      signal: signal
+    });
+    if(!res.ok) throw new Error('API Error: ' + res.status);
+    var data = await res.json();
+    return data.candidates[0].content.parts[0].text;
+  }
+
+  processBtn.addEventListener('click', async function(){
+    hideError();
+    var proj = getCurrentProject();
+    var text = inputText.value.trim();
+    var key = document.getElementById('apiKey').value.trim();
+    if(!proj || !text || !key){ showError('กรุณาเลือกเรื่อง ใส่เนื้อหา และ API Key'); return; }
+
+    var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
+    var chunks = splitIntoChunks(normalizeOCR(text), maxLen);
+    activeController = new AbortController();
+    processBtn.disabled = true;
+    cancelBtn.classList.add('show');
+    setOutput('');
+
+    var sys = "คุณคือนักแปลนิยายมืออาชีพ แนว " + state.genre + " ระดับ " + state.level + " สำนวน " + state.style + 
+              ". คลังคำ: " + proj.glossary + ". บริบท: " + proj.context + ". แปลเฉพาะเนื้อหา ห้ามอธิบายเพิ่มเติม";
+
+    var results = [];
+    try {
+      for(var i=0; i<chunks.length; i++){
+        progressText.textContent = 'กำลังปรุงส่วนที่ ' + (i+1) + '/' + chunks.length;
+        var part = await (providerSel.value === 'openai' ? callOpenAI(sys, chunks[i], key, modelInput.value, activeController.signal) : callGemini(sys, chunks[i], key, modelInput.value, activeController.signal));
+        results.push(part.trim());
+        setOutput(results.join('\n\n'));
+      }
+      stamp.classList.add('show');
+      setResultFocus(true);
+      switchMobileTab('output');
+      scrollToTopTarget();
+      proj.history.push({ id: makeId('h'), ts: Date.now(), label: (chapterTitle.value || 'แปลใหม่'), input: text, output: output.textContent });
+      saveData();
+      renderProjects();
+      renderBottomHistory();
+    } catch(err){
+      if(err.name !== 'AbortError') showError(err.message);
+    } finally {
+      processBtn.disabled = false;
+      cancelBtn.classList.remove('show');
+      progressText.textContent = '';
+    }
+  });
+
+  repairBtn.addEventListener('click', async function(){
+    hideError();
+    var text = inputText.value.trim();
+    var key = document.getElementById('apiKey').value.trim();
+    if(!text || !key){ showError('กรุณาใส่เนื้อหาและ API Key'); return; }
+
+    text = normalizeOCR(text);
+    var chunks = splitIntoChunks(text, 1200);
+
+    activeController = new AbortController();
+    repairBtn.disabled = true;
+    progressText.textContent = 'กำลังซ่อม OCR...';
+    var sys = buildOCRRepairPrompt();
+    var repairedParts = [];
+
+    try {
+      for(var i=0; i<chunks.length; i++){
+        progressText.textContent = chunks.length > 1 ? ('กำลังซ่อมส่วนที่ ' + (i+1) + '/' + chunks.length) : 'กำลังซ่อม OCR...';
+        var repaired = await (providerSel.value === 'openai' 
+          ? callOpenAI(sys, chunks[i], key, modelInput.value, activeController.signal) 
+          : callGemini(sys, chunks[i], key, modelInput.value, activeController.signal));
+        repairedParts.push(repaired.trim());
+      }
+      inputText.value = repairedParts.join('\n\n');
+      highlightSuspicious(inputText.value);
+      saveDraftSoon();
+      progressText.textContent = 'ซ่อม OCR เรียบร้อย';
+    } catch(err){ 
+      if(err.name !== 'AbortError') showError(err.message); 
+    } finally { 
+      repairBtn.disabled = false; 
+      setTimeout(function(){ progressText.textContent = ''; }, 2000);
+    }
+  });
+
+  cancelBtn.addEventListener('click', function(){ if(activeController) activeController.abort(); });
+
+  copyBtn.addEventListener('click', function(){
+    navigator.clipboard.writeText(output.textContent).then(function(){
+      copyBtn.textContent = 'คัดลอกแล้ว';
+      setTimeout(function(){ copyBtn.textContent = 'คัดลอก'; }, 1500);
+    });
+  });
+
+  downloadBtn.addEventListener('click', function(){
+    var blob = new Blob([output.textContent], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = safeFilename(getCurrentProject() ? getCurrentProject().name : '') + '-ผลลัพธ์.txt';
+    a.click();
+  });
+
+  loadData();
+  applySettingsToUI();
+  renderProjects();
+  renderBottomHistory();
+  updateActiveBanner();
+  loadProjectDraft(getCurrentProject());
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(() => {
+      console.log('Service Worker Registered');
+    });
+  }
+</script>
+</body>
+</html>
