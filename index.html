@@ -3124,7 +3124,7 @@
   });
 
 
-  /* ---------------- Reader Mode Logic ---------------- */
+/* ---------------- Reader Mode Logic ---------------- */
   var readerOverlay = document.getElementById('readerOverlay');
   var readerContent = document.getElementById('readerContent');
   var readerTocList = document.getElementById('readerTocList');
@@ -3134,6 +3134,8 @@
   var readerFontValue = document.getElementById('readerFontValue');
   
   var readerFontSize = 18;
+  var readerCurrentBook = null;
+  var readerScrollTimer = null;
 
   function setReaderFontSize(size) {
     readerFontSize = Math.max(14, Math.min(32, size));
@@ -3144,6 +3146,16 @@
   document.getElementById('readerFontDown').addEventListener('click', function(){ setReaderFontSize(readerFontSize - 1); });
   document.getElementById('readerFontUp').addEventListener('click', function(){ setReaderFontSize(readerFontSize + 1); });
 
+  // ติดตามการเลื่อนหน้าจอและบันทึกตำแหน่งอัตโนมัติ
+  readerOverlay.addEventListener('scroll', function() {
+    if (!readerCurrentBook) return;
+    clearTimeout(readerScrollTimer);
+    readerScrollTimer = setTimeout(function() {
+      readerCurrentBook.readerScrollPos = readerOverlay.scrollTop;
+      saveData();
+    }, 500); // บันทึกทุก 0.5 วินาทีหลังจากหยุดเลื่อน
+  }, { passive: true });
+
   function openReaderMode(proj, bookId) {
     var book = (proj.books || []).find(function(b) { return b.id === bookId; });
     if (!book) return;
@@ -3153,11 +3165,11 @@
       return;
     }
 
+    readerCurrentBook = book;
     readerBookTitle.textContent = proj.name + ' - ' + book.title;
     readerContent.innerHTML = '';
     readerTocList.innerHTML = '';
     
-    // ตั้งค่าขนาดอักษรเริ่มต้นในโหมดอ่าน
     setReaderFontSize(18);
 
     // ประมวลผล DOM แบบมีประสิทธิภาพ
@@ -3195,7 +3207,16 @@
       a.addEventListener('click', function(e) {
         e.preventDefault();
         var target = document.getElementById(chId);
-        if(target) target.scrollIntoView({ behavior: 'smooth' });
+        if(target) {
+          target.scrollIntoView({ behavior: 'smooth' });
+          // อัปเดตตำแหน่งหลังกดสารบัญ
+          setTimeout(function() {
+            if (readerCurrentBook) {
+              readerCurrentBook.readerScrollPos = readerOverlay.scrollTop;
+              saveData();
+            }
+          }, 600);
+        }
         closeReaderToc();
       });
       li.appendChild(a);
@@ -3207,12 +3228,22 @@
 
     readerOverlay.classList.add('show');
     document.body.style.overflow = 'hidden'; // ล็อก Scroll หน้าจอหลัก
+
+    // เลื่อนไปยังจุดที่อ่านค้างไว้
+    requestAnimationFrame(function() {
+      if (book.readerScrollPos) {
+        readerOverlay.scrollTop = book.readerScrollPos;
+      } else {
+        readerOverlay.scrollTop = 0;
+      }
+    });
   }
 
   function closeReaderMode() {
     readerOverlay.classList.remove('show');
     document.body.style.overflow = '';
-    readerContent.innerHTML = ''; // คืนพื้นที่หน่วยความจำเพื่อ Performance
+    readerContent.innerHTML = ''; // คืนพื้นที่หน่วยความจำ
+    readerCurrentBook = null;
     closeReaderToc();
   }
 
