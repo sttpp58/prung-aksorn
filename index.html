@@ -729,6 +729,38 @@
     border-color: var(--pen);
   }
 
+  /* ---------------- Reader Mode CSS ---------------- */
+  .reader-overlay { display: none; position: fixed; inset: 0; z-index: 2000; background: var(--paper); overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; transition: background 0.3s ease; }
+  .reader-overlay.show { display: block; }
+  .reader-header { position: sticky; top: 0; background: var(--paper-card); border-bottom: 1px solid var(--paper-line); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; z-index: 2010; box-shadow: 0 4px 15px rgba(0,0,0,0.05); transition: background 0.3s ease, border 0.3s ease; }
+  .reader-book-title { font-family: 'Noto Serif Thai', serif; font-size: 18px; font-weight: 700; color: var(--ink); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
+  .reader-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  
+  .reader-btn { background: var(--paper); border: 1.5px solid var(--ink); border-radius: 4px; padding: 6px 12px; font-family: 'Sarabun', sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer; color: var(--ink); transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; }
+  .reader-btn:hover { background: var(--ink); color: var(--paper); }
+  .reader-font-controls { display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--paper-line); border-radius: 4px; background: var(--paper-deep); padding: 2px; }
+  .reader-font-controls .reader-btn { border: none; padding: 4px 8px; font-size: 13px; border-radius: 2px; }
+  .reader-font-controls .reader-btn:hover { background: var(--ink); color: var(--paper); }
+  .reader-font-value { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 600; min-width: 24px; text-align: center; color: var(--ink); }
+
+  .reader-content { max-width: 760px; margin: 0 auto; padding: 40px 24px 100px; font-family: 'Sarabun', sans-serif; font-size: 18px; line-height: 1.95; color: var(--ink); }
+  .reader-content h2 { font-family: 'Noto Serif Thai', serif; font-size: 24px; font-weight: 700; margin: 2em 0 1.2em; border-bottom: 1px dashed var(--paper-line); padding-bottom: 12px; color: var(--pen); transition: color 0.3s ease; }
+  .reader-content h2:first-child { margin-top: 0; }
+  .reader-content p { margin: 0 0 1.2em; text-indent: 2.5em; text-align: justify; word-break: break-word; overflow-wrap: break-word; }
+  
+  .reader-toc-drawer { position: fixed; top: 0; left: -320px; width: 300px; height: 100vh; background: var(--paper-card); border-right: 1.5px solid var(--ink); z-index: 2020; overflow-y: auto; transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 4px 0 25px rgba(0,0,0,0.15); padding: 24px; }
+  .reader-toc-drawer.open { left: 0; }
+  .reader-toc-close { position: absolute; top: 18px; right: 20px; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--ink-soft); transition: color 0.2s; }
+  .reader-toc-close:hover { color: var(--pen); }
+  .reader-toc-title { font-family: 'Noto Serif Thai', serif; font-size: 17px; font-weight: 700; border-bottom: 1px solid var(--paper-line); padding-bottom: 12px; margin: 0 0 16px 0; color: var(--ink); }
+  .reader-toc-list { list-style: none; padding: 0; margin: 0; }
+  .reader-toc-list li { margin-bottom: 8px; }
+  .reader-toc-list a { color: var(--ink-soft); text-decoration: none; font-size: 14.5px; font-family: 'Sarabun', sans-serif; display: block; padding: 8px 12px; border-radius: 4px; transition: all 0.2s; border: 1px solid transparent; }
+  .reader-toc-list a:hover { background: var(--paper-deep); color: var(--ink); font-weight: 600; border-color: var(--paper-line); }
+  
+  .reader-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 2015; opacity: 0; transition: opacity 0.3s ease; }
+  .reader-backdrop.show { display: block; opacity: 1; }
+
   @media (max-width:900px){
     body{padding:16px 12px 80px;}
     .brand h1{font-size:25px;}
@@ -810,6 +842,17 @@
     .active-project-banner b { font-size: 13px; }
 
     .mobile-sticky-bar { display: flex; }
+
+    /* Mobile tweaks for Reader Mode */
+    .reader-header { padding: 12px 16px; flex-direction: column; align-items: stretch; gap: 12px; }
+    .reader-book-title { font-size: 15.5px; max-width: 100%; text-align: center; }
+    .reader-actions { justify-content: center; gap: 6px; }
+    .reader-btn { padding: 6px 8px; font-size: 12px; }
+    .reader-btn .text-label { display: none; } /* ซ่อนข้อความในปุ่มตอนจอมือถือ ให้เหลือแต่ไอคอน */
+    .reader-font-controls .reader-btn { padding: 4px 6px; }
+    .reader-content { padding: 20px 16px 60px; font-size: 16.5px; line-height: 1.8; }
+    .reader-content h2 { font-size: 20px; }
+    .reader-toc-drawer { width: 260px; }
   }
 </style>
 </head>
@@ -1015,6 +1058,9 @@
         <!-- แถบควบคุม Export และค้นหาในประวัติ -->
         <div class="bottom-history-controls">
           <input type="text" id="bottomHistorySearchInput" class="history-search-input" placeholder="ค้นหาในประวัติ (ชื่อตอน)...">
+          <button class="utility-btn" id="openReaderBtnBottom" type="button" title="อ่านเรื่องนี้ต่อเนื่อง (โหมดนักอ่าน)">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> โหมดนักอ่าน
+          </button>
           <button class="utility-btn" id="exportDocxBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ Word (.docx)">Export .DOCX</button>
           <button class="utility-btn" id="exportEpubBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ E-Book (.epub)">Export .EPUB</button>
         </div>
@@ -1049,6 +1095,44 @@
   </div>
 
 </div>
+
+<!-- Reader Mode Overlay -->
+<div class="reader-overlay" id="readerOverlay">
+  <div class="reader-header">
+    <h3 class="reader-book-title" id="readerBookTitle">ชื่อเรื่อง</h3>
+    <div class="reader-actions">
+      <!-- ส่วนควบคุมตัวอักษร -->
+      <span class="reader-font-controls">
+        <button class="reader-btn" id="readerFontDown" type="button" title="ลดขนาดตัวอักษร">A-</button>
+        <span class="reader-font-value" id="readerFontValue">18</span>
+        <button class="reader-btn" id="readerFontUp" type="button" title="เพิ่มขนาดตัวอักษร">A+</button>
+      </span>
+      <!-- สลับโหมดมืด -->
+      <button class="reader-btn" id="readerThemeToggleBtn" type="button" title="สลับโหมดมืด/สว่าง">
+        <span id="readerThemeIconWrapper">☾</span> <span class="text-label">โหมดมืด</span>
+      </button>
+      <!-- สารบัญ -->
+      <button class="reader-btn" id="readerTocBtn" type="button" title="ดูสารบัญ">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg> 
+        <span class="text-label">สารบัญ</span>
+      </button>
+      <!-- ปิดโหมดอ่าน -->
+      <button class="reader-btn" id="readerCloseBtn" type="button" title="ปิดโหมดนักอ่าน">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> 
+        <span class="text-label">ปิด</span>
+      </button>
+    </div>
+  </div>
+  <div class="reader-content" id="readerContent"></div>
+</div>
+<div class="reader-toc-drawer" id="readerTocDrawer">
+  <button class="reader-toc-close" id="readerTocCloseBtn" type="button" title="ปิดสารบัญ">
+    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <h4 class="reader-toc-title">สารบัญ</h4>
+  <ul class="reader-toc-list" id="readerTocList"></ul>
+</div>
+<div class="reader-backdrop" id="readerBackdrop"></div>
 
 <div class="mobile-sticky-bar">
   <button class="mobile-sticky-btn" id="mobileTabToggleBtn" type="button">≡ ดูผลลัพธ์</button>
@@ -1117,13 +1201,30 @@
   zenToggleBtn.addEventListener('click', function(){ toggleZenMode(); });
   exitZenBtn.addEventListener('click', function(){ toggleZenMode(false); });
 
+  // จัดการ Theme พร้อมซิงค์ปุ่มระหว่างหน้าหลักและโหมดอ่าน
   var themeToggleBtn = document.getElementById('themeToggleBtn');
-  themeToggleBtn.addEventListener('click', function(){
-    var isDark = document.documentElement.classList.toggle('dark-mode');
+  var readerThemeToggleBtn = document.getElementById('readerThemeToggleBtn');
+  var readerThemeIconWrapper = document.getElementById('readerThemeIconWrapper');
+  
+  function updateThemeButtons(isDark) {
     themeToggleBtn.textContent = isDark ? '☼ โหมดสว่าง' : '☾ โหมดมืด';
+    if (readerThemeToggleBtn) {
+      readerThemeIconWrapper.textContent = isDark ? '☼' : '☾';
+      readerThemeToggleBtn.querySelector('.text-label').textContent = isDark ? 'โหมดสว่าง' : 'โหมดมืด';
+    }
+  }
+  
+  function handleThemeToggle() {
+    var isDark = document.documentElement.classList.toggle('dark-mode');
+    updateThemeButtons(isDark);
     appData.settings.darkMode = isDark;
     saveData();
-  });
+  }
+
+  themeToggleBtn.addEventListener('click', handleThemeToggle);
+  if(readerThemeToggleBtn) {
+    readerThemeToggleBtn.addEventListener('click', handleThemeToggle);
+  }
 
   function updateKeyStatusBadge(){
     var key = document.getElementById('apiKey').value.trim();
@@ -1321,7 +1422,6 @@
     if(!appData || typeof appData !== 'object') appData = { projects: [], currentProjectId: null };
     if(!Array.isArray(appData.projects)) appData.projects = [];
     appData.projects = appData.projects.filter(function(p){ return p && typeof p === 'object' && p.id && p.name; }).map(function(p){
-      // แปลงข้อมูลโปรเจกต์เวอร์ชันเก่าที่มีแค่ history[] ให้ย้ายเข้า books[0]
       if(!Array.isArray(p.books) || p.books.length === 0){
         var oldHistory = Array.isArray(p.history) ? p.history : [];
         p.books = [{ id: makeId('b'), title: 'เล่ม 1', history: oldHistory }];
@@ -1365,11 +1465,11 @@
 
     if(s.darkMode){
       document.documentElement.classList.add('dark-mode');
-      themeToggleBtn.textContent = '☼ โหมดสว่าง';
     }else{
       document.documentElement.classList.remove('dark-mode');
-      themeToggleBtn.textContent = '☾ โหมดมืด';
     }
+    // Update both toggle buttons
+    updateThemeButtons(s.darkMode);
 
     function setSegActive(id, val){
       var seg = document.getElementById(id);
@@ -1388,7 +1488,7 @@
     updateKeyStatusBadge();
   }
 
-  var STORAGE_WARN_BYTES = 4 * 1024 * 1024; // เตือนล่วงหน้าเมื่อข้อมูลใกล้ 4MB (เบราว์เซอร์ส่วนใหญ่จำกัดราว 5-10MB ต่อโดเมน)
+  var STORAGE_WARN_BYTES = 4 * 1024 * 1024;
   var storageWarnShown = false;
   var storageFailWarnShown = false;
 
@@ -1518,7 +1618,6 @@
     return frag;
   }
 
-  // ---- กล่องโต้ตอบธีมของแอปเอง (แทน alert/prompt/confirm มาตรฐานของเบราว์เซอร์) ----
   var appDialogOverlay = document.getElementById('appDialogOverlay');
   var appDialogTitle = document.getElementById('appDialogTitle');
   var appDialogMessage = document.getElementById('appDialogMessage');
@@ -1551,8 +1650,6 @@
     if(e.key === 'Enter'){ e.preventDefault(); appDialogConfirmBtn.click(); }
     else if(e.key === 'Escape'){ appDialogCancelBtn.click(); }
   });
-  // ให้ Escape ปิดกล่อง alert/confirm ได้ด้วย ไม่ใช่แค่ตอนโฟกัสอยู่ที่ช่อง input (โหมด prompt)
-  // เพราะ alert/confirm โฟกัสไปที่ปุ่มยืนยันแทน ไม่ใช่ input
   appDialogOverlay.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && appDialogOverlay.classList.contains('show')){
       appDialogCancelBtn.click();
@@ -1818,6 +1915,33 @@
           });
           brow.appendChild(btitle);
 
+          // ปุ่มโหมดนักอ่านใน Sidebar ใช้ Inline SVG แบบเส้น
+          var breadBtn = document.createElement('button');
+          breadBtn.className = 'icon-btn';
+          breadBtn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
+          breadBtn.title = 'อ่านเล่มนี้ต่อเนื่อง (โหมดนักอ่าน)';
+          breadBtn.addEventListener('click', function(e){
+            e.stopPropagation();
+            openReaderMode(proj, book.id);
+          });
+          brow.appendChild(breadBtn);
+
+          var brename = document.createElement('button');
+          brename.className = 'icon-btn';
+          brename.textContent = '✎';
+          brename.title = 'เปลี่ยนชื่อเล่ม';
+          brename.addEventListener('click', async function(e){
+            e.stopPropagation();
+            var newTitle = await showPromptDialog('เปลี่ยนชื่อเล่ม/โฟลเดอร์', book.title);
+            if(newTitle && newTitle.trim()){
+              book.title = newTitle.trim();
+              saveData();
+              renderProjects();
+              renderBottomHistory();
+            }
+          });
+          brow.appendChild(brename);
+
           var bdel = document.createElement('button');
           bdel.className = 'icon-btn';
           bdel.textContent = '✕';
@@ -1835,22 +1959,6 @@
             }
           });
           brow.appendChild(bdel);
-
-          var brename = document.createElement('button');
-          brename.className = 'icon-btn';
-          brename.textContent = '✎';
-          brename.title = 'เปลี่ยนชื่อเล่ม';
-          brename.addEventListener('click', async function(e){
-            e.stopPropagation();
-            var newTitle = await showPromptDialog('เปลี่ยนชื่อเล่ม/โฟลเดอร์', book.title);
-            if(newTitle && newTitle.trim()){
-              book.title = newTitle.trim();
-              saveData();
-              renderProjects();
-              renderBottomHistory();
-            }
-          });
-          brow.appendChild(brename);
 
           bookContainer.appendChild(brow);
 
@@ -1998,8 +2106,6 @@
   });
 
   function dedupeGlossary(existingText, newText){
-    // รวมคลังคำเดิม + คำใหม่ โดยตัดคำซ้ำออก (เทียบจากส่วน "ต้นฉบับ" ก่อนเครื่องหมาย =)
-    // ใช้ Object.create(null) แทน {} ธรรมดา กัน key อย่าง "__proto__" ชนกับ prototype chain
     var seen = Object.create(null);
     var lines = [];
     function addLine(line){
@@ -2023,7 +2129,6 @@
     if(warnIfAiBusy()) return;
 
     var sys = "คุณคือบรรณาธิการตรวจนิยาย อ่านข้อความต่อไปนี้แล้วดึงเฉพาะ 'ชื่อตัวละคร, สถานที่, หรือศัพท์เฉพาะ' ออกมา จัดรูปแบบเป็น 'ต้นฉบับ = คำแปลไทย' บรรทัดละ 1 คำ ตอบกลับเฉพาะรายการคำศัพท์เท่านั้น ห้ามมีคำอธิบายเพิ่มเติม";
-    // สแกนทั้งข้อความ ไม่ใช่แค่ 3000 ตัวอักษรแรก โดยแบ่งเป็นส่วนๆ เหมือนตอนแปลจริง
     var chunks = splitIntoChunks(text, 4000);
     var aggregated = proj.glossary || '';
 
@@ -2300,6 +2405,7 @@
       if(document.body.classList.contains('zen-mode')) toggleZenMode(false);
       else if(translationModal.classList.contains('open')) closeTranslationModal();
       else if(settingsPanel.classList.contains('open')) settingsPanel.classList.remove('open');
+      else if(readerOverlay.classList.contains('show') && !readerTocDrawer.classList.contains('open')) closeReaderMode();
     }
   });
 
@@ -2314,12 +2420,35 @@
     highlightSuspicious(inputText.value);
     saveDraftSoon();
   });
-  clearBtn.addEventListener('click', function(){
+  
+  // ----- ฟังก์ชันล้างข้อความ (เคลียร์ให้พร้อมแปลตอนต่อไป) -----
+  clearBtn.addEventListener('click', async function(){
+    if (inputText.value.trim() !== '' || output.textContent.trim() !== '') {
+      var ok = await showConfirmDialog('ล้างข้อความ', 'ต้องการล้างข้อความและผลลัพธ์ทั้งหมด เพื่อเตรียมแปลเนื้อหาใหม่ใช่หรือไม่?\n\n(หากยังไม่ได้บันทึกฉบับแก้ไข ข้อมูลที่ยังไม่บันทึกจะหายไป)', true);
+      if(!ok) return;
+    }
+
+    chapterTitle.value = '';
     inputText.value = '';
     inCount.textContent = '0 คำ';
     highlightSuspicious('');
+
+    setOutput('');
+    output.contentEditable = 'false';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
+    stamp.classList.remove('show');
+
+    if(viewingHistoryId){
+      viewingHistoryId = null;
+      document.body.classList.remove('history-mode');
+      historyViewBanner.classList.remove('show');
+      historyViewBannerBottom.classList.remove('show');
+      setResultFocus(false);
+    }
+    switchMobileTab('source');
     saveDraftSoon();
   });
+
   output.addEventListener('input', function(){
     outCount.textContent = countWords(output.textContent) + ' คำ';
     saveRevisionBtn.disabled = !output.textContent.trim();
@@ -2389,7 +2518,6 @@
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 0);
   });
 
-  /* [ปรับปรุง] รองรับการกู้คืนไฟล์ทั้งเวอร์ชันเก่า ( history[] ) และเวอร์ชันใหม่ ( books[] ) ได้ 100% */
   document.getElementById('importBackupBtn').addEventListener('click', function(){ document.getElementById('backupFile').click(); });
   document.getElementById('backupFile').addEventListener('change', function(e){
     var file = e.target.files[0];
@@ -2408,7 +2536,7 @@
         if(await showConfirmDialog('ยืนยันการกู้คืนข้อมูล', 'กู้คืนข้อมูลนี้และแทนที่ข้อมูลเดิมทั้งหมดหรือไม่?', true, 'ตกลง')){
           appData = importedData;
           saveData();
-          loadData(); // <--- ตัวย้ายข้อมูลเก่าอัตโนมัติจะทำงานทันทีตรงนี้!
+          loadData();
           applySettingsToUI();
           renderProjects();
           renderBottomHistory();
@@ -2497,7 +2625,6 @@
     function pushCurrent(){
       if(current){ chunks.push(current); current = ''; }
     }
-    // ตัดย่อหน้าที่ยาวเกิน maxLen เดี่ยวๆ ต่อด้วยประโยค/บรรทัด ก่อนค่อยตัดดิบตามความยาวถ้ายังเกิน
     function splitOversizedParagraph(para){
       var parts = [];
       var sentences = para.split(/(?<=[.!?。！？\n])\s*/).filter(Boolean);
@@ -2506,7 +2633,6 @@
         if((buf + sen).length > maxLen){
           if(buf) parts.push(buf);
           if(sen.length > maxLen){
-            // ประโยคเดียวก็ยังยาวเกิน ตัดดิบตามความยาวตัวอักษร
             for(var k = 0; k < sen.length; k += maxLen) parts.push(sen.slice(k, k + maxLen));
             buf = '';
           } else {
@@ -2585,9 +2711,6 @@
   }
 
   var pendingResume = null;
-
-  // ป้องกันไม่ให้เรียกใช้ AI พร้อมกันหลายงาน (แปล/ซ่อม OCR/นำเข้าเป็นชุด) ซึ่งจะแย่งกันใช้
-  // activeController ตัวเดียวกัน จนปุ่มยกเลิกไปยกเลิกงานผิดตัว หรือยกเลิกงานเดิมไม่ได้อีกต่อไป
   var aiBusy = false;
   function setAiBusy(busy){
     aiBusy = busy;
@@ -2813,8 +2936,6 @@
     a.click();
   });
 
-  // hash SRI ของไลบรารีที่ pin เวอร์ชันไว้ (ยืนยันแล้วว่าตรงกับไฟล์จริงบน CDN)
-  /* รหัส SRI Hash มาตรฐานสำหรับตรวจสอบความถูกต้องของสคริปต์ภายนอก */
   var SRI_MAP = {
     'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js': 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==',
     'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js': 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==',
@@ -2832,8 +2953,6 @@
       s.src = src;
       var hash = integrity || (typeof SRI_MAP !== 'undefined' ? SRI_MAP[src] : null);
       if(hash){
-        // ตรวจสอบว่าไฟล์ที่โหลดมาจาก CDN ตรงกับ hash ที่ระบุไว้ (Subresource Integrity)
-        // กันกรณี CDN ถูกแฮ็ก/ถูกแทรกโค้ดระหว่างทาง — ถ้า hash ไม่ตรง เบราว์เซอร์จะบล็อกสคริปต์นี้ทันที
         s.integrity = hash;
         s.crossOrigin = 'anonymous';
         s.referrerPolicy = 'no-referrer';
@@ -2861,7 +2980,6 @@
 
     progressText.textContent = 'กำลังเตรียมระบบแปลงไฟล์ Word (.docx)...';
     try {
-      /* พยายามโหลดจาก jsDelivr หลักก่อน หากไม่ได้จะสลับไป unpkg อัตโนมัติ */
       try {
         await loadScript('https://cdn.jsdelivr.net/npm/docx@8.2.3/build/index.umd.js');
       } catch(e1) {
@@ -3004,6 +3122,125 @@
       setTimeout(function(){ progressText.textContent = ''; }, 2000);
     }
   });
+
+
+  /* ---------------- Reader Mode Logic ---------------- */
+  var readerOverlay = document.getElementById('readerOverlay');
+  var readerContent = document.getElementById('readerContent');
+  var readerTocList = document.getElementById('readerTocList');
+  var readerTocDrawer = document.getElementById('readerTocDrawer');
+  var readerBackdrop = document.getElementById('readerBackdrop');
+  var readerBookTitle = document.getElementById('readerBookTitle');
+  var readerFontValue = document.getElementById('readerFontValue');
+  
+  var readerFontSize = 18;
+
+  function setReaderFontSize(size) {
+    readerFontSize = Math.max(14, Math.min(32, size));
+    readerContent.style.fontSize = readerFontSize + 'px';
+    readerFontValue.textContent = readerFontSize;
+  }
+
+  document.getElementById('readerFontDown').addEventListener('click', function(){ setReaderFontSize(readerFontSize - 1); });
+  document.getElementById('readerFontUp').addEventListener('click', function(){ setReaderFontSize(readerFontSize + 1); });
+
+  function openReaderMode(proj, bookId) {
+    var book = (proj.books || []).find(function(b) { return b.id === bookId; });
+    if (!book) return;
+    var historyList = book.history || [];
+    if (historyList.length === 0) {
+      showAlertDialog('ไม่มีข้อมูล', 'ยังไม่มีตอนที่แปลในเล่มนี้');
+      return;
+    }
+
+    readerBookTitle.textContent = proj.name + ' - ' + book.title;
+    readerContent.innerHTML = '';
+    readerTocList.innerHTML = '';
+    
+    // ตั้งค่าขนาดอักษรเริ่มต้นในโหมดอ่าน
+    setReaderFontSize(18);
+
+    // ประมวลผล DOM แบบมีประสิทธิภาพ
+    var contentFrag = document.createDocumentFragment();
+    var tocFrag = document.createDocumentFragment();
+
+    historyList.forEach(function(entry, idx) {
+      var titleText = entry.label || ('ตอนที่ ' + (idx + 1));
+      var chId = 'rm-chap-' + entry.id;
+
+      // สร้างส่วนเนื้อหา (Content)
+      var chContainer = document.createElement('div');
+      chContainer.style.marginBottom = '40px';
+
+      var h2 = document.createElement('h2');
+      h2.id = chId;
+      h2.textContent = titleText;
+      chContainer.appendChild(h2);
+
+      var paras = (entry.output || '').split('\n');
+      paras.forEach(function(p) {
+        if (p.trim()) {
+          var pEl = document.createElement('p');
+          pEl.textContent = p.trim();
+          chContainer.appendChild(pEl);
+        }
+      });
+      contentFrag.appendChild(chContainer);
+
+      // สร้างส่วนสารบัญ (TOC)
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + chId;
+      a.textContent = titleText;
+      a.addEventListener('click', function(e) {
+        e.preventDefault();
+        var target = document.getElementById(chId);
+        if(target) target.scrollIntoView({ behavior: 'smooth' });
+        closeReaderToc();
+      });
+      li.appendChild(a);
+      tocFrag.appendChild(li);
+    });
+
+    readerContent.appendChild(contentFrag);
+    readerTocList.appendChild(tocFrag);
+
+    readerOverlay.classList.add('show');
+    document.body.style.overflow = 'hidden'; // ล็อก Scroll หน้าจอหลัก
+  }
+
+  function closeReaderMode() {
+    readerOverlay.classList.remove('show');
+    document.body.style.overflow = '';
+    readerContent.innerHTML = ''; // คืนพื้นที่หน่วยความจำเพื่อ Performance
+    closeReaderToc();
+  }
+
+  function openReaderToc() {
+    readerTocDrawer.classList.add('open');
+    readerBackdrop.classList.add('show');
+  }
+
+  function closeReaderToc() {
+    readerTocDrawer.classList.remove('open');
+    readerBackdrop.classList.remove('show');
+  }
+
+  document.getElementById('readerCloseBtn').addEventListener('click', closeReaderMode);
+  document.getElementById('readerTocBtn').addEventListener('click', openReaderToc);
+  document.getElementById('readerTocCloseBtn').addEventListener('click', closeReaderToc);
+  readerBackdrop.addEventListener('click', closeReaderToc);
+
+  var openReaderBtnBottom = document.getElementById('openReaderBtnBottom');
+  if(openReaderBtnBottom) {
+    openReaderBtnBottom.addEventListener('click', function(){
+      var proj = getCurrentProject();
+      if(proj) {
+        var activeBook = getActiveBook(proj);
+        if(activeBook) openReaderMode(proj, activeBook.id);
+      }
+    });
+  }
 
   loadData();
   applySettingsToUI();
