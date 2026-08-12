@@ -1204,7 +1204,6 @@
 </div>
 
 <script>
-(function(){
   var STORAGE_KEY = 'prungAksornData';
   var state = { source: 'translate', level: 'edit', genre: 'ทั่วไป', style: 'สำนวนปัจจุบัน' };
   var appData = { projects: [], currentProjectId: null };
@@ -1409,7 +1408,9 @@
         var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
         if(newLabel && newLabel.trim()){
           entry.label = newLabel.trim();
-          commitChange();
+          saveData();
+          renderProjects();
+          renderBottomHistory();
           if(viewingHistoryId === entry.id){
             historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
             historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
@@ -1438,7 +1439,9 @@
             historyViewBannerBottom.classList.remove('show');
             loadProjectDraft(proj);
           }
-          commitChange();
+          saveData();
+          renderProjects();
+          renderBottomHistory();
         }
       });
       actions.appendChild(delBtn);
@@ -1556,7 +1559,7 @@
   var storageWarnShown = false;
   var storageFailWarnShown = false;
 
-  function saveDataImmediate(){
+  function saveData(){
     var json;
     try{
       json = JSON.stringify(appData);
@@ -1578,39 +1581,6 @@
       showAlertDialog('พื้นที่จัดเก็บใกล้เต็ม', 'ข้อมูลของคุณมีขนาดประมาณ ' + mb + ' MB ซึ่งใกล้เต็มพื้นที่จัดเก็บของเบราว์เซอร์ (โดยทั่วไปจำกัดราว 5-10MB ต่อโดเมน) แนะนำให้กดสำรองข้อมูล (Export) และพิจารณาลบตอนเก่าที่ไม่ใช้แล้ว เพื่อป้องกันข้อมูลใหม่ในอนาคตไม่ถูกบันทึก');
     }
     return true;
-  }
-
-  var saveDataTimer = null;
-  var saveDataPending = false;
-
-  function flushSaveData(){
-    clearTimeout(saveDataTimer);
-    saveDataTimer = null;
-    if(!saveDataPending) return true;
-    saveDataPending = false;
-    return saveDataImmediate();
-  }
-
-  function saveData(){
-    // debounce การเขียน localStorage จริง (400ms) แทนที่จะ JSON.stringify + setItem ทันทีทุกครั้งที่เรียก
-    // ถ้ามีการเรียกซ้อนกันถี่ๆ (เช่นระหว่างนำเข้าหลายไฟล์) จะเขียนจริงแค่ครั้งเดียวหลังหยุดนิ่ง
-    // มี flushSaveData() คอยบันทึกทันทีตอนปิดแท็บ กันข้อมูลตกหล่นจากการ debounce
-    saveDataPending = true;
-    clearTimeout(saveDataTimer);
-    saveDataTimer = setTimeout(flushSaveData, 400);
-    return true;
-  }
-
-  window.addEventListener('beforeunload', function(){
-    if(saveDataPending) flushSaveData();
-  });
-
-  function commitChange(){
-    // รวม save + re-render ที่ต้องทำคู่กันแทบทุกจุดที่ข้อมูลถูกแก้ไข ไว้ที่เดียว
-    // กันปัญหาลืมเรียก render อันใดอันหนึ่งหลังแก้ข้อมูล (เคยเกิดมาแล้วหลายจุดตอนพัฒนาฟีเจอร์ก่อนหน้า)
-    saveData();
-    renderProjects();
-    renderBottomHistory();
   }
 
   function getCurrentProject(){
@@ -1912,7 +1882,9 @@
         var newName = await showPromptDialog('เปลี่ยนชื่อเรื่องนิยาย', proj.name);
         if(newName && newName.trim()){
           proj.name = newName.trim();
-          commitChange();
+          saveData();
+          renderProjects();
+          renderBottomHistory();
           updateActiveBanner();
         }
       });
@@ -1938,7 +1910,9 @@
         if(ok){
           appData.projects = appData.projects.filter(function(p){ return p !== proj; });
           if(appData.currentProjectId === proj.id) appData.currentProjectId = null;
-          commitChange();
+          saveData();
+          renderProjects();
+          renderBottomHistory();
           updateActiveBanner();
         }
       });
@@ -2002,7 +1976,9 @@
           btitle.addEventListener('click', function(e){
             e.stopPropagation();
             proj.currentBookId = book.id;
-            commitChange();
+            saveData();
+            renderProjects();
+            renderBottomHistory();
           });
           brow.appendChild(btitle);
 
@@ -2026,7 +2002,9 @@
             var newTitle = await showPromptDialog('เปลี่ยนชื่อเล่ม/โฟลเดอร์', book.title);
             if(newTitle && newTitle.trim()){
               book.title = newTitle.trim();
-              commitChange();
+              saveData();
+              renderProjects();
+              renderBottomHistory();
             }
           });
           brow.appendChild(brename);
@@ -2042,7 +2020,9 @@
             if(ok){
               proj.books = proj.books.filter(function(b){ return b.id !== book.id; });
               proj.currentBookId = proj.books[0].id;
-              commitChange();
+              saveData();
+              renderProjects();
+              renderBottomHistory();
             }
           });
           brow.appendChild(bdel);
@@ -2091,7 +2071,9 @@
                   var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
                   if(newLabel && newLabel.trim()){
                     entry.label = newLabel.trim();
-                    commitChange();
+                    saveData();
+                    renderProjects();
+                    renderBottomHistory();
                     if(viewingHistoryId === entry.id){
                       historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
                       historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
@@ -2148,7 +2130,9 @@
             var newBook = { id: makeId('b'), title: bname.trim(), history: [] };
             proj.books.push(newBook);
             proj.currentBookId = newBook.id;
-            commitChange();
+            saveData();
+            renderProjects();
+            renderBottomHistory();
           }
         });
         bookContainer.appendChild(addBookBtn);
@@ -2181,7 +2165,9 @@
     appData.projects.push(proj);
     appData.currentProjectId = proj.id;
     expandedProjects[proj.id] = true;
-    commitChange();
+    saveData();
+    renderProjects();
+    renderBottomHistory();
     updateActiveBanner();
     loadProjectDraft(proj);
   });
@@ -2355,7 +2341,6 @@
       historyViewBanner.classList.remove('show');
       historyViewBannerBottom.classList.remove('show');
       loadProjectDraft(getCurrentProject());
-})();
     });
   });
 
@@ -2368,7 +2353,9 @@
     var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', entry.label || '');
     if(newLabel && newLabel.trim()){
       entry.label = newLabel.trim();
-      commitChange();
+      saveData();
+      renderProjects();
+      renderBottomHistory();
       historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
       historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
     }
@@ -2387,7 +2374,9 @@
       if(activeBook) activeBook.history = filtered;
       else proj.history = filtered;
 
-      commitChange();
+      saveData();
+      renderProjects();
+      renderBottomHistory();
       viewingHistoryId = null;
       document.body.classList.remove('history-mode');
       historyViewBanner.classList.remove('show');
@@ -2555,7 +2544,9 @@
     else (proj.history = proj.history || []).push(newEntry);
 
     viewingHistoryId = newEntry.id;
-    commitChange();
+    saveData();
+    renderProjects();
+    renderBottomHistory();
     progressText.textContent = 'บันทึกเรียบร้อย';
     setTimeout(function(){ progressText.textContent = ''; }, 1500);
   });
@@ -2608,7 +2599,7 @@
   });
 
   document.getElementById('exportBackupBtn').addEventListener('click', function(){
-    flushSaveData();
+    saveData();
     var payload = { format: 'prung-aksorn-backup', version: 1, exportedAt: new Date().toISOString(), data: appData };
     var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
     var a = document.createElement('a');
@@ -2859,7 +2850,9 @@
       else (proj.history = proj.history || []).push(newEntry);
 
       viewingHistoryId = newEntry.id;
-      commitChange();
+      saveData();
+      renderProjects();
+      renderBottomHistory();
     } catch(err){
       if(err.name !== 'AbortError'){
         pendingResume = { chunks: chunks, proj: proj, key: key, model: model, startIndex: i, results: results, originalText: originalText };
@@ -2960,7 +2953,9 @@
         var label = f.name.replace(/\.[^.]+$/, '');
         await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text);
         succeeded.push(f.name);
-        commitChange();
+        saveData();
+        renderProjects();
+        renderBottomHistory();
       }catch(err){
         if(err.name === 'AbortError'){ batchCancelled = true; break; }
         failed.push(f.name + ' (' + (err.message || 'เกิดข้อผิดพลาด') + ')');
