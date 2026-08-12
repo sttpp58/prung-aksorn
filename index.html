@@ -757,6 +757,37 @@
   .reader-toc-list li { margin-bottom: 8px; }
   .reader-toc-list a { color: var(--ink-soft); text-decoration: none; font-size: 14.5px; font-family: 'Sarabun', sans-serif; display: block; padding: 8px 12px; border-radius: 4px; transition: all 0.2s; border: 1px solid transparent; }
   .reader-toc-list a:hover { background: var(--paper-deep); color: var(--ink); font-weight: 600; border-color: var(--paper-line); }
+  .reader-tts-bar {
+    position: fixed; left: 50%; bottom: -80px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: var(--paper-card); border: 1.5px solid var(--ink); border-radius: 10px;
+    padding: 10px 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    z-index: 2015; transition: bottom 0.3s cubic-bezier(0.4,0,0.2,1);
+    max-width: calc(100% - 32px);
+  }
+  .reader-tts-bar.show { bottom: 20px; }
+  .reader-tts-bar .reader-btn { padding: 7px 9px; }
+  .reader-tts-bar .reader-btn.primary { background: var(--pen); border-color: var(--pen); color: #fff; }
+  .reader-tts-bar .reader-btn.primary:hover { background: var(--ink); border-color: var(--ink); }
+  .reader-tts-rate { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
+  .reader-tts-rate input[type=range] { width: 80px; accent-color: var(--pen); }
+  .reader-tts-voice-select {
+    font-family: 'Sarabun', sans-serif; font-size: 12.5px; padding: 6px 8px;
+    border: 1px solid var(--paper-line); border-radius: 4px; background: var(--paper); color: var(--ink);
+    max-width: 150px;
+  }
+  .reader-tts-status { font-size: 11.5px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; min-width: 60px; }
+  .reader-content p.tts-active {
+    background: var(--paper-deep); border-radius: 4px;
+    box-shadow: -3px 0 0 var(--pen);
+    padding-left: 10px; margin-left: -10px;
+    transition: background 0.25s ease;
+  }
+  @media (max-width: 760px) {
+    .reader-tts-bar { flex-wrap: wrap; justify-content: center; padding: 8px 10px; gap: 6px; }
+    .reader-tts-rate, .reader-tts-voice-select { display: none; }
+  }
+
   
   .reader-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 2015; opacity: 0; transition: opacity 0.3s ease; }
   .reader-backdrop.show { display: block; opacity: 1; }
@@ -1063,6 +1094,9 @@
           </button>
           <button class="utility-btn" id="exportDocxBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ Word (.docx)">Export .DOCX</button>
           <button class="utility-btn" id="exportEpubBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ E-Book (.epub)">Export .EPUB</button>
+          <button class="utility-btn" id="checkConsistencyBtn" type="button" title="ให้ AI ตรวจสอบว่าชื่อตัวละคร/สถานที่ในคลังคำถูกแปลตรงกันทุกตอนในเล่มนี้หรือไม่">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg> ตรวจสอบความสม่ำเสมอ
+          </button>
         </div>
 
         <div class="project-history-bottom-list" id="bottomHistoryList"></div>
@@ -1107,6 +1141,11 @@
         <span class="reader-font-value" id="readerFontValue">18</span>
         <button class="reader-btn" id="readerFontUp" type="button" title="เพิ่มขนาดตัวอักษร">A+</button>
       </span>
+      <!-- อ่านออกเสียง -->
+      <button class="reader-btn" id="readerTtsBtn" type="button" title="อ่านออกเสียง">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        <span class="text-label">อ่านออกเสียง</span>
+      </button>
       <!-- สลับโหมดมืด -->
       <button class="reader-btn" id="readerThemeToggleBtn" type="button" title="สลับโหมดมืด/สว่าง">
         <span id="readerThemeIconWrapper">☾</span> <span class="text-label">โหมดมืด</span>
@@ -1124,6 +1163,31 @@
     </div>
   </div>
   <div class="reader-content" id="readerContent"></div>
+
+  <div class="reader-tts-bar" id="readerTtsBar">
+    <button class="reader-btn" id="ttsPrevBtn" type="button" title="ย่อหน้าก่อนหน้า">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none;"><rect x="4" y="4" width="2.4" height="16"/><polygon points="19,4 7,12 19,20"/></svg>
+    </button>
+    <button class="reader-btn primary" id="ttsPlayPauseBtn" type="button" title="เล่น">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none;"><polygon points="6,4 20,12 6,20"/></svg>
+    </button>
+    <button class="reader-btn" id="ttsStopBtn" type="button" title="หยุด">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none;"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg>
+    </button>
+    <button class="reader-btn" id="ttsNextBtn" type="button" title="ย่อหน้าถัดไป">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none;"><rect x="17.6" y="4" width="2.4" height="16"/><polygon points="5,4 17,12 5,20"/></svg>
+    </button>
+    <span class="reader-tts-rate">
+      <label for="ttsRateSlider">ความเร็ว</label>
+      <input type="range" id="ttsRateSlider" min="0.6" max="2" step="0.1" value="1">
+      <span id="ttsRateValue">1.0x</span>
+    </span>
+    <select id="ttsVoiceSelect" class="reader-tts-voice-select" title="เลือกเสียงอ่าน"></select>
+    <span class="reader-tts-status" id="ttsStatusText"></span>
+    <button class="reader-btn" id="ttsCloseBarBtn" type="button" title="ซ่อนแถบควบคุมเสียง">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
 </div>
 <div class="reader-toc-drawer" id="readerTocDrawer">
   <button class="reader-toc-close" id="readerTocCloseBtn" type="button" title="ปิดสารบัญ">
@@ -1140,6 +1204,7 @@
 </div>
 
 <script>
+(function(){
   var STORAGE_KEY = 'prungAksornData';
   var state = { source: 'translate', level: 'edit', genre: 'ทั่วไป', style: 'สำนวนปัจจุบัน' };
   var appData = { projects: [], currentProjectId: null };
@@ -1149,7 +1214,7 @@
   var draftSaveTimer = null;
   var outputFontSize = 15.5;
 
-  var defaultSettings = { provider:'openai', model:'gpt-4o-mini', chunkLen:'3000', source:'translate', level:'edit', genre:'ทั่วไป', style:'สำนวนปัจจุบัน', outputFontSize:15.5, darkMode: false };
+  var defaultSettings = { provider:'openai', model:'gpt-4o-mini', chunkLen:'3000', source:'translate', level:'edit', genre:'ทั่วไป', style:'สำนวนปัจจุบัน', outputFontSize:15.5, darkMode: false, ttsRate:'1', ttsVoiceURI:'' };
 
   var tabSourceBtn = document.getElementById('tabSourceBtn');
   var tabOutputBtn = document.getElementById('tabOutputBtn');
@@ -1344,9 +1409,7 @@
         var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
         if(newLabel && newLabel.trim()){
           entry.label = newLabel.trim();
-          saveData();
-          renderProjects();
-          renderBottomHistory();
+          commitChange();
           if(viewingHistoryId === entry.id){
             historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
             historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
@@ -1375,9 +1438,7 @@
             historyViewBannerBottom.classList.remove('show');
             loadProjectDraft(proj);
           }
-          saveData();
-          renderProjects();
-          renderBottomHistory();
+          commitChange();
         }
       });
       actions.appendChild(delBtn);
@@ -1444,13 +1505,16 @@
   }
 
   function saveSettings(){
+    var prevSettings = appData.settings || {};
     appData.settings = {
       provider: providerSel.value,
       model: modelInput.value,
       chunkLen: document.getElementById('chunkLen').value,
       source: state.source, level: state.level, genre: state.genre, style: state.style,
       outputFontSize: outputFontSize,
-      darkMode: document.documentElement.classList.contains('dark-mode')
+      darkMode: document.documentElement.classList.contains('dark-mode'),
+      ttsRate: prevSettings.ttsRate || defaultSettings.ttsRate,
+      ttsVoiceURI: prevSettings.ttsVoiceURI || defaultSettings.ttsVoiceURI
     };
     saveData();
   }
@@ -1492,7 +1556,7 @@
   var storageWarnShown = false;
   var storageFailWarnShown = false;
 
-  function saveData(){
+  function saveDataImmediate(){
     var json;
     try{
       json = JSON.stringify(appData);
@@ -1514,6 +1578,39 @@
       showAlertDialog('พื้นที่จัดเก็บใกล้เต็ม', 'ข้อมูลของคุณมีขนาดประมาณ ' + mb + ' MB ซึ่งใกล้เต็มพื้นที่จัดเก็บของเบราว์เซอร์ (โดยทั่วไปจำกัดราว 5-10MB ต่อโดเมน) แนะนำให้กดสำรองข้อมูล (Export) และพิจารณาลบตอนเก่าที่ไม่ใช้แล้ว เพื่อป้องกันข้อมูลใหม่ในอนาคตไม่ถูกบันทึก');
     }
     return true;
+  }
+
+  var saveDataTimer = null;
+  var saveDataPending = false;
+
+  function flushSaveData(){
+    clearTimeout(saveDataTimer);
+    saveDataTimer = null;
+    if(!saveDataPending) return true;
+    saveDataPending = false;
+    return saveDataImmediate();
+  }
+
+  function saveData(){
+    // debounce การเขียน localStorage จริง (400ms) แทนที่จะ JSON.stringify + setItem ทันทีทุกครั้งที่เรียก
+    // ถ้ามีการเรียกซ้อนกันถี่ๆ (เช่นระหว่างนำเข้าหลายไฟล์) จะเขียนจริงแค่ครั้งเดียวหลังหยุดนิ่ง
+    // มี flushSaveData() คอยบันทึกทันทีตอนปิดแท็บ กันข้อมูลตกหล่นจากการ debounce
+    saveDataPending = true;
+    clearTimeout(saveDataTimer);
+    saveDataTimer = setTimeout(flushSaveData, 400);
+    return true;
+  }
+
+  window.addEventListener('beforeunload', function(){
+    if(saveDataPending) flushSaveData();
+  });
+
+  function commitChange(){
+    // รวม save + re-render ที่ต้องทำคู่กันแทบทุกจุดที่ข้อมูลถูกแก้ไข ไว้ที่เดียว
+    // กันปัญหาลืมเรียก render อันใดอันหนึ่งหลังแก้ข้อมูล (เคยเกิดมาแล้วหลายจุดตอนพัฒนาฟีเจอร์ก่อนหน้า)
+    saveData();
+    renderProjects();
+    renderBottomHistory();
   }
 
   function getCurrentProject(){
@@ -1815,9 +1912,7 @@
         var newName = await showPromptDialog('เปลี่ยนชื่อเรื่องนิยาย', proj.name);
         if(newName && newName.trim()){
           proj.name = newName.trim();
-          saveData();
-          renderProjects();
-          renderBottomHistory();
+          commitChange();
           updateActiveBanner();
         }
       });
@@ -1843,9 +1938,7 @@
         if(ok){
           appData.projects = appData.projects.filter(function(p){ return p !== proj; });
           if(appData.currentProjectId === proj.id) appData.currentProjectId = null;
-          saveData();
-          renderProjects();
-          renderBottomHistory();
+          commitChange();
           updateActiveBanner();
         }
       });
@@ -1909,9 +2002,7 @@
           btitle.addEventListener('click', function(e){
             e.stopPropagation();
             proj.currentBookId = book.id;
-            saveData();
-            renderProjects();
-            renderBottomHistory();
+            commitChange();
           });
           brow.appendChild(btitle);
 
@@ -1935,9 +2026,7 @@
             var newTitle = await showPromptDialog('เปลี่ยนชื่อเล่ม/โฟลเดอร์', book.title);
             if(newTitle && newTitle.trim()){
               book.title = newTitle.trim();
-              saveData();
-              renderProjects();
-              renderBottomHistory();
+              commitChange();
             }
           });
           brow.appendChild(brename);
@@ -1953,9 +2042,7 @@
             if(ok){
               proj.books = proj.books.filter(function(b){ return b.id !== book.id; });
               proj.currentBookId = proj.books[0].id;
-              saveData();
-              renderProjects();
-              renderBottomHistory();
+              commitChange();
             }
           });
           brow.appendChild(bdel);
@@ -2004,9 +2091,7 @@
                   var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
                   if(newLabel && newLabel.trim()){
                     entry.label = newLabel.trim();
-                    saveData();
-                    renderProjects();
-                    renderBottomHistory();
+                    commitChange();
                     if(viewingHistoryId === entry.id){
                       historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
                       historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
@@ -2063,9 +2148,7 @@
             var newBook = { id: makeId('b'), title: bname.trim(), history: [] };
             proj.books.push(newBook);
             proj.currentBookId = newBook.id;
-            saveData();
-            renderProjects();
-            renderBottomHistory();
+            commitChange();
           }
         });
         bookContainer.appendChild(addBookBtn);
@@ -2098,9 +2181,7 @@
     appData.projects.push(proj);
     appData.currentProjectId = proj.id;
     expandedProjects[proj.id] = true;
-    saveData();
-    renderProjects();
-    renderBottomHistory();
+    commitChange();
     updateActiveBanner();
     loadProjectDraft(proj);
   });
@@ -2274,6 +2355,7 @@
       historyViewBanner.classList.remove('show');
       historyViewBannerBottom.classList.remove('show');
       loadProjectDraft(getCurrentProject());
+})();
     });
   });
 
@@ -2286,9 +2368,7 @@
     var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', entry.label || '');
     if(newLabel && newLabel.trim()){
       entry.label = newLabel.trim();
-      saveData();
-      renderProjects();
-      renderBottomHistory();
+      commitChange();
       historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
       historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
     }
@@ -2307,9 +2387,7 @@
       if(activeBook) activeBook.history = filtered;
       else proj.history = filtered;
 
-      saveData();
-      renderProjects();
-      renderBottomHistory();
+      commitChange();
       viewingHistoryId = null;
       document.body.classList.remove('history-mode');
       historyViewBanner.classList.remove('show');
@@ -2477,9 +2555,7 @@
     else (proj.history = proj.history || []).push(newEntry);
 
     viewingHistoryId = newEntry.id;
-    saveData();
-    renderProjects();
-    renderBottomHistory();
+    commitChange();
     progressText.textContent = 'บันทึกเรียบร้อย';
     setTimeout(function(){ progressText.textContent = ''; }, 1500);
   });
@@ -2493,22 +2569,46 @@
     e.target.value = '';
     if(files.length) runBatchImport(files);
   });
-  document.getElementById('textFile').addEventListener('change', function(e){
+  document.getElementById('textFile').addEventListener('change', async function(e){
     var file = e.target.files[0];
-    if(!file) return;
-    var reader = new FileReader();
-    reader.onload = function(){
-      inputText.value = String(reader.result || '');
-      inCount.textContent = countWords(inputText.value) + ' คำ';
-      highlightSuspicious(inputText.value);
-      saveDraftSoon();
-    };
-    reader.readAsText(file, 'UTF-8');
     e.target.value = '';
+    if(!file) return;
+
+    var rawText;
+    try{
+      rawText = await readFileAsText(file);
+    }catch(err){
+      showError('อ่านไฟล์ไม่สำเร็จ: ' + (err.message || ''));
+      return;
+    }
+
+    var segments = detectChapterSplits(rawText);
+    if(segments){
+      var wantSplit = await showConfirmDialog(
+        'พบหลายตอนในไฟล์นี้',
+        'ตรวจพบรูปแบบหัวข้อตอนในไฟล์ทั้งหมด ' + segments.length + ' ตอน (เช่น "' + segments[0].label + '") ต้องการแบ่งและแปลทีละตอนอัตโนมัติหรือไม่?\n\nกด "ยกเลิก" เพื่อนำเข้าทั้งไฟล์เป็นก้อนเดียวแบบเดิมแทน'
+      );
+      if(wantSplit){
+        var proj = getCurrentProject();
+        var key = document.getElementById('apiKey').value.trim();
+        if(!proj){ showError('กรุณาเลือกหรือสร้างเรื่องนิยายก่อน'); return; }
+        if(!key){ showError('กรุณาใส่ API Key ก่อน'); return; }
+        var virtualFiles = segments.map(function(seg){
+          return { name: safeFilename(seg.label) + '.txt', __virtualText: seg.text };
+        });
+        runBatchImport(virtualFiles);
+        return;
+      }
+    }
+
+    inputText.value = rawText;
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    highlightSuspicious(inputText.value);
+    saveDraftSoon();
   });
 
   document.getElementById('exportBackupBtn').addEventListener('click', function(){
-    saveData();
+    flushSaveData();
     var payload = { format: 'prung-aksorn-backup', version: 1, exportedAt: new Date().toISOString(), data: appData };
     var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
     var a = document.createElement('a');
@@ -2759,9 +2859,7 @@
       else (proj.history = proj.history || []).push(newEntry);
 
       viewingHistoryId = newEntry.id;
-      saveData();
-      renderProjects();
-      renderBottomHistory();
+      commitChange();
     } catch(err){
       if(err.name !== 'AbortError'){
         pendingResume = { chunks: chunks, proj: proj, key: key, model: model, startIndex: i, results: results, originalText: originalText };
@@ -2781,12 +2879,39 @@
   var batchCancelled = false;
 
   function readFileAsText(file){
+    if(file && typeof file.__virtualText === 'string'){
+      // "ไฟล์เสมือน" ที่ได้จากการตัดแบ่งตอนอัตโนมัติในแอปเอง ไม่ใช่ไฟล์จริงบนดิสก์
+      return Promise.resolve(file.__virtualText);
+    }
     return new Promise(function(resolve, reject){
       var reader = new FileReader();
       reader.onload = function(){ resolve(String(reader.result || '')); };
       reader.onerror = function(){ reject(new Error('อ่านไฟล์ไม่สำเร็จ: ' + file.name)); };
       reader.readAsText(file, 'UTF-8');
     });
+  }
+
+  function detectChapterSplits(text){
+    // ตรวจจับรูปแบบหัวข้อตอน/บทที่พบบ่อย: "บทที่ 1", "ตอนที่ 500", "Chapter 12", "Ch. 3", "第12章", "第十二章"
+    var pattern = /^[ \t]*(?:(?:บทที่|ตอนที่)[ \t]*\d+|Chapter[ \t]*\d+|Ch\.[ \t]*\d+|第[ \t]*(?:\d+|[〇零一二三四五六七八九十百千两]+)[ \t]*章)[^\n]*$/gim;
+    var matches = [];
+    var m;
+    while((m = pattern.exec(text)) !== null){
+      matches.push({ index: m.index, heading: m[0].trim().slice(0, 60) });
+      if(m.index === pattern.lastIndex) pattern.lastIndex++;
+    }
+    if(matches.length < 2) return null; // พบรูปแบบไม่ชัดพอ (0-1 ตอน) ไม่คุ้มที่จะแบ่งอัตโนมัติ
+
+    var segments = [];
+    var prefix = text.slice(0, matches[0].index).trim();
+    for(var i = 0; i < matches.length; i++){
+      var start = matches[i].index;
+      var end = (i + 1 < matches.length) ? matches[i + 1].index : text.length;
+      var segText = text.slice(start, end).trim();
+      if(i === 0 && prefix) segText = prefix + '\n\n' + segText;
+      if(segText) segments.push({ label: matches[i].heading, text: segText });
+    }
+    return segments.length >= 2 ? segments : null;
   }
 
   async function runSingleTranslationForBatch(chunks, proj, key, model, label, originalText){
@@ -2835,9 +2960,7 @@
         var label = f.name.replace(/\.[^.]+$/, '');
         await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text);
         succeeded.push(f.name);
-        saveData();
-        renderProjects();
-        renderBottomHistory();
+        commitChange();
       }catch(err){
         if(err.name === 'AbortError'){ batchCancelled = true; break; }
         failed.push(f.name + ' (' + (err.message || 'เกิดข้อผิดพลาด') + ')');
@@ -3123,6 +3246,68 @@
     }
   });
 
+  var checkConsistencyBtn = document.getElementById('checkConsistencyBtn');
+  checkConsistencyBtn.addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    var activeBook = getActiveBook(proj);
+    var historyList = getActiveHistoryList(proj);
+    var key = document.getElementById('apiKey').value.trim();
+
+    if(!proj || !historyList || historyList.length < 2){
+      await showAlertDialog('ยังตรวจสอบไม่ได้', 'ต้องมีอย่างน้อย 2 ตอนที่แปลแล้วในเล่มนี้ก่อน จึงจะเทียบความสม่ำเสมอข้ามตอนได้');
+      return;
+    }
+    if(!proj.glossary || !proj.glossary.trim()){
+      await showAlertDialog('ยังไม่มีคลังคำ', 'กรุณาใส่คลังคำเฉพาะเรื่อง (ชื่อตัวละคร/สถานที่) ไว้ก่อน จึงจะมีสิ่งให้เทียบความสม่ำเสมอได้');
+      return;
+    }
+    if(!key){
+      await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน');
+      return;
+    }
+
+    // แปะป้ายชื่อตอนกำกับแต่ละตอน แล้วต่อกันเป็นข้อความเดียว
+    var taggedText = historyList.map(function(entry, idx){
+      var label = entry.label || ('ตอนที่ ' + (idx + 1));
+      return '=== ' + label + ' ===\n' + (entry.output || '');
+    }).join('\n\n');
+
+    var maxLen = parseInt(document.getElementById('chunkLen').value, 10) || 3000;
+    var batches = splitIntoChunks(taggedText, Math.max(maxLen, 4000));
+
+    var sys = 'คุณเป็นบรรณาธิการตรวจทานความสม่ำเสมอของคำศัพท์เฉพาะในนิยายแปล ' +
+      'นี่คือคลังคำที่กำหนดไว้ล่วงหน้า (รูปแบบ "ต้นฉบับ = คำแปลไทย"):\n' + proj.glossary.trim() + '\n\n' +
+      'เนื้อหาที่ให้มาจะมีป้ายชื่อกำกับแต่ละตอนไว้ในรูปแบบ "=== ชื่อตอน ===" ให้ตรวจสอบว่ามีการแปล/สะกด ' +
+      'ชื่อตัวละคร สถานที่ หรือคำศัพท์เฉพาะ ที่ไม่ตรงกับคลังคำ หรือสะกด/แปลไม่ตรงกันระหว่างตอนหรือไม่ ' +
+      'ถ้าพบให้รายงานเป็นข้อๆ ระบุชื่อตอนที่พบ คำที่ใช้ไม่ตรงกัน และคำที่ควรจะเป็นตามคลังคำ (ถ้ามี) ' +
+      'ถ้าไม่พบปัญหาเลยในส่วนที่ตรวจ ให้ตอบว่า "ไม่พบความไม่สอดคล้องกัน" เท่านั้น ' +
+      'ตอบเป็นภาษาไทย กระชับ เป็นข้อๆ ห้ามมีคำนำหรือคำลงท้าย';
+
+    var reportParts = [];
+    checkConsistencyBtn.disabled = true;
+    try{
+      for(var i = 0; i < batches.length; i++){
+        progressText.textContent = batches.length > 1
+          ? ('กำลังตรวจสอบความสม่ำเสมอ ส่วนที่ ' + (i + 1) + '/' + batches.length + '...')
+          : 'กำลังตรวจสอบความสม่ำเสมอของคลังคำทั้งเล่ม...';
+        var result = await callAIWithRetry(sys, batches[i], key, modelInput.value, activeController ? activeController.signal : null, 2);
+        if(result && result.trim()){
+          reportParts.push(batches.length > 1 ? ('— ส่วนที่ ' + (i + 1) + ' —\n' + result.trim()) : result.trim());
+        }
+      }
+      var fullReport = reportParts.join('\n\n').trim();
+      if(!fullReport) fullReport = 'ไม่พบความไม่สอดคล้องกัน';
+      diffTitleEl.textContent = 'รายงานความสม่ำเสมอของคลังคำ — ' + (activeBook ? activeBook.title : proj.name);
+      diffBody.textContent = fullReport;
+      diffOverlay.classList.add('show');
+    }catch(err){
+      await showAlertDialog('ตรวจสอบไม่สำเร็จ', 'เกิดข้อผิดพลาด: ' + (err.message || ''));
+    }finally{
+      checkConsistencyBtn.disabled = false;
+      progressText.textContent = '';
+    }
+  });
+
 
 /* ---------------- Reader Mode Logic ---------------- */
   var readerOverlay = document.getElementById('readerOverlay');
@@ -3145,6 +3330,252 @@
 
   document.getElementById('readerFontDown').addEventListener('click', function(){ setReaderFontSize(readerFontSize - 1); });
   document.getElementById('readerFontUp').addEventListener('click', function(){ setReaderFontSize(readerFontSize + 1); });
+
+  /* ---------------- อ่านออกเสียง (Text-to-Speech) ---------------- */
+  var readerTtsBtn = document.getElementById('readerTtsBtn');
+  var readerTtsBar = document.getElementById('readerTtsBar');
+  var ttsPlayPauseBtn = document.getElementById('ttsPlayPauseBtn');
+  var ttsStopBtn = document.getElementById('ttsStopBtn');
+  var ttsPrevBtn = document.getElementById('ttsPrevBtn');
+  var ttsNextBtn = document.getElementById('ttsNextBtn');
+  var ttsRateSlider = document.getElementById('ttsRateSlider');
+  var ttsRateValue = document.getElementById('ttsRateValue');
+  var ttsVoiceSelect = document.getElementById('ttsVoiceSelect');
+  var ttsStatusText = document.getElementById('ttsStatusText');
+  var ttsCloseBarBtn = document.getElementById('ttsCloseBarBtn');
+
+  var ttsSupported = ('speechSynthesis' in window);
+  var ttsQueue = [];        // { el, text }
+  var ttsIndex = -1;
+  var ttsState = 'stopped'; // 'stopped' | 'playing' | 'paused'
+  var ttsVoicesLoaded = false;
+
+  var ttsPlayIconSvg = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none;"><polygon points="6,4 20,12 6,20"/></svg>';
+  var ttsPauseIconSvg = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+
+  if(!ttsSupported && readerTtsBtn){
+    readerTtsBtn.disabled = true;
+    readerTtsBtn.title = 'เบราว์เซอร์นี้ไม่รองรับการอ่านออกเสียง (ลองใช้ Chrome หรือ Edge)';
+  }
+
+  function populateTtsVoices(){
+    if(!ttsSupported) return;
+    var voices = window.speechSynthesis.getVoices();
+    if(!voices.length) return;
+    ttsVoicesLoaded = true;
+    var thVoices = voices.filter(function(v){ return /^th/i.test(v.lang); });
+    var otherVoices = voices.filter(function(v){ return !/^th/i.test(v.lang); });
+    ttsVoiceSelect.innerHTML = '';
+    function addOptGroup(label, list){
+      if(!list.length) return;
+      var group = document.createElement('optgroup');
+      group.label = label;
+      list.forEach(function(v){
+        var opt = document.createElement('option');
+        opt.value = v.voiceURI;
+        opt.textContent = v.name + ' (' + v.lang + ')';
+        group.appendChild(opt);
+      });
+      ttsVoiceSelect.appendChild(group);
+    }
+    addOptGroup('เสียงไทย', thVoices);
+    addOptGroup('เสียงอื่นๆ', otherVoices);
+
+    var savedURI = appData.settings && appData.settings.ttsVoiceURI;
+    if(savedURI && voices.some(function(v){ return v.voiceURI === savedURI; })){
+      ttsVoiceSelect.value = savedURI;
+    } else if(thVoices.length){
+      ttsVoiceSelect.value = thVoices[0].voiceURI;
+    }
+  }
+  if(ttsSupported){
+    populateTtsVoices();
+    window.speechSynthesis.onvoiceschanged = populateTtsVoices;
+    var savedRate = (appData.settings && appData.settings.ttsRate) || '1';
+    ttsRateSlider.value = savedRate;
+    ttsRateValue.textContent = parseFloat(savedRate).toFixed(1) + 'x';
+  }
+
+  function getSelectedTtsVoice(){
+    if(!ttsSupported) return null;
+    var voices = window.speechSynthesis.getVoices();
+    var uri = ttsVoiceSelect.value;
+    return voices.find(function(v){ return v.voiceURI === uri; }) || null;
+  }
+
+  function buildTtsQueue(startEl){
+    var nodes = readerContent.querySelectorAll('h2, p');
+    ttsQueue = [];
+    var startIdx = 0;
+    var foundStart = false;
+    nodes.forEach(function(el){
+      var text = (el.textContent || '').trim();
+      if(!text) return;
+      ttsQueue.push({ el: el, text: text });
+      if(!foundStart && startEl && el === startEl){
+        startIdx = ttsQueue.length - 1;
+        foundStart = true;
+      }
+    });
+    return startIdx;
+  }
+
+  function findStartElementFromScroll(){
+    // หาย่อหน้าแรกที่อยู่ ณ ตำแหน่งเลื่อนปัจจุบันหรือถัดไป เพื่อเริ่มอ่านจากตรงที่กำลังอ่านอยู่จริง
+    var nodes = readerContent.querySelectorAll('h2, p');
+    var scrollTop = readerOverlay.scrollTop + 80;
+    var candidate = null;
+    for(var i = 0; i < nodes.length; i++){
+      if(nodes[i].offsetTop >= scrollTop){ candidate = nodes[i]; break; }
+    }
+    return candidate || nodes[0] || null;
+  }
+
+  function clearTtsHighlight(){
+    var prev = readerContent.querySelector('p.tts-active');
+    if(prev) prev.classList.remove('tts-active');
+  }
+
+  function updatePlayPauseIcon(){
+    ttsPlayPauseBtn.innerHTML = (ttsState === 'playing') ? ttsPauseIconSvg : ttsPlayIconSvg;
+    ttsPlayPauseBtn.title = (ttsState === 'playing') ? 'หยุดชั่วคราว' : 'เล่น';
+  }
+
+  function speakIndex(idx){
+    if(!ttsSupported) return;
+    if(idx < 0 || idx >= ttsQueue.length){
+      stopTts();
+      return;
+    }
+    ttsIndex = idx;
+    clearTtsHighlight();
+    var item = ttsQueue[idx];
+    if(item.el.tagName === 'P'){
+      item.el.classList.add('tts-active');
+      item.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      item.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    var utt = new SpeechSynthesisUtterance(item.text);
+    var voice = getSelectedTtsVoice();
+    if(voice) utt.voice = voice;
+    utt.rate = parseFloat(ttsRateSlider.value) || 1;
+    utt.lang = voice ? voice.lang : 'th-TH';
+
+    utt.onend = function(){
+      if(ttsState === 'playing') speakIndex(ttsIndex + 1);
+    };
+    utt.onerror = function(e){
+      if(e.error === 'interrupted' || e.error === 'canceled') return;
+      ttsStatusText.textContent = 'เกิดข้อผิดพลาดในการอ่านออกเสียง';
+      stopTts();
+    };
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utt);
+    ttsStatusText.textContent = 'กำลังอ่าน ' + (idx + 1) + '/' + ttsQueue.length;
+    updatePlayPauseIcon();
+  }
+
+  function playTts(){
+    if(!ttsSupported){
+      showAlertDialog('ไม่รองรับ', 'เบราว์เซอร์นี้ไม่รองรับการอ่านออกเสียง (Web Speech API) ลองใช้ Chrome หรือ Edge เวอร์ชันล่าสุดแทน');
+      return;
+    }
+    readerTtsBar.classList.add('show');
+    if(ttsState === 'paused' && ttsIndex >= 0){
+      ttsState = 'playing';
+      speakIndex(ttsIndex);
+    } else {
+      var startEl = findStartElementFromScroll();
+      var startIdx = buildTtsQueue(startEl);
+      if(!ttsQueue.length){
+        ttsStatusText.textContent = 'ไม่มีเนื้อหาให้อ่าน';
+        return;
+      }
+      ttsState = 'playing';
+      speakIndex(startIdx);
+    }
+  }
+
+  function pauseTts(){
+    if(!ttsSupported) return;
+    ttsState = 'paused';
+    // ยกเลิกประโยคปัจจุบันแล้วเริ่มประโยคเดิมใหม่ตอนกดเล่นต่อ
+    // (เสถียรกว่าการใช้ speechSynthesis.pause()/resume() แบบ native ซึ่งมีบั๊กค้างในหลายเบราว์เซอร์)
+    window.speechSynthesis.cancel();
+    ttsStatusText.textContent = 'หยุดชั่วคราว';
+    updatePlayPauseIcon();
+  }
+
+  function stopTts(){
+    if(!ttsSupported) return;
+    ttsState = 'stopped';
+    ttsIndex = -1;
+    ttsQueue = [];
+    window.speechSynthesis.cancel();
+    clearTtsHighlight();
+    ttsStatusText.textContent = '';
+    readerTtsBar.classList.remove('show');
+    updatePlayPauseIcon();
+  }
+
+  readerTtsBtn.addEventListener('click', function(){
+    if(readerTtsBar.classList.contains('show') && ttsState === 'stopped'){
+      readerTtsBar.classList.remove('show');
+    } else {
+      readerTtsBar.classList.add('show');
+      if(!ttsVoicesLoaded) populateTtsVoices();
+    }
+  });
+
+  ttsCloseBarBtn.addEventListener('click', function(){ stopTts(); });
+  ttsPlayPauseBtn.addEventListener('click', function(){
+    if(ttsState === 'playing') pauseTts();
+    else playTts();
+  });
+  ttsStopBtn.addEventListener('click', stopTts);
+
+  ttsPrevBtn.addEventListener('click', function(){
+    if(!ttsQueue.length){ playTts(); return; }
+    var wasPlaying = (ttsState === 'playing');
+    var newIdx = Math.max(0, ttsIndex - 1);
+    if(wasPlaying){ speakIndex(newIdx); }
+    else {
+      ttsIndex = newIdx; clearTtsHighlight();
+      ttsQueue[newIdx].el.classList.add('tts-active');
+      ttsQueue[newIdx].el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  ttsNextBtn.addEventListener('click', function(){
+    if(!ttsQueue.length){ playTts(); return; }
+    var wasPlaying = (ttsState === 'playing');
+    var newIdx = Math.min(ttsQueue.length - 1, ttsIndex + 1);
+    if(wasPlaying){ speakIndex(newIdx); }
+    else {
+      ttsIndex = newIdx; clearTtsHighlight();
+      ttsQueue[newIdx].el.classList.add('tts-active');
+      ttsQueue[newIdx].el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  ttsRateSlider.addEventListener('input', function(){
+    ttsRateValue.textContent = parseFloat(ttsRateSlider.value).toFixed(1) + 'x';
+  });
+  ttsRateSlider.addEventListener('change', function(){
+    if(appData.settings) appData.settings.ttsRate = ttsRateSlider.value;
+    saveData();
+    if(ttsState === 'playing') speakIndex(ttsIndex);
+  });
+
+  ttsVoiceSelect.addEventListener('change', function(){
+    if(appData.settings) appData.settings.ttsVoiceURI = ttsVoiceSelect.value;
+    saveData();
+    if(ttsState === 'playing') speakIndex(ttsIndex);
+  });
+
 
   // ติดตามการเลื่อนหน้าจอและบันทึกตำแหน่งอัตโนมัติ
   readerOverlay.addEventListener('scroll', function() {
@@ -3240,6 +3671,7 @@
   }
 
   function closeReaderMode() {
+    stopTts();
     readerOverlay.classList.remove('show');
     document.body.style.overflow = '';
     readerContent.innerHTML = ''; // คืนพื้นที่หน่วยความจำ
