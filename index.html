@@ -1918,8 +1918,8 @@ var API_RATES = {
     var modelKey = model.toLowerCase().trim();
     var rate = API_RATES[modelKey];
     if(!rate) {
-      if(modelKey.indexOf('flash') !== -1) rate = API_RATES['gemini-1.5-flash'];
-      else if(modelKey.indexOf('pro') !== -1) rate = API_RATES['gemini-1.5-pro'];
+      if(modelKey.indexOf('flash') !== -1) rate = API_RATES['gemini-2.5-flash'];
+      else if(modelKey.indexOf('pro') !== -1) rate = API_RATES['gemini-2.5-pro'];
       else if(modelKey.indexOf('4o-mini') !== -1) rate = API_RATES['gpt-4o-mini'];
       else if(modelKey.indexOf('4o') !== -1) rate = API_RATES['gpt-4o'];
       else rate = API_RATES['default'];
@@ -2785,7 +2785,7 @@ var API_RATES = {
   });
 
   document.getElementById('exportBackupBtn').addEventListener('click', function(){
-    flushSaveData();
+    saveDataImmediate(); // ต้องใช้ saveDataImmediate() ตรงๆ ไม่ใช่ flushSaveData() ซึ่งไม่ทำอะไรเลยถ้าไม่มี debounce ค้างอยู่ก่อนหน้า
     var payload = { format: 'prung-aksorn-backup', version: 1, exportedAt: new Date().toISOString(), data: appData };
     var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
     var a = document.createElement('a');
@@ -3048,7 +3048,7 @@ var API_RATES = {
       var statsStr = '';
       if(currentActionTokens > 0) statsStr = ' (ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
       progressText.textContent = 'ปรุงอักษรเสร็จสิ้น' + statsStr;
-      setTimeout(function(){ progressText.textContent = ''; }, 10000);
+      setTimeout(function(){ progressText.textContent = ''; }, 15000);
       
     } catch(err){
       if(err.name !== 'AbortError'){
@@ -3231,7 +3231,7 @@ var API_RATES = {
     } finally { 
       setAiBusy(false);
       cancelBtn.classList.remove('show');
-      setTimeout(function(){ if(progressText.textContent.includes('ซ่อม OCR ด้วย AI เรียบร้อย')) progressText.textContent = ''; }, 10000);
+      setTimeout(function(){ if(progressText.textContent.includes('ซ่อม OCR ด้วย AI เรียบร้อย')) progressText.textContent = ''; }, 15000);
     }
   });
 
@@ -3876,8 +3876,9 @@ var API_RATES = {
     stopTts();
     if(readerCurrentBook){
       // บันทึกตำแหน่งอ่านล่าสุดทันทีก่อนปิด กันคลาดเคลื่อนกรณีปิดเร็วกว่า debounce ของ scroll listener (0.5s)
+      // ใช้ saveDataImmediate() ตรงๆ เพราะ flushSaveData() จะไม่ทำอะไรเลยถ้าไม่มีการ debounce ค้างอยู่ก่อนหน้า
       readerCurrentBook.readerScrollPos = readerOverlay.scrollTop;
-      flushSaveData();
+      saveDataImmediate();
     }
     readerOverlay.classList.remove('show');
     document.body.style.overflow = '';
