@@ -3048,7 +3048,7 @@ var API_RATES = {
       var statsStr = '';
       if(currentActionTokens > 0) statsStr = ' (ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
       progressText.textContent = 'ปรุงอักษรเสร็จสิ้น' + statsStr;
-      setTimeout(function(){ progressText.textContent = ''; }, 4000);
+      setTimeout(function(){ progressText.textContent = ''; }, 10000);
       
     } catch(err){
       if(err.name !== 'AbortError'){
@@ -3231,7 +3231,7 @@ var API_RATES = {
     } finally { 
       setAiBusy(false);
       cancelBtn.classList.remove('show');
-      setTimeout(function(){ if(progressText.textContent.includes('ซ่อม OCR ด้วย AI เรียบร้อย')) progressText.textContent = ''; }, 4000);
+      setTimeout(function(){ if(progressText.textContent.includes('ซ่อม OCR ด้วย AI เรียบร้อย')) progressText.textContent = ''; }, 10000);
     }
   });
 
