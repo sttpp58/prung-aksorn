@@ -1232,16 +1232,33 @@
 
   var defaultSettings = { provider:'openai', model:'gpt-4o-mini', chunkLen:'3000', source:'translate', level:'edit', genre:'ทั่วไป', style:'สำนวนปัจจุบัน', outputFontSize:15.5, darkMode: false, ttsRate:'1', ttsVoiceURI:'' };
 
-  // อัตราค่าบริการ API (USD ต่อ 1,000,000 Tokens) - ประมาณการอัปเดต 2024-2025
-  var API_RATES = {
-    'gpt-4o-mini': { in: 0.150, out: 0.600 },
-    'gpt-4o': { in: 2.50, out: 10.00 },
-    'gpt-4-turbo': { in: 10.00, out: 30.00 },
-    'gemini-1.5-flash': { in: 0.075, out: 0.300 },
-    'gemini-flash-latest': { in: 0.075, out: 0.300 },
-    'gemini-1.5-pro': { in: 1.25, out: 5.00 },
-    'default': { in: 0.150, out: 0.600 }
-  };
+// API Pricing (USD per 1,000,000 tokens)
+// Updated: Aug 2026
+// Source: OpenAI API Pricing + Google Gemini API Pricing
+var API_RATES = {
+  'gpt-4o-mini': { in: 0.15, out: 0.60 },
+  'gpt-4o':      { in: 2.50, out: 10.00 },
+  // GPT-5 family
+  'gpt-5-mini':  { in: 0.25, out: 2.00 },
+  'gpt-5':       { in: 1.25, out: 10.00 },
+  'gpt-5.5':     { in: 5.00, out: 30.00 },
+  // Gemini 
+  'gemini-2.5-flash': { in: 0.30, out: 2.50 },
+  'gemini-2.5-flash-lite': { in: 0.10, out: 0.40 },
+  'gemini-2.5-pro':   { in: 1.25, out: 10.00 },
+  'gemini-3.1-pro':   { in: 2.00, out: 12.00 },
+  'gemini-3.1-flash-lite': { in: 0.25, out: 1.50 },
+  'gemini-3.5-flash': { in: 1.50, out: 9.00 },
+  'gemini-3.5-flash-lite': { in: 0.30, out: 2.50 },
+  'gemini-3.6-flash': { in: 1.50, out: 7.50 },
+  'gemma-4-26b-a4b-it': { in: 0.00, out: 0.00 },
+  'gemma-4-31b-it': { in: 0.00, out: 0.00 },
+  // Alias names
+  'gemini-flash-latest': { in: 1.50, out: 7.50 },
+  'gemini-pro-latest':   { in: 2.00, out: 12.00 },
+  // Default model for cost estimation
+  'default': { in: 0.25, out: 2.00 } // gpt-5-mini
+};
   var currentActionCost = 0;
   var currentActionTokens = 0;
 
