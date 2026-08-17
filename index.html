@@ -2627,7 +2627,7 @@ var API_RATES = {
   });
 
   // --- ระบบซ่อมฟอนต์ (PUA) และดึงชื่อตอนอัตโนมัติเมื่อวางข้อความ ---
-  var chapterHeadingRegex = /^[ \t]*(?:(?:ตอนที่|ตอน|บทที่|บท|chapter|ch\.|episode|ep\.|第)[ \t]*[0-9〇零一二三四五六七八九十百千两]+(?:[ \t]*章)?|(?:บทนำ|บทส่งท้าย|prologue|epilogue|番外)).*$/i;
+  var chapterHeadingRegex = /^[ \t]*(?:(?:ตอนที่|ตอที่|ตอน|บทที่|บท|chapter|ch\.|episode|ep\.|第)[ \t]*[0-9〇零一二三四五六七八九十百千两]+(?:[ \t]*章)?|(?:บทนำ|บทำ|บทส่งท้าย|prologue|epilogue|番外)).*$/i;
 
   inputText.addEventListener('paste', function(e) {
     e.preventDefault();
@@ -2838,6 +2838,8 @@ var API_RATES = {
     text = text.replace(/[\uE200-\uE207]/g, function(m){ return puaMap[m] || m; });
     return text
       .replace(/\r/g,'')
+      // ลบอักษรเว้นวรรคความกว้างศูนย์ (zero-width space) ที่มักแทงมากันการคัดลอกข้อความ
+      .replace(/[\u200B\u200C\u200D\uFEFF]/g,'')
       .replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
       .replace(/[□■◆◇※¤]/g,'')
       .replace(/â€œ/g,'"').replace(/â€ /g,'"');
@@ -3048,7 +3050,7 @@ var API_RATES = {
       var statsStr = '';
       if(currentActionTokens > 0) statsStr = ' (ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
       progressText.textContent = 'ปรุงอักษรเสร็จสิ้น' + statsStr;
-      setTimeout(function(){ progressText.textContent = ''; }, 15000);
+      setTimeout(function(){ progressText.textContent = ''; }, 4000);
       
     } catch(err){
       if(err.name !== 'AbortError'){
@@ -3231,7 +3233,7 @@ var API_RATES = {
     } finally { 
       setAiBusy(false);
       cancelBtn.classList.remove('show');
-      setTimeout(function(){ if(progressText.textContent.includes('ซ่อม OCR ด้วย AI เรียบร้อย')) progressText.textContent = ''; }, 15000);
+      setTimeout(function(){ if(progressText.textContent.includes('ซ่อม OCR ด้วย AI เรียบร้อย')) progressText.textContent = ''; }, 4000);
     }
   });
 
