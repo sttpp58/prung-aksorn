@@ -2368,22 +2368,34 @@
     loadProjectDraft(proj);
   });
 
+// ฟังก์ชันจัดระเบียบและตัดคำซ้ำ (ล้าง Markdown, bullet, เลขนำหน้า และบรรทัดขยะอัตโนมัติ)
   function dedupeGlossary(existingText, newText){
     var seen = Object.create(null);
     var lines = [];
-    function addLine(line){
-      line = line.trim();
-      if(!line) return;
-      var key = line.split('=')[0].trim().toLowerCase();
-      if(!key || seen[key]) return;
+
+    function addLine(rawLine){
+      if(!rawLine) return;
+      // ลบ bullet เช่น "-", "*", "1.", "•" ที่หัวบรรทัดออก
+      var line = rawLine.trim().replace(/^[-*•\d.]+\s*/, '').trim();
+      if(!line.includes('=')) return;
+      var parts = line.split('=');
+      var src = parts[0].trim();
+      var trans = parts.slice(1).join('=').trim();
+      
+      if(!src || !trans) return;
+
+      var key = src.toLowerCase();
+      if(seen[key]) return; // ข้ามคำซ้ำ
       seen[key] = true;
-      lines.push(line);
+      lines.push(src + ' = ' + trans);
     }
+
     (existingText || '').split('\n').forEach(addLine);
     (newText || '').split('\n').forEach(addLine);
     return lines.join('\n');
   }
 
+  // ฟังก์ชันเรียก AI สกัดคลังคำ (สลับโหมดอัตโนมัติระหว่าง แปลภาษาอื่น vs ขัดเกลาภาษาไทย)
   async function runAiGlossaryExtract(proj, textareaEl){
     var text = inputText.value.trim();
     var key = document.getElementById('apiKey').value.trim();
@@ -2391,7 +2403,34 @@
     if(!key){ await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน'); return; }
     if(warnIfAiBusy()) return;
 
-    var sys = "คุณคือบรรณาธิการตรวจนิยาย อ่านข้อความต่อไปนี้แล้วดึงเฉพาะ 'ชื่อตัวละคร, สถานที่, หรือศัพท์เฉพาะ' ออกมา จัดรูปแบบเป็น 'ต้นฉบับ = คำแปลไทย' บรรทัดละ 1 คำ ตอบกลับเฉพาะรายการคำศัพท์เท่านั้น ห้ามมีคำอธิบายเพิ่มเติม";
+    var isThaiSource = (state.source === 'polish');
+    var sys = "";
+
+    if (isThaiSource) {
+      // กรณีต้นฉบับเป็นภาษาไทย: เน้นสกัดชื่อเฉพาะ, คำทับศัพท์, และคำที่ควรล็อกการสะกดให้เป็นมาตรฐาน
+      sys = "คุณคือบรรณาธิการภาษาไทยมืออาชีพ หน้าที่ของคุณคือสแกนข้อความนิยายภาษาไทยนี้ แล้วดึง:\n" +
+            "1. ชื่อตัวละคร สถานที่ หรือคำเฉพาะ ที่เป็นคำทับศัพท์/คำประดิษฐ์\n" +
+            "2. คำศัพท์ภาษาไทยที่มักมีการสะกดผิด หรือควรล็อกการสะกดให้เป็นมาตรฐานเดียวกันทั้งเรื่อง\n\n" +
+            "ข้อกำหนดรูปแบบผลลัพธ์:\n" +
+            "- ตอบในรูปแบบ 'คำที่พบ/คำผิด = คำสะกดที่ถูกต้องตามมาตรฐาน' บรรทัดละ 1 คำ เช่น:\n" +
+            "แคร์รอต = แคร์รอต\n" +
+            "เซนส์ = เซนส์\n" +
+            "ผูกพันธ์ = ผูกพัน\n" +
+            "หลินเฟิง = หลินเฟิง\n" +
+            "- หากเป็นชื่อเฉพาะ ให้ระบุ 'ชื่อ = คำสะกดที่เลือกใช้เป็นหลัก'\n" +
+            "- ห้ามใส่ bullet (- หรือ *), ห้ามใส่ตัวเลขลำดับ, ห้ามใส่วงเล็บอธิบาย\n" +
+            "- ตอบกลับเฉพาะรายการคำศัพท์เท่านั้น ห้ามมีข้อความอื่น";
+    } else {
+      // กรณีแปลจากภาษาอื่น: สกัด คำต่างประเทศ = คำแปลไทย
+      sys = "คุณคือบรรณาธิการตรวจนิยาย มีหน้าที่สกัด 'ชื่อเฉพาะ' (ชื่อตัวละคร, สถานที่, สำนัก, ทักษะวิชา, ศัพท์เฉพาะในเรื่อง) จากข้อความที่ให้\n\n" +
+            "ข้อกำหนดรูปแบบผลลัพธ์:\n" +
+            "1. ตอบกลับในรูปแบบ 'ต้นฉบับ = คำแปลไทย' บรรทัดละ 1 คำเท่านั้น เช่น:\n" +
+            "Lin Feng = หลินเฟิง\n" +
+            "Cloud Sect = สำนักเมฆา\n" +
+            "2. ห้ามใส่เครื่องหมายหัวข้อย่อย (- หรือ *), ห้ามใส่ตัวเลขลำดับ, และห้ามใส่วงเล็บอธิบายเด็ดขาด\n" +
+            "3. ห้ามมีคำนำ คำลงท้าย หรือหัวข้อใดๆ ทั้งสิ้น ตอบมาเฉพาะรายการคำศัพท์เท่านั้น";
+    }
+
     var chunks = splitIntoChunks(text, 4000);
     var aggregated = proj.glossary || '';
 
@@ -2402,8 +2441,8 @@
     try {
       for(var i = 0; i < chunks.length; i++){
         progressText.textContent = chunks.length > 1
-          ? ('กำลังให้ AI วิเคราะห์คำศัพท์เฉพาะ ส่วนที่ ' + (i + 1) + '/' + chunks.length + '...')
-          : 'กำลังให้ AI วิเคราะห์คำศัพท์เฉพาะและชื่อตัวละคร...';
+          ? ('กำลังให้ AI วิเคราะห์คลังคำ ส่วนที่ ' + (i + 1) + '/' + chunks.length + '...')
+          : 'กำลังให้ AI วิเคราะห์คลังคำและชื่อเฉพาะ...';
         var result = await callAIWithRetry(sys, chunks[i], key, modelInput.value, activeController.signal, 1);
         if(result && result.trim()){
           aggregated = dedupeGlossary(aggregated, result.trim());
@@ -2415,7 +2454,12 @@
       
       var statsStr = '';
       if(currentActionTokens > 0) statsStr = '\n\n(ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ประมาณ $' + currentActionCost.toFixed(4) + ')';
-      await showAlertDialog('เสร็จแล้ว', 'ดึงคลังคำจากทั้งข้อความเรียบร้อยแล้ว (ตัดคำซ้ำออกให้อัตโนมัติ)' + statsStr);
+      
+      var doneMsg = isThaiSource 
+        ? 'สกัดรายชื่อเฉพาะและคำมาตรฐานภาษาไทยเรียบร้อยแล้ว' 
+        : 'ดึงคลังคำศัพท์แปลเรียบร้อยแล้ว';
+        
+      await showAlertDialog('เสร็จแล้ว', doneMsg + ' (จัดรูปแบบและตัดคำซ้ำให้อัตโนมัติ)' + statsStr);
     } catch(err){
       if(err.name !== 'AbortError'){
         await showAlertDialog('ทำไม่สำเร็จ', 'ไม่สามารถดึงคลังคำได้: ' + (err.message || ''));
