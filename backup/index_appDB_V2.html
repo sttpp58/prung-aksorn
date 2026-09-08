@@ -1714,6 +1714,7 @@
       chunkLen: document.getElementById('chunkLen').value,
       source: state.source, level: state.level, genre: state.genre, style: state.style,
       outputFontSize: outputFontSize,
+      readerFontSize: prevSettings.readerFontSize || defaultSettings.readerFontSize,
       darkMode: document.documentElement.classList.contains('dark-mode'),
       ttsRate: prevSettings.ttsRate || defaultSettings.ttsRate,
       ttsVoiceURI: prevSettings.ttsVoiceURI || defaultSettings.ttsVoiceURI,
@@ -4087,14 +4088,20 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
   var readerCurrentBook = null;
   var readerScrollTimer = null;
 
-  function setReaderFontSize(size) {
+function setReaderFontSize(size, persist) {
     readerFontSize = Math.max(14, Math.min(32, size));
     readerContent.style.fontSize = readerFontSize + 'px';
     readerFontValue.textContent = readerFontSize;
+
+    // บันทึกลง IndexedDB เมื่อมีการปรับขนาดฟอนต์
+    if (persist && appData.settings) {
+      appData.settings.readerFontSize = readerFontSize;
+      saveData();
+    }
   }
 
-  document.getElementById('readerFontDown').addEventListener('click', function(){ setReaderFontSize(readerFontSize - 1); });
-  document.getElementById('readerFontUp').addEventListener('click', function(){ setReaderFontSize(readerFontSize + 1); });
+  document.getElementById('readerFontDown').addEventListener('click', function(){ setReaderFontSize(readerFontSize - 1, true); });
+  document.getElementById('readerFontUp').addEventListener('click', function(){ setReaderFontSize(readerFontSize + 1, true); });
 
   /* ---------------- Text-to-Speech (TTS) ---------------- */
   var readerTtsBtn = document.getElementById('readerTtsBtn');
@@ -4609,7 +4616,9 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     readerContent.innerHTML = '';
     readerTocList.innerHTML = '';
     
-    setReaderFontSize(18);
+    var savedReaderFont = (appData.settings && Number(appData.settings.readerFontSize)) || 18;
+    setReaderFontSize(savedReaderFont, false);
+
 
     var contentFrag = document.createDocumentFragment();
     var tocFrag = document.createDocumentFragment();
