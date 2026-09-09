@@ -4400,11 +4400,11 @@ function setReaderFontSize(size, persist) {
               "4. ตอบเฉพาะรายการคำศัพท์บรรทัดละ 1 คำ ห้ามใส่ bullet ห้ามใส่ตัวเลขลำดับ และห้ามมีคำอธิบายเพิ่มเติม";
       }
 
-      // ดึงตัวอย่างเนื้อหาจากทุกตอนในเล่มแบบประกบคู่ (ต้นฉบับ + คำแปล)
+      // กระชับเนื้อหาตัวอย่าง: ดึงชื่อตอน + 4 ย่อหน้าสำคัญ (ลดขนาดข้อมูลลง 50%)
       var pairedBookText = historyList.map(function(entry, idx){
         var title = entry.label || ('ตอนที่ ' + (idx + 1));
-        var inputExcerpt = (entry.input || '').slice(0, 700).trim();
-        var outputExcerpt = (entry.output || '').slice(0, 700).trim();
+        var inputExcerpt = (entry.input || '').slice(0, 450).trim();
+        var outputExcerpt = (entry.output || '').slice(0, 450).trim();
 
         if (inputExcerpt) {
           return '=== ' + title + ' ===\n[ต้นฉบับ]:\n' + inputExcerpt + '\n[คำแปล]:\n' + outputExcerpt;
@@ -4413,7 +4413,8 @@ function setReaderFontSize(size, persist) {
         }
       }).join('\n\n');
 
-      var chunks = splitIntoChunks(pairedBookText, 4500);
+      // 2. ขยายขนาด Chunk เป็น 7500 ตัวอักษร (ลดจำนวนรอบในการส่ง API ลงเหลือแค่ 4-8 รอบ)
+      var chunks = splitIntoChunks(pairedBookText, 7500);
       var rawResults = '';
 
       activeController = new AbortController();
@@ -4424,10 +4425,16 @@ function setReaderFontSize(size, persist) {
       try {
         for(var i = 0; i < chunks.length; i++){
           progressText.textContent = chunks.length > 1
-            ? ('กำลังสแกนคลังคำทั้งเล่ม ส่วนที่ ' + (i + 1) + '/' + chunks.length + '...')
+            ? ('กำลังสแกนคลังคำทั้งเล่ม ส่วนที่ ' + (i + 1) + '/' + chunks.length + ' (คุมความเร็ว Rate Limit)...')
             : 'กำลังสแกนคลังคำจากทุกตอนในเล่ม...';
+
           var result = await callAIWithRetry(sys, chunks[i], key, modelInput.value, activeController.signal, 1);
           if(result && result.trim()) rawResults += '\n' + result.trim();
+
+          // 3. หน่วงเวลา 3.2 วินาทีระหว่างก้อน (ป้องกันการยิงเกิน 20 RPM 100%)
+          if (i < chunks.length - 1) {
+            await sleep(3200);
+          }
         }
 
         // แยกคู่คำศัพท์ และกรองคำซ้ำ
