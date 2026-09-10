@@ -3268,24 +3268,38 @@
     e.target.value = '';
   });
 
-/* ---------------- ฟังก์ชันทำความสะอาดอักขระขยะ & สระเพี้ยน ---------------- */
+/* ---------------- ฟังก์ชันทำความสะอาดอักขระขยะ, สระเพี้ยน & โฆษณาเว็บ ---------------- */
   function normalizeOCR(text){
     if(!text) return '';
     
-    // แปลงรหัส PUA พื้นฐานเดิม 8 ตัว (ไม่ใส่ตารางตายตัวขนาดใหญ่)
+    // 1. แปลงรหัส PUA พื้นฐานเดิม 8 ตัว
     var puaMap = {
       '\uE200': 'ก', '\uE201': 'ง', '\uE202': 'จ', '\uE203': 'ด',
       '\uE204': 'ค', '\uE205': 'น', '\uE206': 'ม', '\uE207': 'ร'
     };
     text = text.replace(/[\uE200-\uE207]/g, function(m){ return puaMap[m] || m; });
 
+    // 2. ลบข้อความขยะ โฆษณา ปุ่มนำทาง และ Video Player Artifacts จากเว็บนิยาย
+    text = text
+      // ลบปุ่ม Previous/Next Chapter และ Table of Contents
+      .replace(/^[ \t]*(?:[‹<«]?[ \t]*(?:Previous|Next)[ \t]*Chapter[ \t]*[›>»]?|Table of Contents|Back to list)[ \t]*$/gim, '')
+      // ลบชื่อ Ad Network เช่น Ezoic
+      .replace(/^[ \t]*Ezoic[ \t]*$/gim, '')
+      // ลบปุ่มและข้อความจาก Video Player โฆษณา (Play, Unmute, Fullscreen ฯลฯ)
+      .replace(/^[ \t]*(?:[×xX]|Play|Pause|Unmute|Mute|Fullscreen|Advertisement:\s*\d+:\d+|Now Playing|Play Video|Watch on|Video channel logo)[ \t]*$/gim, '')
+      // ลบแถบหัวข้อและคำบรรยายวิดีโอโฆษณา (video of: ..., Daily Gospel ฯลฯ)
+      .replace(/^[ \t]*(?:video of:\s*.*|Watch on\s*.*|.*Play Video.*)$/gim, '')
+      .replace(/^[ \t]*(?:Daily Gospel.*|Catholic Bible.*|Fiction vs Nonfiction.*|Web Wealth.*)$/gim, '');
+
+    // 3. ล้างอักขระล่องหน, สัญลักษณ์สแกนเพี้ยน, สระแอ
     return text
       .replace(/\r/g, '')
-      .replace(/[\u00AD\u200B-\u200D\u2060\uFEFF\u202A-\u202E]/g, '') // ลบ zero-width, soft-hyphen และ bidi
+      .replace(/[\u00AD\u200B-\u200D\u2060\uFEFF\u202A-\u202E]/g, '') // ลบ zero-width, soft-hyphen, bidi
       .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
       .replace(/[□■◆◇※¤]/g, '')
       .replace(/â€œ/g, '"').replace(/â€ /g, '"')
-      .replace(/เเ/g, 'แ'); // แก้สระแอที่เกิดจากสระเอสองตัวติดกัน
+      .replace(/เเ/g, 'แ')
+      .replace(/\n{3,}/g, '\n\n'); // ยุบบรรทัดว่างที่เกิดจากการลบขยะ ให้เหลือเว้นวรรคย่อหน้าปกติ (2 บรรทัด)
   }
 
   /* ---------------- ระบบตรวจจับข้อความเพี้ยน & ฟอนต์ PUA ---------------- */
