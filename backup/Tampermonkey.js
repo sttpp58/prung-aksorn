@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         ปรุงอักษร x HostedNovel (Smart No-Duplicate Tab)
+// @name         ปรุงอักษร x HostedNovel (Full Edition)
 // @namespace    prung-aksorn
-// @version      2.2
-// @description  ส่งนิยายเข้าแท็บปรุงอักษรที่เปิดอยู่แล้วทันที ไม่เด้งแท็บใหม่ซ้ำซ้อน
+// @version      2.3
+// @description  ส่งนิยายจาก HostedNovel เข้าแอปปรุงอักษร คลีนชื่อตอน คลีนเนื้อหา แปลอัตโนมัติ ไม่เปิดแท็บซ้ำ
 // @author       Prung Aksorn
 // @match        https://hostednovel.com/novel/*
 // @match        https://sttpp58.github.io/prung-aksorn/*
@@ -17,6 +17,7 @@
 (function() {
     'use strict';
 
+    // กำหนด URL ของแอปปรุงอักษร (GitHub Pages เป็นหลัก)
     const APP_URL = 'https://sttpp58.github.io/prung-aksorn/';
     const IS_HOSTED_NOVEL = window.location.hostname.includes('hostednovel.com');
 
@@ -24,8 +25,10 @@
        ฝั่งที่ 1: ทำงานบน HostedNovel.com
        ========================================================== */
     if (IS_HOSTED_NOVEL) {
+        // ทำงานเฉพาะหน้าตอนนิยายที่มี /chapter- ใน URL
         if (!window.location.pathname.includes('/chapter-')) return;
 
+        // 1. สร้างปุ่มลอยสีแดงหรูหราที่มุมขวาล่าง
         const btn = document.createElement('button');
         btn.id = 'prung-aksorn-btn';
         btn.innerHTML = '✒️ ส่งไปปรุงอักษร';
@@ -50,11 +53,24 @@
         btn.onmouseout = () => { btn.style.transform = 'scale(1) translateY(0)'; };
 
         btn.onclick = function() {
+            // 2. ดึงชื่อตอนและคลีนชื่อเรื่อง/ลิงก์ breadcrumb ด้านหน้าออก
             let title = '';
             const h1 = document.querySelector('h1');
-            if (h1) title = h1.innerText.trim();
-            else title = document.title.split('|')[0].trim();
+            if (h1) {
+                const cloneH1 = h1.cloneNode(true);
+                // ลบแท็ก <a> หรือ breadcrumbs ที่มีชื่อเรื่อง "Chaotic Sword God" ออก
+                const removeElements = cloneH1.querySelectorAll('a, .breadcrumb, span.text-gray-500, .text-muted');
+                removeElements.forEach(el => el.remove());
+                title = cloneH1.innerText.trim();
+                if (!title) title = h1.innerText.trim();
+            } else {
+                title = document.title.split('|')[0].trim();
+            }
 
+            // แยกคำกรณีข้อความติดกัน เช่น "GodChapter 3391" -> "God Chapter 3391"
+            title = title.replace(/([a-zA-Z])(Chapter\s*\d+)/i, '$1 $2').trim();
+
+            // 3. ดึงเนื้อหาตอนและคัดกรองขยะหน้าเว็บ
             const contentContainer = document.querySelector('#chapter-content') ||
                                      document.querySelector('.chapter-content') ||
                                      document.querySelector('.prose') ||
@@ -70,6 +86,7 @@
             paragraphs.forEach(p => {
                 let text = p.innerText.trim();
                 if (!text) return;
+                // ตัดข้อความนำทาง ลายน้ำ และลิงก์โฆษณา
                 if (/hostednovel\.com/i.test(text)) return;
                 if (/^(previous chapter|next chapter|table of contents)$/i.test(text)) return;
                 if (/support us on patreon/i.test(text)) return;
@@ -82,11 +99,11 @@
                 return;
             }
 
-            // ตรวจสอบสัญญาณว่ามีแท็บแอปปรุงอักษรเปิดค้างอยู่หรือไม่ (Heartbeat Check)
+            // 4. ตรวจสอบว่าแอปปรุงอักษรเปิดอยู่แล้วหรือไม่ (Heartbeat Detection)
             const lastHeartbeat = GM_getValue('prung_app_heartbeat', 0);
-            const isAppAlreadyOpen = (Date.now() - lastHeartbeat < 4000); // ส่งสัญญาณมาไม่เกิน 4 วินาที
+            const isAppAlreadyOpen = (Date.now() - lastHeartbeat < 4000);
 
-            // ส่งข้อมูลเข้า Storage กลาง
+            // 5. บันทึกข้อมูลเข้า Storage กลาง
             GM_setValue('incoming_payload', {
                 title: title,
                 content: fullContent,
@@ -95,12 +112,12 @@
             });
 
             if (isAppAlreadyOpen) {
-                // กรณีมีแท็บเดิมเปิดอยู่: ส่งเข้าแท็บเดิม ไม่เปิดแท็บใหม่เด็ดขาด
-                btn.innerHTML = '✅ ส่งไปแปลในแท็บเดิมแล้ว!';
-                btn.style.background = '#2E5C34'; // สีเขียว
+                // ส่งเข้าแท็บเดิมเงียบๆ ไม่เด้งแท็บใหม่
+                btn.innerHTML = '✅ ส่งเข้าแท็บเดิมแล้ว!';
+                btn.style.background = '#2E5C34';
                 btn.style.borderColor = '#81C784';
             } else {
-                // กรณีไม่มีแท็บเปิดอยู่เลย: จึงเปิดแท็บให้
+                // ยังไม่เคยเปิดแท็บแอป ให้เปิดแท็บขึ้นมาใหม่
                 btn.innerHTML = '🚀 กำลังเปิดแอปปรุงอักษร...';
                 btn.style.background = '#8C6F2E';
                 GM_openInTab(APP_URL, { active: true });
@@ -117,43 +134,42 @@
     }
 
     /* ==========================================================
-       ฝั่งที่ 2: ทำงานบนหน้าแอป ปรุงอักษร (GitHub Pages หรือ Local)
+       ฝั่งที่ 2: ทำงานบนแอป ปรุงอักษร (GitHub Pages หรือ Local File)
        ========================================================== */
     else {
-        // ส่งสัญญาณบอกเบราว์เซอร์ตลอดเวลาว่า "ฉันเปิดอยู่นะ อย่าเปิดแท็บใหม่" (Heartbeat ทุก 2 วินาที)
+        // ส่งสัญญาณบอกเบราว์เซอร์ตลอดเวลาว่า "ฉันเปิดอยู่นะ อย่าเปิดแท็บใหม่" (ทุก 2 วินาที)
         function sendHeartbeat() {
             GM_setValue('prung_app_heartbeat', Date.now());
         }
         sendHeartbeat();
         setInterval(sendHeartbeat, 2000);
 
-        // เมื่อปิดแท็บ ให้รีเซ็ตค่าทันที
         window.addEventListener('beforeunload', () => {
             GM_setValue('prung_app_heartbeat', 0);
         });
 
-        // ฟังก์ชันประมวลผลข้อมูลที่ส่งเข้ามา
+        // ฟังก์ชันส่งต่อข้อความเข้าสู่ตัวแอป
         function processPayload(payload) {
             if (!payload) return;
-            if (Date.now() - payload.timestamp < 60000) {
+            if (Date.now() - payload.timestamp < 60000) { // ภายใน 60 วินาที
                 window.postMessage({
                     type: 'PRUNG_INGEST',
                     title: payload.title,
                     content: payload.content,
                     autoStart: payload.autoTranslate
                 }, '*');
-                GM_setValue('incoming_payload', null); // เคลียร์เพื่อไม่ให้รับซ้ำ
+                GM_setValue('incoming_payload', null); // ล้างค่าทิ้งเพื่อไม่ให้รันซ้ำ
             }
         }
 
-        // ดักฟังสัญญาณ Real-time เมื่อกดส่งจาก HostedNovel
+        // ดักฟังสัญญาณ Real-time ทันทีที่กดส่งมาจาก HostedNovel
         GM_addValueChangeListener('incoming_payload', function(key, oldValue, newValue, remote) {
             if (newValue) {
                 setTimeout(() => processPayload(newValue), 150);
             }
         });
 
-        // ตรวจสอบข้อมูลเผื่อกรณีเพิ่งเปิดหน้าเว็บขึ้นมา
+        // ตรวจสอบข้อมูลเผื่อกรณีเปิดแท็บใหม่ขึ้นมา
         setTimeout(() => {
             const initialPayload = GM_getValue('incoming_payload', null);
             if (initialPayload) processPayload(initialPayload);
