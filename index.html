@@ -1132,7 +1132,8 @@
           <div class="stamp" id="stamp">ตรวจแล้ว<br>✒</div>
           <div id="output" role="textbox" aria-label="ฉบับตรวจแล้ว" aria-multiline="true" spellcheck="false"></div>
           <div id="qualityWarningBox" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#FFF8DB;border:1px solid #E6C85C;border-radius:4px;font-size:13px;color:#232F3A;white-space:pre-line;"></div>
-          
+          <!-- กล่องแจ้งเตือนคำศัพท์ที่ AI ลืมใช้ (Post-Translation Glossary Enforcer) -->
+          <div id="glossaryEnforceBox" role="status" style="display:none;margin-top:10px;padding:12px 14px;background:var(--paper);border:1.5px solid var(--gold);border-radius:6px;font-size:13px;color:var(--ink);box-shadow:var(--shadow-soft);"></div>
           <div class="page-foot">
             <span id="outCount">0 คำ</span>
             <span>
@@ -1841,34 +1842,42 @@
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+/* ---------------- ฟังก์ชันตรวจจับคำในบทความแบบยืดหยุ่น (Case-Insensitive + Suffix Support) ---------------- */
   function isTermInText(term, text) {
     if (!term || !text) return false;
     term = term.trim();
     if (!term) return false;
 
-    // ภาษาอังกฤษ/ละติน ตรวจแบบ Word Boundary เพื่อไม่ให้ match ชนในคำอื่น
-    if (/^[A-Za-z0-9\s'-]+$/.test(term)) {
+    // 1. ล้างอักขระล่องหนและแปลง Smart Quotes ในคำค้นหาให้เป็นมาตรฐานเดียวกับบทความ
+    var cleanTerm = term
+      .replace(/[\u00AD\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+
+    // 2. ถ้าเป็นภาษาอังกฤษ/ละติน: รองรับตัวพิมพ์เล็ก-ใหญ่ (Case-Insensitive) และการเติม s, es, 's, ed, ing
+    if (/^[A-Za-z0-9\s'-]+$/.test(cleanTerm)) {
       try {
-        var reg = new RegExp('\\b' + escapeRegex(term) + '\\b', 'i');
-        return reg.test(text);
-      } catch(e) {
-        return text.toLowerCase().indexOf(term.toLowerCase()) !== -1;
-      }
+        // ดักจับคำ ไม่ว่าจะเป็นรูปเอกพจน์, พหูพจน์ (s/es), แสดงความเป็นเจ้าของ ('s), หรือกริยา (ed/ing)
+        var pattern = '\\b' + escapeRegex(cleanTerm) + "(?:'s|’s|s|es|d|ed|ing)?\\b";
+        var reg = new RegExp(pattern, 'i');
+        if (reg.test(text)) return true;
+      } catch(e) {}
     }
-    // ภาษาไทย จีน หรือข้อความทั่วไป
-    return text.toLowerCase().indexOf(term.toLowerCase()) !== -1;
+
+    // 3. Fallback: ค้นหาแบบ Substring ไม่สนตัวพิมพ์เล็ก-ใหญ่ (สำหรับภาษาไทย, จีน หรือคำที่มีสัญลักษณ์)
+    return text.toLowerCase().indexOf(cleanTerm.toLowerCase()) !== -1;
   }
 
+/* ---------------- ระบบคัดกรองคลังคำแบบคำยาวมาก่อน (Longest-Match-First) ---------------- */
   function filterRelevantGlossary(glossaryText, chunkText) {
     if (!glossaryText || !glossaryText.trim() || !chunkText) return { text: '', count: 0 };
 
     var lines = glossaryText.split('\n');
-    var matchedTerms = [];
+    var validTerms = [];
     var seen = Object.create(null);
 
+    // 1. แยกบรรทัดและคัดกรองคู่คำศัพท์ที่ถูกต้อง
     lines.forEach(function(line) {
       var cleanLine = line.trim().replace(/^[-*•\d.]+\s*/, '').trim();
-      // ข้ามบรรทัดว่าง, หัวข้อหมวดหมู่ [หมวด] หรือ คอมเมนต์ #
       if (!cleanLine || cleanLine.startsWith('[') || cleanLine.startsWith('#')) return;
       if (!cleanLine.includes('=')) return;
 
@@ -1879,11 +1888,21 @@
 
       var keyLower = src.toLowerCase();
       if (seen[keyLower]) return;
+      seen[keyLower] = true;
 
-      // ตรวจสอบว่าคำต้นฉบับ หรือคำแปล ปรากฏใน Chunk นี้หรือไม่
-      if (isTermInText(src, chunkText) || isTermInText(trans, chunkText)) {
-        seen[keyLower] = true;
-        matchedTerms.push(src + ' = ' + trans);
+      validTerms.push({ src: src, trans: trans });
+    });
+
+    // 2. ⚡ จัดเรียงลำดับจากคำที่ยาวที่สุดไปหาสั้นที่สุด (Longest-Match-First)
+    validTerms.sort(function(a, b) {
+      return b.src.length - a.src.length || a.src.localeCompare(b.src);
+    });
+
+    // 3. ตรวจจับคำที่ปรากฏใน Chunk ตามลำดับความยาว
+    var matchedTerms = [];
+    validTerms.forEach(function(term) {
+      if (isTermInText(term.src, chunkText) || isTermInText(term.trans, chunkText)) {
+        matchedTerms.push(term.src + ' = ' + term.trans);
       }
     });
 
@@ -1900,7 +1919,7 @@
       : { text: (proj.glossary ? proj.glossary.replace(/\n+/g, '; ') : ''), count: 0 };
 
     var glossaryPart = filterResult.text 
-      ? (' ใช้คำศัพท์เฉพาะที่พบในส่วนนี้อย่างสม่ำเสมอ (รูปแบบ "ต้นฉบับ = คำแปล"): ' + filterResult.text + '.') 
+      ? (' ใช้คำศัพท์เฉพาะที่พบในส่วนนี้อย่างสม่ำเสมอ (เรียงลำดับตามความเจาะจง หากมีคำซ้อนทับกันให้ยึดคำที่ยาวที่สุดเป็นหลัก): ' + filterResult.text + '.') 
       : '';
     var contextPart = proj.context ? (' บริบทของเรื่อง: ' + proj.context) : '';
     var tailPart = previousTail ? (' นี่คือข้อความท้ายส่วนก่อนหน้าที่ทำเสร็จไปแล้ว (แค่ให้ดูเพื่อต่อเนื้อความให้ลื่นไหลเป็นธรรมชาติ ห้ามทำซ้ำข้อความนี้อีกในคำตอบ): "' + previousTail + '"') : '';
@@ -3569,6 +3588,183 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     }
     return false;
   }
+  
+  /* =============================================================
+     ระบบตรวจจับและแทนที่คำศัพท์ที่ AI ลืมใช้ (Post-Translation Glossary Enforcer)
+     ============================================================= */
+  var glossaryEnforceBox = document.getElementById('glossaryEnforceBox');
+
+  function hideGlossaryEnforce(){
+    if(!glossaryEnforceBox) return;
+    glossaryEnforceBox.style.display = 'none';
+    glossaryEnforceBox.innerHTML = '';
+  }
+
+  // ฟังก์ชันสแกนหาคำที่ต้นฉบับมี แต่คำแปลภาษาไทยไม่มีคำนั้นปรากฏอยู่
+  function checkMissedGlossaryTerms(sourceText, targetText, glossaryText){
+    if(!sourceText || !targetText || !glossaryText || !glossaryText.trim()) return [];
+
+    var lines = glossaryText.split('\n');
+    var missed = [];
+    var seen = Object.create(null);
+
+    lines.forEach(function(line){
+      var cleanLine = line.trim().replace(/^[-*•\d.]+\s*/, '').trim();
+      if(!cleanLine || cleanLine.startsWith('[') || cleanLine.startsWith('#')) return;
+      if(!cleanLine.includes('=')) return;
+
+      var parts = cleanLine.split('=');
+      var src = parts[0].trim();
+      var trans = parts.slice(1).join('=').trim();
+      if(!src || !trans) return;
+
+      var keyLower = src.toLowerCase();
+      if(seen[keyLower]) return;
+
+      // ถ้าคำต้นฉบับปรากฏในข้อความต้นฉบับ แต่ "คำแปลไทย" กลับไม่ปรากฏในข้อความผลลัพธ์
+      if(isTermInText(src, sourceText) && targetText.indexOf(trans) === -1){
+        seen[keyLower] = true;
+        missed.push({ src: src, trans: trans });
+      }
+    });
+
+    return missed;
+  }
+
+  // ฟังก์ชันแสดงแถบแจ้งเตือนและปุ่มแก้ไข
+  function renderGlossaryEnforceWarning(missedTerms){
+    if(!glossaryEnforceBox) return;
+    if(!missedTerms || missedTerms.length === 0){
+      hideGlossaryEnforce();
+      return;
+    }
+
+    glossaryEnforceBox.innerHTML = '';
+    
+    var header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.style.marginBottom = '8px';
+    header.innerHTML = '<b style="color:var(--gold);font-size:13.5px;">⚠ พบคำศัพท์ที่ AI อาจไม่ได้แปลตามคลังคำ (' + missedTerms.length + ' คำ):</b>';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'icon-btn';
+    closeBtn.textContent = '✕';
+    closeBtn.title = 'ซ่อนคำเตือนนี้';
+    closeBtn.addEventListener('click', hideGlossaryEnforce);
+    header.appendChild(closeBtn);
+    glossaryEnforceBox.appendChild(header);
+
+    var list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '6px';
+
+    missedTerms.forEach(function(term){
+      var row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.justifyContent = 'space-between';
+      row.style.gap = '8px';
+      row.style.padding = '6px 10px';
+      row.style.background = 'var(--paper-card)';
+      row.style.border = '1px solid var(--paper-line)';
+      row.style.borderRadius = '4px';
+
+      var label = document.createElement('span');
+      label.innerHTML = '<code>' + escapeHtml(term.src) + '</code> ➔ <b style="color:var(--pen);">' + escapeHtml(term.trans) + '</b>';
+      row.appendChild(label);
+
+      var actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.gap = '6px';
+
+      // ปุ่มแทนที่คำด้วยตัวเอง
+      var replaceManualBtn = document.createElement('button');
+      replaceManualBtn.className = 'utility-btn';
+      replaceManualBtn.style.padding = '3px 8px';
+      replaceManualBtn.style.fontSize = '11.5px';
+      replaceManualBtn.textContent = '✎ แทนที่คำ';
+      replaceManualBtn.addEventListener('click', async function(){
+        var wrongWord = await showPromptDialog('พิมพ์คำในผลลัพธ์ที่ต้องการแทนที่ด้วย "' + term.trans + '":', '');
+        if(wrongWord && wrongWord.trim()){
+          var curOutput = output.textContent;
+          var regex = new RegExp(escapeRegex(wrongWord.trim()), 'g');
+          output.textContent = curOutput.replace(regex, term.trans);
+          output.dispatchEvent(new Event('input'));
+          // ตรวจสอบซ้ำหลังแทนที่
+          var remaining = checkMissedGlossaryTerms(inputText.value, output.textContent, getCurrentProject().glossary);
+          renderGlossaryEnforceWarning(remaining);
+        }
+      });
+      actions.appendChild(replaceManualBtn);
+
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+
+    glossaryEnforceBox.appendChild(list);
+
+    // ปุ่มกดให้ AI แก้ไขคำทั้งหมดแบบรวมศูนย์ใน 1 คลิก
+    var aiFixAllContainer = document.createElement('div');
+    aiFixAllContainer.style.marginTop = '10px';
+    aiFixAllContainer.style.display = 'flex';
+    aiFixAllContainer.style.justifyContent = 'flex-end';
+
+    var aiFixAllBtn = document.createElement('button');
+    aiFixAllBtn.className = 'utility-btn';
+    aiFixAllBtn.style.background = 'var(--gold)';
+    aiFixAllBtn.style.color = '#fff';
+    aiFixAllBtn.style.borderColor = 'var(--gold)';
+    aiFixAllBtn.style.fontWeight = '600';
+    aiFixAllBtn.textContent = '⚡ ให้ AI ช่วยแทนที่คำศัพท์ทั้งหมดในผลลัพธ์ทันที';
+    aiFixAllBtn.addEventListener('click', function(){
+      runSurgicalGlossaryFixWithAI(missedTerms);
+    });
+    aiFixAllContainer.appendChild(aiFixAllBtn);
+    glossaryEnforceBox.appendChild(aiFixAllContainer);
+
+    glossaryEnforceBox.style.display = 'block';
+  }
+
+  // คำสั่งยิงให้ AI ทำ Surgical Edit แทนที่เฉพาะคำที่หลุดโดยไม่แตะต้องประโยคอื่น
+  async function runSurgicalGlossaryFixWithAI(missedTerms){
+    var key = document.getElementById('apiKey').value.trim();
+    if(!key){ await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน'); return; }
+    if(warnIfAiBusy()) return;
+
+    var termRules = missedTerms.map(function(t){ return '- ต้นฉบับ: "' + t.src + '" ต้องแปลเป็น: "' + t.trans + '"'; }).join('\n');
+    var sys = "คุณคือบรรณาธิการภาษาไทย มีหน้าที่ตรวจสอบและแทนที่คำศัพท์เฉพาะในบทความภาษาไทยให้ถูกต้องตามคลังคำดังนี้:\n" +
+              termRules + "\n\n" +
+              "[ข้อห้ามเด็ดขาด]\n" +
+              "1. แทนที่เฉพาะคำศัพท์ที่แปลผิดให้ตรงตามคลังคำ ห้ามเปลี่ยนแปลง เรียบเรียงใหม่ หรือตัดทอนประโยคอื่นเด็ดขาด\n" +
+              "2. คงโครงสร้างย่อหน้าและเครื่องหมายคำพูดไว้ 100%\n" +
+              "3. ตอบกลับเฉพาะข้อความภาษาไทยที่แก้ไขเสร็จแล้วเท่านั้น ห้ามมีคำอธิบายเพิ่มเติม";
+
+    activeController = new AbortController();
+    setAiBusy(true);
+    cancelBtn.classList.add('show');
+    progressText.textContent = 'กำลังให้ AI แทนที่คำศัพท์ให้ตรงตามคลังคำ...';
+
+    try {
+      var currentOutput = output.textContent;
+      var fixedResult = await callAIWithRetry(sys, currentOutput, key, modelInput.value, activeController.signal, 1);
+      if(fixedResult && fixedResult.trim()){
+        output.textContent = fixedResult.trim();
+        output.dispatchEvent(new Event('input'));
+        hideGlossaryEnforce();
+        progressText.textContent = 'แก้ไขคำศัพท์ให้ตรงตามคลังคำเรียบร้อย!';
+        setTimeout(function(){ progressText.textContent = ''; }, 3000);
+      }
+    } catch(err){
+      if(err.name !== 'AbortError') await showAlertDialog('แก้ไขไม่สำเร็จ', err.message);
+    } finally {
+      setAiBusy(false);
+      cancelBtn.classList.remove('show');
+      progressText.textContent = '';
+    }
+  }
 
   async function runTranslation(chunks, proj, key, model, startIndex, existingResults, originalText){
     activeController = new AbortController();
@@ -3625,6 +3821,9 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
           suspiciousChunks.map(function(s){ return '• ส่วนที่ ' + (s.index + 1) + ': ' + s.reasons.join('; '); }).join('\n');
         showQualityWarning(warnMsg);
       }
+
+      var missed = checkMissedGlossaryTerms(originalText, output.textContent, proj.glossary);
+      renderGlossaryEnforceWarning(missed);
 
       var statsStr = '';
       if(currentActionTokens > 0) statsStr = ' (ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
