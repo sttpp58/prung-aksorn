@@ -4945,6 +4945,45 @@ function setReaderFontSize(size, persist) {
     });
   }
 
+/* ---------------- External Auto-Ingestion Receiver ---------------- */
+  function importExternalChapter(title, content, autoStart) {
+    if (!content) return;
+    var proj = getCurrentProject();
+    if (!proj) {
+      showError('กรุณาสร้างหรือเลือกเรื่องนิยายก่อนรับข้อมูลจากเว็บ');
+      return;
+    }
+    hideError();
+    hideGlossaryEnforce();
+
+    if (title) {
+      chapterTitle.value = title.trim();
+    }
+    inputText.value = normalizeOCR(content.trim());
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    updateChunkInfo();
+    highlightSuspicious(inputText.value);
+    saveDraftSoon();
+    switchMobileTab('source');
+
+    progressText.textContent = '📥 นำเข้าจาก HostedNovel: ' + (title || 'ตอนใหม่');
+    setTimeout(function(){ if(!aiBusy) progressText.textContent = ''; }, 3000);
+
+    // สั่งเริ่มแปลอัตโนมัติทันที
+    if (autoStart && !aiBusy) {
+      setTimeout(function() {
+        processBtn.click();
+      }, 400);
+    }
+  }
+
+  // ดักฟังสัญญาณที่ส่งมาจาก Tampermonkey
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'PRUNG_INGEST') {
+      importExternalChapter(e.data.title, e.data.content, e.data.autoStart);
+    }
+  });
+
   /* เริ่มต้นระบบแบบ Asynchronous */
   (async function initApp(){
     await loadData();
