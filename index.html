@@ -4945,8 +4945,8 @@ function setReaderFontSize(size, persist) {
     });
   }
 
-/* ---------------- External Auto-Ingestion Receiver ---------------- */
-  function importExternalChapter(title, content, autoStart) {
+/* ---------------- External Auto-Ingestion Receiver (พร้อมแปลชื่อตอนเป็นไทย) ---------------- */
+  async function importExternalChapter(title, content, autoStart) {
     if (!content) return;
     var proj = getCurrentProject();
     if (!proj) {
@@ -4956,9 +4956,22 @@ function setReaderFontSize(size, persist) {
     hideError();
     hideGlossaryEnforce();
 
-    if (title) {
-      chapterTitle.value = title.trim();
+    // 1. Stage 1: คลีนข้อความชื่อตอนด่วนด้วย Regex
+    var cleanTitle = (title || '').trim();
+    // แยกคำที่ติดกัน เช่น "GodChapter 3391" -> "Chapter 3391"
+    cleanTitle = cleanTitle.replace(/([a-zA-Z])(Chapter\s*\d+)/i, '$1 $2');
+    
+    var chapMatch = cleanTitle.match(/(?:Chapter|ตอนที่|บทที่)\s*(\d+)[:\s-]*(.*)/i);
+    var chapNum = chapMatch ? chapMatch[1] : '';
+    var rawSubtitle = chapMatch ? chapMatch[2].trim() : cleanTitle;
+
+    // ตั้งค่าชื่อตอนเบื้องต้นทันที (เช่น "บทที่ 3391: Natural Spirit")
+    if (chapNum) {
+      chapterTitle.value = 'บทที่ ' + chapNum + (rawSubtitle ? ': ' + rawSubtitle : '');
+    } else {
+      chapterTitle.value = cleanTitle || 'ตอนใหม่';
     }
+
     inputText.value = normalizeOCR(content.trim());
     inCount.textContent = countWords(inputText.value) + ' คำ';
     updateChunkInfo();
@@ -4966,10 +4979,30 @@ function setReaderFontSize(size, persist) {
     saveDraftSoon();
     switchMobileTab('source');
 
-    progressText.textContent = '📥 นำเข้าจาก HostedNovel: ' + (title || 'ตอนใหม่');
-    setTimeout(function(){ if(!aiBusy) progressText.textContent = ''; }, 3000);
+    progressText.textContent = ' นำเข้าเนื้อหาเรียบร้อย กำลังเตรียมแปล...';
 
-    // สั่งเริ่มแปลอัตโนมัติทันที
+    // 2. Stage 2: สั่งแปลชื่อตอนเป็นภาษาไทยด้วย AI แบบเบื้องหลัง (Background Parallel Task)
+    var key = document.getElementById('apiKey').value.trim();
+    if (key && rawSubtitle && /[a-zA-Z]/.test(rawSubtitle)) {
+      (async function translateTitleBackground() {
+        try {
+          var filterRes = filterRelevantGlossary(proj.glossary, rawSubtitle);
+          var glossHint = filterRes.text ? (' ยึดตามคลังคำ: ' + filterRes.text) : '';
+          var sysTitle = "คุณคือนักแปลนิยาย แปลชื่อตอนภาษาอังกฤษต่อไปนี้เป็นชื่อตอนภาษาไทยที่สละสลวย กระชับ เหมาะกับนิยายแฟนตาซี/กำลังภายใน" +
+                         glossHint + " ตอบเฉพาะชื่อตอนภาษาไทยเท่านั้น ห้ามใส่เครื่องหมายคำพูด ห้ามมีคำนำ";
+          var translatedSub = await callAIWithRetry(sysTitle, rawSubtitle, key, modelInput.value, null, 1);
+          if (translatedSub && translatedSub.trim()) {
+            var finalTitle = chapNum ? ('บทที่ ' + chapNum + ': ' + translatedSub.trim()) : translatedSub.trim();
+            chapterTitle.value = finalTitle;
+            saveDraftSoon(); // บันทึกชื่อตอนภาษาไทยลง IndexedDB
+          }
+        } catch(e) {
+          console.warn('แปลชื่อตอนไม่สำเร็จ ใช้ชื่อเดิม:', e);
+        }
+      })();
+    }
+
+    // 3. สั่งเริ่มแปลเนื้อหาทันที
     if (autoStart && !aiBusy) {
       setTimeout(function() {
         processBtn.click();
