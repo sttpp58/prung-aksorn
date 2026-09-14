@@ -2862,6 +2862,7 @@
     var hasOutput = !!output.textContent.trim();
     spread.classList.toggle('has-result', hasOutput);
     if(!hasOutput) stamp.classList.remove('show');
+    hideGlossaryEnforce();
     copyBtn.disabled = !hasOutput;
     downloadBtn.disabled = !hasOutput;
     editOutputBtn.disabled = !hasOutput;
@@ -2883,6 +2884,7 @@
     updateChunkInfo();
     highlightSuspicious(inputText.value);
     stamp.classList.remove('show');
+    hideGlossaryEnforce();
     setOutput('');
     output.contentEditable = 'false';
     editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
@@ -3145,6 +3147,7 @@
     updateChunkInfo();
     highlightSuspicious('');
 
+    hideGlossaryEnforce();
     setOutput('');
     output.contentEditable = 'false';
     editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
@@ -3772,6 +3775,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     resetActionStats();
     if(resumeBtn) resumeBtn.classList.remove('show');
     cancelBtn.classList.add('show');
+    hideGlossaryEnforce();
 
     var results = existingResults.slice();
     setOutput(results.join('\n\n'));
