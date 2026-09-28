@@ -1626,6 +1626,153 @@
   }
   bottomHistorySearchInput.addEventListener('input', applyBottomHistorySearchFilter);
 
+
+  /* ---------------- STEP 4.3 Translation Job Recovery ---------------- */
+  function clearTranslationRecoveryUI(){
+    var box = document.getElementById('translationRecoveryBox');
+    if(box) box.remove();
+  }
+
+  function renderTranslationRecovery(jobs){
+    clearTranslationRecoveryUI();
+    if(!jobs || !jobs.length) return;
+    var box=document.createElement('div');
+    box.id='translationRecoveryBox';
+    box.style.margin='12px 0';
+    box.style.padding='12px';
+    box.style.border='1px solid var(--border-color, #d9d9d9)';
+    box.style.borderRadius='10px';
+    box.style.background='var(--panel-bg, transparent)';
+    var title=document.createElement('div');
+    title.textContent='พบงานแปลที่ต้องตรวจสอบ';
+    title.style.fontWeight='600';
+    title.style.marginBottom='8px';
+    box.appendChild(title);
+    jobs.forEach(function(job){
+      var row=document.createElement('div');
+      row.style.display='flex';
+      row.style.alignItems='center';
+      row.style.justifyContent='space-between';
+      row.style.gap='8px';
+      row.style.marginTop='6px';
+      var label=document.createElement('span');
+      label.textContent=(job.label||('Job '+job.jobId))+' — '+job.completedChunks+'/'+job.totalChunks+' ('+job.status+')'+(job.reason?' — '+job.reason:'');
+      row.appendChild(label);
+      if(job.recoverable){
+        var btn=document.createElement('button');
+        btn.type='button';
+        btn.className='secondary-btn';
+        btn.textContent='กู้คืน';
+        btn.addEventListener('click',function(){prepareTranslationRecovery(job.jobId);});
+        row.appendChild(btn);
+      }
+      box.appendChild(row);
+    });
+    var note=document.createElement('div');
+    note.textContent='ระบบจะไม่เริ่ม API อัตโนมัติ ต้องกดกู้คืนและเริ่มงานด้วยตนเอง';
+    note.style.marginTop='8px';
+    note.style.fontSize='0.9em';
+    note.style.opacity='0.75';
+    box.appendChild(note);
+    var anchor=resumeBtn&&resumeBtn.parentNode?resumeBtn.parentNode:null;
+    if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(box,anchor);
+  }
+
+  async function scanTranslationJobs(){
+    try{
+      var jobs=await PrungAksornStorageV2.listTranslationJobs();
+      var candidates=[];
+      jobs.forEach(function(job){
+        if(!job||['pending','running','paused','failed'].indexOf(job.status)<0)return;
+        var base={
+          jobId:job.jobId,
+          status:job.status,
+          completedChunks:Number(job.completedChunks||0),
+          totalChunks:Number(job.totalChunks||0),
+          label:job.sourceSnapshot&&job.sourceSnapshot.title||('งานแปล '+job.jobId),
+          recoverable:false,
+          reason:''
+        };
+        try{
+          PrungAksornStorageV2.validateStoredTranslationJob(job);
+          var proj=appData.projects.find(function(p){return p.id===job.projectId;});
+          var book=proj&&(proj.books||[]).find(function(b){return b.id===job.bookId;});
+          if(!proj){base.reason='ไม่พบ Project ต้นทาง';candidates.push(base);return;}
+          if(!book){base.reason='ไม่พบ Book ต้นทาง';candidates.push(base);return;}
+          if(!job.sourceSnapshot||typeof job.sourceSnapshot.text!=='string'||!job.sourceSnapshot.text){base.reason='ไม่มี Recovery Source Snapshot';candidates.push(base);return;}
+          base.recoverable=true;
+          candidates.push(base);
+        }catch(e){
+          base.reason='Job validation ไม่ผ่าน';
+          candidates.push(base);
+          console.warn('Translation recovery candidate rejected:',job.jobId,e);
+        }
+      });
+      translationRecoveryJobs=candidates;
+      renderTranslationRecovery(candidates);
+    }catch(e){
+      console.warn('Translation recovery scan failed:',e);
+    }
+  }
+
+  async function prepareTranslationRecovery(jobId){
+    if(warnIfAiBusy())return;
+    hideError();
+    try{
+      var job=await PrungAksornStorageV2.getTranslationJob(jobId);
+      if(!job)throw new Error('ไม่พบ Translation Job นี้แล้ว');
+      PrungAksornStorageV2.validateStoredTranslationJob(job);
+      if(['pending','running','paused','failed'].indexOf(job.status)<0)throw new Error('Job นี้ไม่สามารถกู้คืนจากสถานะ '+job.status+' ได้');
+      var proj=appData.projects.find(function(p){return p.id===job.projectId;});
+      if(!proj)throw new Error('ไม่พบ Project ต้นทางของ Job');
+      var book=(proj.books||[]).find(function(b){return b.id===job.bookId;});
+      if(!book)throw new Error('ไม่พบ Book ต้นทางของ Job');
+      var snapshot=job.sourceSnapshot;
+      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true)throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
+      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+      if(job.completedChunks>chunks.length)throw new Error('Checkpoint ของ Job เกินจำนวน Chunk ที่กู้คืนได้');
+      if(job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
+      if(job.completedChunks>0){
+        var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
+        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
+      }
+      if(providerSel.value!==job.provider)throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อนกู้คืน');
+      if(modelInput.value!==job.model)throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อนกู้คืน');
+      if(!document.getElementById('apiKey').value.trim())throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
+      appData.currentProjectId=proj.id;
+      proj.currentBookId=book.id;
+      chapterTitle.value=snapshot.title||chapterTitle.value||'';
+      inputText.value=snapshot.originalText;
+      inCount.textContent=countWords(inputText.value)+' คำ';
+      updateChunkInfo();
+      setOutput(job.partialResults.map(function(x){return x.text;}).join('\n\n'));
+      pendingResume={
+        chunks:chunks,
+        proj:proj,
+        key:null,
+        model:job.model,
+        startIndex:job.completedChunks,
+        results:job.partialResults.map(function(x){return x.text;}),
+        originalText:snapshot.originalText,
+        chapterId:job.chapterId,
+        jobId:job.jobId,
+        sourceSnapshotText:snapshot.text
+      };
+      activeTranslationJobId=null;
+      if(resumeBtn){
+        resumeBtn.textContent='ดำเนินการต่อจากจุดกู้คืน';
+        resumeBtn.classList.add('show');
+      }
+      renderProjects();
+      renderBottomHistory();
+      clearTranslationRecoveryUI();
+      showError('เตรียมกู้คืน Job '+job.jobId+' แล้ว กด “ดำเนินการต่อจากจุดกู้คืน” เพื่อเริ่ม API');
+    }catch(e){
+      showError('ไม่สามารถเตรียม Recovery Job ได้: '+(e.message||e));
+    }
+  }
+
   /* โหลดข้อมูลจาก IndexedDB V2 และทำ migration V1 -> V2 เมื่อจำเป็น */
   async function loadData(){
     try{
@@ -3555,6 +3702,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
 
   var pendingResume = null;
   var activeTranslationJobId = null;
+  var translationRecoveryJobs = [];
   var aiBusy = false;
   function setAiBusy(busy){
     aiBusy = busy;
@@ -3748,7 +3896,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     }
   }
 
-  async function runTranslation(chunks, proj, key, model, startIndex, existingResults, originalText, chapterId, jobId){
+  async function runTranslation(chunks, proj, key, model, startIndex, existingResults, originalText, chapterId, jobId, sourceSnapshotText){
     activeController = new AbortController();
     setAiBusy(true);
     resetActionStats();
@@ -3765,7 +3913,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     var translationRetryCount = 0;
     if(!jobId){
       try{
-        await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:state.provider || 'openai',model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length});
+        await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:providerSel.value,model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length,sourceSnapshot:{text:String(sourceSnapshotText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(chapterTitle.value || ''),normalized:true}});
         await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running'});
       }catch(jobErr){
         setAiBusy(false);
@@ -3808,6 +3956,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
       await PrungAksornStorageV2.completeTranslationJob(translationJobId);
       pendingResume = null;
       activeTranslationJobId = null;
+      clearTranslationRecoveryUI();
       stamp.classList.add('show');
       setResultFocus(true);
       switchMobileTab('output');
@@ -3967,10 +4116,11 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     if(!proj || !text || !key){ showError('กรุณาเลือกเรื่อง ใส่เนื้อหา และ API Key'); return; }
 
     var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
-    var chunks = splitIntoChunks(normalizeOCR(text), maxLen);
+    var normalizedText = normalizeOCR(text);
+    var chunks = splitIntoChunks(normalizedText, maxLen);
     pendingResume = null;
-    if(resumeBtn) resumeBtn.classList.remove('show');
-    await runTranslation(chunks, proj, key, modelInput.value, 0, [], text, makeId('h'), null);
+    if(resumeBtn){ resumeBtn.classList.remove('show'); resumeBtn.textContent='ดำเนินการต่อ'; }
+    await runTranslation(chunks, proj, key, modelInput.value, 0, [], text, makeId('h'), null, normalizedText);
   });
 
   if(resumeBtn){
@@ -3979,7 +4129,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
       hideError();
       if(warnIfAiBusy()) return;
       var key = document.getElementById('apiKey').value.trim() || pendingResume.key;
-      await runTranslation(pendingResume.chunks, pendingResume.proj, key, modelInput.value, pendingResume.startIndex, pendingResume.results, pendingResume.originalText, pendingResume.chapterId, pendingResume.jobId);
+      await runTranslation(pendingResume.chunks, pendingResume.proj, key, pendingResume.model, pendingResume.startIndex, pendingResume.results, pendingResume.originalText, pendingResume.chapterId, pendingResume.jobId, pendingResume.sourceSnapshotText);
     });
   }
 
@@ -5033,6 +5183,7 @@ function setReaderFontSize(size, persist) {
     renderBottomHistory();
     updateActiveBanner();
     loadProjectDraft(getCurrentProject());
+    await scanTranslationJobs();
   })();
 
 })();
