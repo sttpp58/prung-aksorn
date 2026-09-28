@@ -3193,14 +3193,20 @@
   });
 
   document.getElementById('exportBackupBtn').addEventListener('click', async function(){
-    await flushSaveData();
-    var payload = { format: 'prung-aksorn-backup', version: 1, exportedAt: new Date().toISOString(), data: appData };
-    var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'prung-aksorn-backup-' + new Date().toISOString().slice(0,10) + '.json';
-    a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 0);
+    try{
+      var flushed = await flushSaveData();
+      if(!flushed){ await showAlertDialog('สำรองข้อมูลไม่สำเร็จ', 'ไม่สามารถบันทึกข้อมูลล่าสุดลงฐานข้อมูลได้'); return; }
+      var payload = await storageV2.exportBackup();
+      var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'prung-aksorn-backup-v2-' + new Date().toISOString().slice(0,10) + '.json';
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 0);
+    }catch(err){
+      console.error('Backup export failed:', err);
+      await showAlertDialog('สำรองข้อมูลไม่สำเร็จ', 'ไม่สามารถสร้างไฟล์สำรองข้อมูลที่มีความสมบูรณ์ได้');
+    }
   });
 
   document.getElementById('importBackupBtn').addEventListener('click', function(){ document.getElementById('backupFile').click(); });
@@ -3211,26 +3217,30 @@
     reader.onload = async function(){
       try {
         var rawParsed = JSON.parse(String(reader.result || ''));
-        var importedData = (rawParsed && rawParsed.data && Array.isArray(rawParsed.data.projects)) ? rawParsed.data : rawParsed;
-
-        if(!importedData || !Array.isArray(importedData.projects)){
-          await showAlertDialog('ไฟล์ไม่ถูกต้อง', 'ไฟล์สำรองไม่ถูกต้อง ไม่พบรายการเรื่องนิยาย');
-          return;
-        }
-
-        if(await showConfirmDialog('ยืนยันการกู้คืนข้อมูล', 'กู้คืนข้อมูลนี้และแทนที่ข้อมูลเดิมทั้งหมดหรือไม่?', true, 'ตกลง')){
-          appData = importedData;
-          await saveDataImmediate();
+        var checked = await storageV2.validateBackup(rawParsed);
+        var r = checked.report;
+        var summary = 'Projects: '+r.projects+'\\nBooks: '+r.books+'\\nChapters: '+r.chapters+'\\nGlossary: '+r.glossary+'\\nRevisions: '+r.revisions+'\\n\\nSHA-256: VALID\\nSchema: 2 (supported)\\n\\nการกู้คืนจะแทนที่ข้อมูลปัจจุบันทั้งหมด และระบบจะสร้าง Safety Backup อัตโนมัติก่อนดำเนินการ';
+        if(await showConfirmDialog('ยืนยันการกู้คืนข้อมูล', summary, true, 'ตกลง')){
+          var result = await storageV2.restoreBackup(rawParsed);
+          if(!result.success) throw new Error('Restore did not complete.');
           await loadData();
           applySettingsToUI();
           renderProjects();
           renderBottomHistory();
           updateActiveBanner();
           loadProjectDraft(getCurrentProject());
-          await showAlertDialog('สำเร็จ', 'กู้คืนข้อมูลสำรองเรียบร้อยแล้ว');
+          await showAlertDialog('กู้คืนสำเร็จ', 'กู้คืนข้อมูลและตรวจสอบฐานข้อมูลหลังการกู้คืนเรียบร้อยแล้ว');
         }
-      } catch(err){ 
-        await showAlertDialog('ทำไม่สำเร็จ', 'ไม่สามารถอ่านไฟล์สำรองได้ หรือรูปแบบไฟล์ไม่ถูกต้อง'); 
+      } catch(err) {
+        console.error('Backup restore failed:', err);
+        var msg = String(err&&err.message || 'ไม่สามารถกู้คืนไฟล์สำรองได้');
+        if(msg.indexOf('rolled back safely')>=0){
+          await showAlertDialog('กู้คืนไม่สำเร็จ', msg+'\\n\\nข้อมูลเดิมถูกนำกลับคืนแล้ว');
+        }else if(msg.indexOf('rollback failed')>=0){
+          await showAlertDialog('เกิดข้อผิดพลาดร้ายแรง', msg+'\\n\\nไม่สามารถยืนยันสถานะข้อมูลได้');
+        }else{
+          await showAlertDialog('ไฟล์สำรองไม่ถูกต้อง', msg);
+        }
       }
     };
     reader.readAsText(file, 'UTF-8');
