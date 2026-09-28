@@ -1350,9 +1350,10 @@
       return new Promise(function(resolve, reject) {
         var tx = db.transaction(STORE_NAME, 'readwrite');
         var store = tx.objectStore(STORE_NAME);
-        var req = store.put(val, key);
-        req.onsuccess = function() { resolve(); };
-        req.onerror = function(e) { reject(e.target.error); };
+        store.put(val, key);
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function(e) { reject(e.target.error); };
+        tx.onabort = function(e) { reject(e.target.error); };
       });
     });
   }
@@ -4208,7 +4209,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         tocNav += '<li><a href="' + chFileName + '">' + escapeHtml(chTitle) + '</a></li>\n';
       });
 
-      var opfContent = '<?xml version="1.0" encoding="utf-8"?><package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>' + escapeHtml(proj.name) + ' - ' + escapeHtml(bookTitle) + '</dc:title><dc:language>th</dc:language></metadata><manifest>' + manifestItems + '</manifest><spine>' + spineItems + '</spine></package>';
+      var opfContent = '<?xml version="1.0" encoding="utf-8"?><package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>' + escapeHtml(proj.name) + ' - ' + escapeHtml(bookTitle) + '</dc:title><dc:language>th</dc:language><dc:identifier id="BookId">urn:prung-aksorn:book:' + escapeHtml((activeBook && activeBook.id) ? activeBook.id : (proj.id || 'default')) + '</dc:identifier></metadata><manifest>' + manifestItems + '</manifest><spine>' + spineItems + '</spine></package>';
       zip.file('OEBPS/content.opf', opfContent);
 
       var blob = await zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
