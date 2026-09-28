@@ -3,7 +3,7 @@
 // ไม่แตะ/ไม่แคชการเรียก AI API (OpenAI, Gemini) หรือฟอนต์จาก Google เด็ดขาด
 // เพื่อไม่ให้คำแปลค้างหรือใช้คีย์/โควตาผิดพลาด
 
-const CACHE_NAME = 'prung-aksorn-v1';
+const CACHE_NAME = 'prung-aksorn-v2';
 const APP_SHELL = [
   './',
   './index.html',
