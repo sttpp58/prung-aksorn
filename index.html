@@ -1953,7 +1953,7 @@
     try{
       job=await PrungAksornStorageV2.getTranslationJob(jobId);
       if(!job) throw new Error('ไม่พบ Translation Job นี้แล้ว');
-      PrungAksornStorageV2.validateStoredTranslationJob(job);
+      PrungAksornStorageV2.validateTranslationJob(job);
       if(job.jobType!=='batch') throw new Error('Job นี้ไม่ใช่ Batch Job');
       if(job.status!=='failed') throw new Error('Retry ได้เฉพาะ Job ที่อยู่ในสถานะ failed');
       if(typeof job.batchId!=='string'||!job.batchId) throw new Error('Batch Job ไม่มี batchId');
