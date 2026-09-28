@@ -1857,10 +1857,12 @@
 
       if(job.completedChunks===job.totalChunks){
         recoveryStarted=true;
-        await PrungAksornStorageV2.completeTranslationJob(job.jobId);
+        await PrungAksornStorageV2.completeTranslationJob(job.jobId,job.revision);
+        activeTranslationJobRevision=null;
         recoveryCompleted=true;
       }else{
-        await PrungAksornStorageV2.updateTranslationJob({jobId:job.jobId,status:'running',retryCount:activeRetryCount,error:null});
+        job=await PrungAksornStorageV2.updateTranslationJob({jobId:job.jobId,status:'running',retryCount:activeRetryCount,error:null,expectedRevision:job.revision});
+        activeTranslationJobRevision=job.revision;
         recoveryStarted=true;
         activeController=new AbortController();
         activeTranslationJobId=job.jobId;
@@ -1879,10 +1881,11 @@
           }
           progressText.textContent='กำลังกู้คืน Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
           var sys=buildTranslatePrompt(state.proj,previousTail,chunks[i]);
-          var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2);
+          var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
           var partTrim=part.trim();
           previousTail=getTail(partTrim,300);
-          await PrungAksornStorageV2.checkpointTranslationJob({jobId:job.jobId,retryCount:activeRetryCount},i,partTrim,previousTail);
+          job=await PrungAksornStorageV2.checkpointTranslationJob({jobId:job.jobId,retryCount:activeRetryCount,expectedRevision:job.revision},i,partTrim,previousTail);
+          activeTranslationJobRevision=job.revision;
           results.push(partTrim);
           setOutput(results.join('\n\n'));
         }
@@ -1919,7 +1922,7 @@
       if(recoveryStarted&&!recoveryCompleted){
         try{
           if(err.name==='AbortError'){
-            await PrungAksornStorageV2.cancelTranslationJob(job.jobId);
+            await PrungAksornStorageV2.cancelTranslationJob(job.jobId,job.revision);
           }else{
             await PrungAksornStorageV2.failTranslationJob(job.jobId,{
               code:'BATCH_RECOVERY_FAILED',
@@ -1927,7 +1930,7 @@
               chunkIndex:typeof i==='number'?i:null,
               retryCount:activeRetryCount,
               timestamp:Date.now()
-            });
+            },job.revision);
           }
         }catch(jobErr){
           console.warn('Batch recovery job state checkpoint failed:',jobErr);
@@ -1984,15 +1987,11 @@
       if(chunks.length!==job.totalChunks) throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
 
       retryCount=Number(job.retryCount||0)+1;
-      await PrungAksornStorageV2.updateTranslationJob({
-        jobId:job.jobId,
-        status:'running',
-        retryCount:retryCount,
-        error:null
-      });
+      job=await PrungAksornStorageV2.updateTranslationJob({jobId:job.jobId,status:'running',retryCount:retryCount,error:null,expectedRevision:job.revision});
       retryStarted=true;
       activeController=new AbortController();
       activeTranslationJobId=job.jobId;
+      activeTranslationJobRevision=job.revision;
       batchCancelled=false;
       setAiBusy(true);
       resetActionStats();
@@ -2011,18 +2010,17 @@
         }
         progressText.textContent='กำลัง Retry Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
         var sys=buildTranslatePrompt(proj,previousTail,chunks[i]);
-        var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2);
+        var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
         var partTrim=part.trim();
         previousTail=getTail(partTrim,300);
-        await PrungAksornStorageV2.checkpointTranslationJob({
-          jobId:job.jobId,
-          retryCount:retryCount
-        },i,partTrim,previousTail);
+        job=await PrungAksornStorageV2.checkpointTranslationJob({jobId:job.jobId,retryCount:retryCount,expectedRevision:job.revision},i,partTrim,previousTail);
+        activeTranslationJobRevision=job.revision;
         results.push(partTrim);
         setOutput(results.join('\n\n'));
       }
 
-      await PrungAksornStorageV2.completeTranslationJob(job.jobId);
+      await PrungAksornStorageV2.completeTranslationJob(job.jobId,job.revision);
+      activeTranslationJobRevision=null;
       retryCompleted=true;
       activeTranslationJobId=null;
 
@@ -2048,7 +2046,7 @@
       if(retryStarted&&!retryCompleted){
         try{
           if(err.name==='AbortError'){
-            await PrungAksornStorageV2.cancelTranslationJob(job.jobId);
+            await PrungAksornStorageV2.cancelTranslationJob(job.jobId,job.revision);
           }else{
             await PrungAksornStorageV2.failTranslationJob(job.jobId,{
               code:'BATCH_RETRY_FAILED',
@@ -2056,7 +2054,7 @@
               chunkIndex:typeof i==='number'?i:null,
               retryCount:retryCount,
               timestamp:Date.now()
-            });
+            },job.revision);
           }
         }catch(jobErr){
           console.warn('Batch retry job state checkpoint failed:',jobErr);
@@ -2116,7 +2114,8 @@
         chapterId:job.chapterId,
         jobId:job.jobId,
         provider:job.provider,
-        sourceSnapshotText:snapshot.text
+        sourceSnapshotText:snapshot.text,
+        revision:job.revision
       };
       activeTranslationJobId=null;
       if(resumeBtn){
@@ -2669,11 +2668,12 @@
     renderCostMeter();
   }
 
-  async function callAIWithRetry(sys, text, key, model, signal, maxRetries){
+  async function callAIWithRetry(sys, text, key, model, signal, maxRetries, providerOverride){
+    var requestProvider = providerOverride || providerSel.value;
     var lastErr;
     for(var attempt = 0; attempt <= maxRetries; attempt++){
       try{
-        return await (providerSel.value === 'openai'
+        return await (requestProvider === 'openai'
           ? callOpenAI(sys, text, key, model, signal)
           : callGemini(sys, text, key, model, signal));
       }catch(err){
@@ -4062,6 +4062,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
   var pendingResume = null;
   var pendingBatchResume = null;
   var activeTranslationJobId = null;
+  var activeTranslationJobRevision = null;
   var translationRecoveryJobs = [];
   var aiBusy = false;
   function setAiBusy(busy){
@@ -4070,6 +4071,9 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     if(resumeBtn) resumeBtn.disabled = busy;
     repairBtn.disabled = busy;
     if(batchImportBtn) batchImportBtn.disabled = busy;
+    providerSel.disabled = busy;
+    modelInput.disabled = busy;
+    document.getElementById('chunkLen').disabled = busy;
   }
   function warnIfAiBusy(){
     if(aiBusy){
@@ -4271,10 +4275,13 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     var translationJobId = jobId || makeId('tj');
     var translationChapterId = chapterId || makeId('h');
     var translationRetryCount = 0;
+    var translationProvider = providerSel.value;
+    var translationJobRevision = null;
     if(!jobId){
       try{
-        await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:providerSel.value,model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length,sourceSnapshot:{text:String(sourceSnapshotText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(chapterTitle.value || ''),normalized:true}});
-        await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running'});
+        var createdJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:translationProvider,model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length,sourceSnapshot:{text:String(sourceSnapshotText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(chapterTitle.value || ''),normalized:true}});
+        var runningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',expectedRevision:createdJob.revision});
+        translationJobRevision = runningJob.revision;
       }catch(jobErr){
         setAiBusy(false);
         cancelBtn.classList.remove('show');
@@ -4282,9 +4289,12 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         return;
       }
     }else{
-      await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running'});
+      var recoveredRunningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',expectedRevision:Number(pendingResume && pendingResume.revision || 0)});
+      translationJobRevision = recoveredRunningJob.revision;
+      translationProvider = recoveredRunningJob.provider;
     }
     activeTranslationJobId = translationJobId;
+    activeTranslationJobRevision = translationJobRevision;
     var chunkRatios = [];
     var suspiciousChunks = [];
 
@@ -4298,7 +4308,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         
         // ส่ง chunks[i] เข้าไปเพื่อให้ Prompt สร้างเฉพาะคลังคำที่เกี่ยวข้อง
         var sys = buildTranslatePrompt(proj, previousTail, chunks[i]);
-        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2);
+        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2, translationProvider);
         var partTrim = part.trim();
 
         var analysis = analyzeChunkRatio(chunks[i], partTrim, chunkRatios);
@@ -4309,11 +4319,14 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
 
         previousTail = getTail(partTrim, 300);
         translationRetryCount = 0;
-        await PrungAksornStorageV2.checkpointTranslationJob({jobId:translationJobId,retryCount:translationRetryCount},i,partTrim,previousTail);
+        var checkpointedJob = await PrungAksornStorageV2.checkpointTranslationJob({jobId:translationJobId,retryCount:translationRetryCount,expectedRevision:translationJobRevision},i,partTrim,previousTail);
+        translationJobRevision = checkpointedJob.revision;
+        activeTranslationJobRevision = translationJobRevision;
         results.push(partTrim);
         setOutput(results.join('\n\n'));
       }
-      await PrungAksornStorageV2.completeTranslationJob(translationJobId);
+      await PrungAksornStorageV2.completeTranslationJob(translationJobId, translationJobRevision);
+      activeTranslationJobRevision = null;
       pendingResume = null;
       activeTranslationJobId = null;
       clearTranslationRecoveryUI();
@@ -4346,13 +4359,14 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
       
     } catch(err){
       if(err.name !== 'AbortError'){
-        await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:i,retryCount:translationRetryCount,timestamp:Date.now()});
-        pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: providerSel.value, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || '') };
+        var failedJob = await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:i,retryCount:translationRetryCount,timestamp:Date.now()},translationJobRevision);
+        translationJobRevision = failedJob.revision;
+        pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision };
         activeTranslationJobId = null;
         showError((err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)');
         if(resumeBtn) resumeBtn.classList.add('show');
       } else {
-        await PrungAksornStorageV2.cancelTranslationJob(translationJobId);
+        await PrungAksornStorageV2.cancelTranslationJob(translationJobId,translationJobRevision);
         pendingResume = null;
         activeTranslationJobId = null;
       }
@@ -4408,21 +4422,29 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     var translationChapterId = makeId('h');
     var jobCreated = false;
     var translationJobCompleted = false;
+    var batchProvider = providerSel.value;
+    var batchJobRevision = null;
     try{
-      await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'batch',batchId:batchId,batchIndex:batchIndex,provider:providerSel.value,model:model,chunkSize:chunkSize,totalChunks:chunks.length,sourceSnapshot:{text:String(normalizedText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(label || ''),normalized:true}});
+      var batchCreatedJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'batch',batchId:batchId,batchIndex:batchIndex,provider:batchProvider,model:model,chunkSize:chunkSize,totalChunks:chunks.length,sourceSnapshot:{text:String(normalizedText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(label || ''),normalized:true}});
       jobCreated = true;
-      await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running'});
+      var batchRunningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',expectedRevision:batchCreatedJob.revision});
+      batchJobRevision = batchRunningJob.revision;
+      activeTranslationJobRevision = batchJobRevision;
       activeTranslationJobId = translationJobId;
       for(var i = 0; i < chunks.length; i++){
         // ส่ง chunks[i] เข้าไปด้วย
         var sys = buildTranslatePrompt(proj, previousTail, chunks[i]);
-        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2);
+        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2, batchProvider);
         var partTrim = part.trim();
         previousTail = getTail(partTrim, 300);
-        await PrungAksornStorageV2.checkpointTranslationJob({jobId:translationJobId,retryCount:0},i,partTrim,previousTail);
+        var batchCheckpointedJob = await PrungAksornStorageV2.checkpointTranslationJob({jobId:translationJobId,retryCount:0,expectedRevision:batchJobRevision},i,partTrim,previousTail);
+        batchJobRevision = batchCheckpointedJob.revision;
+        activeTranslationJobRevision = batchJobRevision;
         results.push(partTrim);
       }
-      await PrungAksornStorageV2.completeTranslationJob(translationJobId);
+      await PrungAksornStorageV2.completeTranslationJob(translationJobId,batchJobRevision);
+      batchJobRevision = null;
+      activeTranslationJobRevision = null;
       translationJobCompleted = true;
       activeTranslationJobId = null;
 
@@ -4433,8 +4455,8 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     }catch(err){
       if(jobCreated && !translationJobCompleted){
         try{
-          if(err.name === 'AbortError') await PrungAksornStorageV2.cancelTranslationJob(translationJobId);
-          else await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'BATCH_TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:typeof i === 'number' ? i : null,retryCount:0,timestamp:Date.now()});
+          if(err.name === 'AbortError') await PrungAksornStorageV2.cancelTranslationJob(translationJobId,batchJobRevision);
+          else await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'BATCH_TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:typeof i === 'number' ? i : null,retryCount:0,timestamp:Date.now()},batchJobRevision);
         }catch(jobErr){
           console.warn('Batch translation job state checkpoint failed:', jobErr);
         }
@@ -4570,7 +4592,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
   cancelBtn.addEventListener('click', function(){
     batchCancelled = true;
     if(activeTranslationJobId){
-      PrungAksornStorageV2.cancelTranslationJob(activeTranslationJobId).catch(function(err){ console.warn('Translation job cancellation checkpoint failed:', err); });
+      PrungAksornStorageV2.cancelTranslationJob(activeTranslationJobId,activeTranslationJobRevision).catch(function(err){ console.warn('Translation job cancellation checkpoint failed:', err); });
     }
     if(activeController) activeController.abort();
   });
