@@ -1662,8 +1662,13 @@
         var btn=document.createElement('button');
         btn.type='button';
         btn.className='secondary-btn';
-        btn.textContent='กู้คืน';
-        btn.addEventListener('click',function(){prepareTranslationRecovery(job.jobId);});
+        if(job.jobType==='batch' && job.status==='failed'){
+          btn.textContent='Retry';
+          btn.addEventListener('click',function(){retryBatchTranslationJob(job.jobId);});
+        }else{
+          btn.textContent='กู้คืน';
+          btn.addEventListener('click',function(){prepareTranslationRecovery(job.jobId);});
+        }
         row.appendChild(btn);
       }
       box.appendChild(row);
@@ -1686,6 +1691,9 @@
         if(!job||['pending','running','paused','failed'].indexOf(job.status)<0)return;
         var base={
           jobId:job.jobId,
+          jobType:job.jobType||'single',
+          batchId:job.batchId||null,
+          batchIndex:Number.isInteger(job.batchIndex)?job.batchIndex:null,
           status:job.status,
           completedChunks:Number(job.completedChunks||0),
           totalChunks:Number(job.totalChunks||0),
@@ -1712,6 +1720,134 @@
       renderTranslationRecovery(candidates);
     }catch(e){
       console.warn('Translation recovery scan failed:',e);
+    }
+  }
+
+  async function retryBatchTranslationJob(jobId){
+    if(warnIfAiBusy()) return;
+    hideError();
+    var job=null;
+    var retryStarted=false;
+    var retryCompleted=false;
+    var retryCount=0;
+    try{
+      job=await PrungAksornStorageV2.getTranslationJob(jobId);
+      if(!job) throw new Error('ไม่พบ Translation Job นี้แล้ว');
+      PrungAksornStorageV2.validateStoredTranslationJob(job);
+      if(job.jobType!=='batch') throw new Error('Job นี้ไม่ใช่ Batch Job');
+      if(job.status!=='failed') throw new Error('Retry ได้เฉพาะ Job ที่อยู่ในสถานะ failed');
+      if(typeof job.batchId!=='string'||!job.batchId) throw new Error('Batch Job ไม่มี batchId');
+      if(!Number.isInteger(job.batchIndex)||job.batchIndex<0) throw new Error('Batch Job มี batchIndex ไม่ถูกต้อง');
+      var proj=appData.projects.find(function(p){return p.id===job.projectId;});
+      if(!proj) throw new Error('ไม่พบ Project ต้นทางของ Job');
+      var book=(proj.books||[]).find(function(b){return b.id===job.bookId;});
+      if(!book) throw new Error('ไม่พบ Book ต้นทางของ Job');
+      var snapshot=job.sourceSnapshot;
+      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true) throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
+      if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0) throw new Error('Job มี chunkSize ไม่ถูกต้อง');
+      if(!Number.isInteger(job.totalChunks)||job.totalChunks<0) throw new Error('Job มี totalChunks ไม่ถูกต้อง');
+      if(!Number.isInteger(job.completedChunks)||job.completedChunks<0||job.completedChunks>job.totalChunks) throw new Error('Checkpoint ของ Job ไม่ถูกต้อง');
+      if(!Array.isArray(job.partialResults)||job.partialResults.length!==job.completedChunks) throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
+      if(job.partialResults.some(function(x,idx){return !x||x.chunkIndex!==idx||typeof x.text!=='string';})) throw new Error('partialResults ของ Job ไม่ถูกต้อง');
+      if(job.completedChunks>0){
+        var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
+        if(expectedTail!==String(job.previousTail||'')) throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
+      }else if(String(job.previousTail||'')) {
+        throw new Error('previousTail ต้องว่างเมื่อยังไม่มี Chunk ที่ checkpoint');
+      }
+      if(providerSel.value!==job.provider) throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อน Retry');
+      if(modelInput.value!==job.model) throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อน Retry');
+      var key=document.getElementById('apiKey').value.trim();
+      if(!key) throw new Error('กรุณาใส่ API Key ก่อน Retry');
+
+      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      if(chunks.length!==job.totalChunks) throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+
+      retryCount=Number(job.retryCount||0)+1;
+      await PrungAksornStorageV2.updateTranslationJob({
+        jobId:job.jobId,
+        status:'running',
+        retryCount:retryCount,
+        error:null
+      });
+      retryStarted=true;
+      activeController=new AbortController();
+      activeTranslationJobId=job.jobId;
+      batchCancelled=false;
+      setAiBusy(true);
+      resetActionStats();
+      cancelBtn.classList.add('show');
+      progressText.textContent='กำลัง Retry Batch Item '+(job.batchIndex+1)+' จากจุด '+job.completedChunks+'/'+job.totalChunks;
+
+      var results=job.partialResults.map(function(x){return x.text;});
+      var previousTail=String(job.previousTail||'');
+      setOutput(results.join('\n\n'));
+
+      for(var i=job.completedChunks;i<chunks.length;i++){
+        if(batchCancelled){
+          var cancelError=new Error('Batch retry cancelled');
+          cancelError.name='AbortError';
+          throw cancelError;
+        }
+        progressText.textContent='กำลัง Retry Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
+        var sys=buildTranslatePrompt(proj,previousTail,chunks[i]);
+        var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2);
+        var partTrim=part.trim();
+        previousTail=getTail(partTrim,300);
+        await PrungAksornStorageV2.checkpointTranslationJob({
+          jobId:job.jobId,
+          retryCount:retryCount
+        },i,partTrim,previousTail);
+        results.push(partTrim);
+        setOutput(results.join('\n\n'));
+      }
+
+      await PrungAksornStorageV2.completeTranslationJob(job.jobId);
+      retryCompleted=true;
+      activeTranslationJobId=null;
+
+      var existingEntry=findEntryById(proj,job.chapterId);
+      if(!existingEntry){
+        var newEntry={
+          id:job.chapterId,
+          ts:Date.now(),
+          label:snapshot.title||('Batch Item '+(job.batchIndex+1)),
+          input:snapshot.originalText,
+          output:results.join('\n\n')
+        };
+        if(book) book.history.push(newEntry);
+        else (proj.history=proj.history||[]).push(newEntry);
+      }
+      commitChange();
+      clearTranslationRecoveryUI();
+      progressText.textContent='Retry Batch Item สำเร็จ';
+      setTimeout(function(){
+        if(progressText.textContent==='Retry Batch Item สำเร็จ') progressText.textContent='';
+      },4000);
+    }catch(err){
+      if(retryStarted&&!retryCompleted){
+        try{
+          if(err.name==='AbortError'){
+            await PrungAksornStorageV2.cancelTranslationJob(job.jobId);
+          }else{
+            await PrungAksornStorageV2.failTranslationJob(job.jobId,{
+              code:'BATCH_RETRY_FAILED',
+              message:String(err.message||'เกิดข้อผิดพลาด'),
+              chunkIndex:typeof i==='number'?i:null,
+              retryCount:retryCount,
+              timestamp:Date.now()
+            });
+          }
+        }catch(jobErr){
+          console.warn('Batch retry job state checkpoint failed:',jobErr);
+        }
+      }
+      activeTranslationJobId=null;
+      if(err.name!=='AbortError') showError('Retry ไม่สำเร็จ: '+(err.message||err));
+    }finally{
+      setAiBusy(false);
+      cancelBtn.classList.remove('show');
+      if(progressText.textContent!=='Retry Batch Item สำเร็จ') progressText.textContent='';
     }
   }
 
