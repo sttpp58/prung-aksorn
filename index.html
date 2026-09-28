@@ -1890,7 +1890,7 @@
           setOutput(results.join('\n\n'));
         }
 
-        await PrungAksornStorageV2.completeTranslationJob(job.jobId);
+        await PrungAksornStorageV2.completeTranslationJob(job.jobId,job.revision);
         recoveryCompleted=true;
       }
 
@@ -1907,6 +1907,7 @@
         if(state.book)state.book.history.push(newEntry);
         else(state.proj.history=state.proj.history||[]).push(newEntry);
       }
+      await restoreBatchHistoryOrder(state.proj,state.book,job.batchId);
       commitChange();
       pendingBatchResume=null;
       clearTranslationRecoveryUI();
@@ -2036,6 +2037,7 @@
         if(book) book.history.push(newEntry);
         else (proj.history=proj.history||[]).push(newEntry);
       }
+      await restoreBatchHistoryOrder(proj,book,job.batchId);
       commitChange();
       clearTranslationRecoveryUI();
       progressText.textContent='Retry Batch Item สำเร็จ';
@@ -2553,6 +2555,39 @@
     (proj.books || []).forEach(function(b){ allHist = allHist.concat(b.history || []); });
     if(proj.history) allHist = allHist.concat(proj.history);
     return allHist.find(function(h){ return h.id === id; }) || null;
+  }
+
+  async function restoreBatchHistoryOrder(proj, book, batchId){
+    if(!proj || !batchId) return;
+    try{
+      var history = book ? (book.history || []) : (proj.history || []);
+      if(history.length < 2) return;
+      var jobs = await PrungAksornStorageV2.listTranslationJobs();
+      var orderByChapter = Object.create(null);
+      jobs.forEach(function(j){
+        if(j && j.jobType === 'batch' && j.batchId === batchId && Number.isInteger(j.batchIndex) && j.chapterId){
+          orderByChapter[j.chapterId] = j.batchIndex;
+        }
+      });
+      var batchEntries = history.map(function(entry, index){
+        return {
+          entry: entry,
+          index: index,
+          order: Object.prototype.hasOwnProperty.call(orderByChapter, entry.id) ? orderByChapter[entry.id] : null
+        };
+      }).filter(function(x){ return x.order !== null; });
+      if(batchEntries.length < 2) return;
+      batchEntries.sort(function(a,b){ return a.order - b.order || a.index - b.index; });
+      var cursor = 0;
+      var reordered = history.map(function(entry){
+        if(Object.prototype.hasOwnProperty.call(orderByChapter, entry.id)) return batchEntries[cursor++].entry;
+        return entry;
+      });
+      if(book) book.history = reordered;
+      else proj.history = reordered;
+    }catch(e){
+      console.warn('Batch history order restoration skipped:', e);
+    }
   }
 
   function sleep(ms){
