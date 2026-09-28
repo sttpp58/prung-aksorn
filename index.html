@@ -3554,6 +3554,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
   }
 
   var pendingResume = null;
+  var activeTranslationJobId = null;
   var aiBusy = false;
   function setAiBusy(busy){
     aiBusy = busy;
@@ -3747,7 +3748,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     }
   }
 
-  async function runTranslation(chunks, proj, key, model, startIndex, existingResults, originalText){
+  async function runTranslation(chunks, proj, key, model, startIndex, existingResults, originalText, chapterId, jobId){
     activeController = new AbortController();
     setAiBusy(true);
     resetActionStats();
@@ -3758,6 +3759,24 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     var results = existingResults.slice();
     setOutput(results.join('\n\n'));
     var previousTail = results.length ? getTail(results[results.length - 1], 300) : '';
+    var activeBook = getActiveBook(proj);
+    var translationJobId = jobId || makeId('tj');
+    var translationChapterId = chapterId || makeId('h');
+    var translationRetryCount = 0;
+    if(!jobId){
+      try{
+        await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:state.provider || 'openai',model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length});
+        await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running'});
+      }catch(jobErr){
+        setAiBusy(false);
+        cancelBtn.classList.remove('show');
+        showError('ไม่สามารถสร้าง Translation Job ได้: ' + (jobErr.message || jobErr));
+        return;
+      }
+    }else{
+      await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running'});
+    }
+    activeTranslationJobId = translationJobId;
     var chunkRatios = [];
     var suspiciousChunks = [];
 
@@ -3780,17 +3799,21 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
           if(analysis.suspicious) suspiciousChunks.push({ index: i, reasons: analysis.reasons });
         }
 
-        results.push(partTrim);
         previousTail = getTail(partTrim, 300);
+        translationRetryCount = 0;
+        await PrungAksornStorageV2.checkpointTranslationJob({jobId:translationJobId,retryCount:translationRetryCount},i,partTrim,previousTail);
+        results.push(partTrim);
         setOutput(results.join('\n\n'));
       }
+      await PrungAksornStorageV2.completeTranslationJob(translationJobId);
       pendingResume = null;
+      activeTranslationJobId = null;
       stamp.classList.add('show');
       setResultFocus(true);
       switchMobileTab('output');
       scrollToTopTarget();
 
-      var newEntry = { id: makeId('h'), ts: Date.now(), label: (chapterTitle.value || 'แปลใหม่'), input: originalText, output: output.textContent };
+      var newEntry = { id: translationChapterId, ts: Date.now(), label: (chapterTitle.value || 'แปลใหม่'), input: originalText, output: output.textContent };
       var activeBook = getActiveBook(proj);
       if(activeBook) activeBook.history.push(newEntry);
       else (proj.history = proj.history || []).push(newEntry);
@@ -3814,11 +3837,15 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
       
     } catch(err){
       if(err.name !== 'AbortError'){
-        pendingResume = { chunks: chunks, proj: proj, key: key, model: model, startIndex: i, results: results, originalText: originalText };
+        await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:i,retryCount:translationRetryCount,timestamp:Date.now()});
+        pendingResume = { chunks: chunks, proj: proj, key: key, model: model, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId };
+        activeTranslationJobId = null;
         showError((err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)');
         if(resumeBtn) resumeBtn.classList.add('show');
       } else {
+        await PrungAksornStorageV2.cancelTranslationJob(translationJobId);
         pendingResume = null;
+        activeTranslationJobId = null;
       }
     } finally {
       setAiBusy(false);
@@ -3943,7 +3970,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     var chunks = splitIntoChunks(normalizeOCR(text), maxLen);
     pendingResume = null;
     if(resumeBtn) resumeBtn.classList.remove('show');
-    await runTranslation(chunks, proj, key, modelInput.value, 0, [], text);
+    await runTranslation(chunks, proj, key, modelInput.value, 0, [], text, makeId('h'), null);
   });
 
   if(resumeBtn){
@@ -3952,7 +3979,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
       hideError();
       if(warnIfAiBusy()) return;
       var key = document.getElementById('apiKey').value.trim() || pendingResume.key;
-      await runTranslation(pendingResume.chunks, pendingResume.proj, key, modelInput.value, pendingResume.startIndex, pendingResume.results, pendingResume.originalText);
+      await runTranslation(pendingResume.chunks, pendingResume.proj, key, modelInput.value, pendingResume.startIndex, pendingResume.results, pendingResume.originalText, pendingResume.chapterId, pendingResume.jobId);
     });
   }
 
@@ -3998,6 +4025,9 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
 
   cancelBtn.addEventListener('click', function(){
     batchCancelled = true;
+    if(activeTranslationJobId){
+      PrungAksornStorageV2.cancelTranslationJob(activeTranslationJobId).catch(function(err){ console.warn('Translation job cancellation checkpoint failed:', err); });
+    }
     if(activeController) activeController.abort();
   });
 
