@@ -1757,6 +1757,7 @@
         originalText:snapshot.originalText,
         chapterId:job.chapterId,
         jobId:job.jobId,
+        provider:job.provider,
         sourceSnapshotText:snapshot.text
       };
       activeTranslationJobId=null;
@@ -3987,7 +3988,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     } catch(err){
       if(err.name !== 'AbortError'){
         await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:i,retryCount:translationRetryCount,timestamp:Date.now()});
-        pendingResume = { chunks: chunks, proj: proj, key: key, model: model, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId };
+        pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: providerSel.value, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || '') };
         activeTranslationJobId = null;
         showError((err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)');
         if(resumeBtn) resumeBtn.classList.add('show');
@@ -4129,6 +4130,8 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
       hideError();
       if(warnIfAiBusy()) return;
       var key = document.getElementById('apiKey').value.trim() || pendingResume.key;
+      if(pendingResume.provider && providerSel.value !== pendingResume.provider){ showError('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก ' + pendingResume.provider + ' ก่อนดำเนินการต่อ'); return; }
+      if(modelInput.value !== pendingResume.model){ showError('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก ' + pendingResume.model + ' ก่อนดำเนินการต่อ'); return; }
       await runTranslation(pendingResume.chunks, pendingResume.proj, key, pendingResume.model, pendingResume.startIndex, pendingResume.results, pendingResume.originalText, pendingResume.chapterId, pendingResume.jobId, pendingResume.sourceSnapshotText);
     });
   }
