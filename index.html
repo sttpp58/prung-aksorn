@@ -1324,51 +1324,16 @@
   <button class="mobile-sticky-btn primary" id="mobileProcessBtn" type="button">ปรุงอักษร</button>
 </div>
 
+<script src="storage-v2.js"></script>
 <script>
 (function(){
   var STORAGE_KEY = 'prungAksornData';
   var DB_NAME = 'PrungAksornDB';
   var STORE_NAME = 'app_store';
 
-  /* ---------------- Native IndexedDB Wrapper ---------------- */
-  function getDB() {
-    return new Promise(function(resolve, reject) {
-      var req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = function(e) {
-        var db = e.target.result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME);
-        }
-      };
-      req.onsuccess = function(e) { resolve(e.target.result); };
-      req.onerror = function(e) { reject(e.target.error); };
-    });
-  }
-
-  function idbSet(key, val) {
-    return getDB().then(function(db) {
-      return new Promise(function(resolve, reject) {
-        var tx = db.transaction(STORE_NAME, 'readwrite');
-        var store = tx.objectStore(STORE_NAME);
-        store.put(val, key);
-        tx.oncomplete = function() { resolve(); };
-        tx.onerror = function(e) { reject(e.target.error); };
-        tx.onabort = function(e) { reject(e.target.error); };
-      });
-    });
-  }
-
-  function idbGet(key) {
-    return getDB().then(function(db) {
-      return new Promise(function(resolve, reject) {
-        var tx = db.transaction(STORE_NAME, 'readonly');
-        var store = tx.objectStore(STORE_NAME);
-        var req = store.get(key);
-        req.onsuccess = function() { resolve(req.result); };
-        req.onerror = function(e) { reject(e.target.error); };
-      });
-    });
-  }
+  /* ---------------- IndexedDB V2 Storage Adapter ---------------- */
+  var storageV2 = window.PrungAksornStorageV2;
+  if(!storageV2) throw new Error('IndexedDB V2 storage layer failed to load.');
 
   var state = { source: 'translate', level: 'edit', genre: 'ทั่วไป', style: 'สำนวนปัจจุบัน' };
   var appData = { projects: [], currentProjectId: null };
@@ -1661,43 +1626,24 @@
   }
   bottomHistorySearchInput.addEventListener('input', applyBottomHistorySearchFilter);
 
-  /* โหลดข้อมูลจาก IndexedDB และทำการ Auto-Migration จาก localStorage หากเพิ่งอัปเกรด */
+  /* โหลดข้อมูลจาก IndexedDB V2 และทำ migration V1 -> V2 เมื่อจำเป็น */
   async function loadData(){
     try{
-      var data = await idbGet(STORAGE_KEY);
-      if(!data){
-        var raw = localStorage.getItem(STORAGE_KEY);
-        if(raw){
-          try{
-            data = JSON.parse(raw);
-            if(data){
-              await idbSet(STORAGE_KEY, data);
-              localStorage.removeItem(STORAGE_KEY);
-              console.log('ย้ายข้อมูลจาก localStorage มายัง IndexedDB สำเร็จ');
-            }
-          }catch(e){}
-        }
-      }
+      var data = await storageV2.load();
       if(data && typeof data === 'object') appData = data;
     }catch(e){
-      console.error('Error loading data from IndexedDB:', e);
+      console.error('Error loading data from IndexedDB V2:', e);
     }
-
     if(!appData || typeof appData !== 'object') appData = { projects: [], currentProjectId: null };
     if(!Array.isArray(appData.projects)) appData.projects = [];
     appData.projects = appData.projects.filter(function(p){ return p && typeof p === 'object' && p.id && p.name; }).map(function(p){
       if(!Array.isArray(p.books) || p.books.length === 0){
-        var oldHistory = Array.isArray(p.history) ? p.history : [];
-        p.books = [{ id: makeId('b'), title: 'เล่ม 1', history: oldHistory }];
+        p.books = [{ id: makeId('b'), title: 'เล่ม 1', history: Array.isArray(p.history) ? p.history : [] }];
         p.currentBookId = p.books[0].id;
       } else {
-        p.books.forEach(function(b){
-          b.history = Array.isArray(b.history) ? b.history : [];
-        });
+        p.books.forEach(function(b){ b.history = Array.isArray(b.history) ? b.history : []; });
       }
-      if(!p.currentBookId && p.books.length > 0){
-        p.currentBookId = p.books[0].id;
-      }
+      if(!p.currentBookId && p.books.length > 0) p.currentBookId = p.books[0].id;
       p.glossary = typeof p.glossary === 'string' ? p.glossary : '';
       p.context = typeof p.context === 'string' ? p.context : '';
       p.draft = typeof p.draft === 'string' ? p.draft : '';
@@ -1760,14 +1706,14 @@
 
   async function saveDataImmediate(){
     try{
-      await idbSet(STORAGE_KEY, appData);
+      await storageV2.save(appData);
       if(saveStatusText){
         saveStatusText.textContent = '⚬ บันทึกแล้ว';
         saveStatusText.classList.remove('saving');
       }
       return true;
     }catch(e){
-      console.error('IndexedDB save failed:', e);
+      console.error('IndexedDB V2 save failed:', e);
       if(saveStatusText){
         saveStatusText.textContent = '⚠ บันทึกไม่สำเร็จ';
         saveStatusText.classList.remove('saving');
