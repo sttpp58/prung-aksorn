@@ -4041,24 +4041,49 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     return segments.length >= 2 ? segments : null;
   }
 
-  async function runSingleTranslationForBatch(chunks, proj, key, model, label, originalText){
+  async function runSingleTranslationForBatch(chunks, proj, key, model, label, originalText, batchId, batchIndex, chunkSize, normalizedText){
     var results = [];
     var previousTail = '';
-    for(var i = 0; i < chunks.length; i++){
-      // ส่ง chunks[i] เข้าไปด้วย
-      var sys = buildTranslatePrompt(proj, previousTail, chunks[i]);
-      var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2);
-      var partTrim = part.trim();
-      results.push(partTrim);
-      previousTail = getTail(partTrim, 300);
-    }
-    var outputText = results.join('\n\n');
-    var newEntry = { id: makeId('h'), ts: Date.now(), label: label, input: originalText, output: outputText };
     var activeBook = getActiveBook(proj);
-    if(activeBook) activeBook.history.push(newEntry);
-    else (proj.history = proj.history || []).push(newEntry);
-  }
+    var translationJobId = makeId('tj');
+    var translationChapterId = makeId('h');
+    var jobCreated = false;
+    var translationJobCompleted = false;
+    try{
+      await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'batch',batchId:batchId,batchIndex:batchIndex,provider:providerSel.value,model:model,chunkSize:chunkSize,totalChunks:chunks.length,sourceSnapshot:{text:String(normalizedText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(label || ''),normalized:true}});
+      jobCreated = true;
+      await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running'});
+      activeTranslationJobId = translationJobId;
+      for(var i = 0; i < chunks.length; i++){
+        // ส่ง chunks[i] เข้าไปด้วย
+        var sys = buildTranslatePrompt(proj, previousTail, chunks[i]);
+        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2);
+        var partTrim = part.trim();
+        previousTail = getTail(partTrim, 300);
+        await PrungAksornStorageV2.checkpointTranslationJob({jobId:translationJobId,retryCount:0},i,partTrim,previousTail);
+        results.push(partTrim);
+      }
+      await PrungAksornStorageV2.completeTranslationJob(translationJobId);
+      translationJobCompleted = true;
+      activeTranslationJobId = null;
 
+      var outputText = results.join('\n\n');
+      var newEntry = { id: translationChapterId, ts: Date.now(), label: label, input: originalText, output: outputText };
+      if(activeBook) activeBook.history.push(newEntry);
+      else (proj.history = proj.history || []).push(newEntry);
+    }catch(err){
+      if(jobCreated && !translationJobCompleted){
+        try{
+          if(err.name === 'AbortError') await PrungAksornStorageV2.cancelTranslationJob(translationJobId);
+          else await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'BATCH_TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:typeof i === 'number' ? i : null,retryCount:0,timestamp:Date.now()});
+        }catch(jobErr){
+          console.warn('Batch translation job state checkpoint failed:', jobErr);
+        }
+      }
+      activeTranslationJobId = null;
+      throw err;
+    }
+  }
   async function runBatchImport(files){
     var proj = getCurrentProject();
     var key = document.getElementById('apiKey').value.trim();
@@ -4074,6 +4099,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     resetActionStats();
     cancelBtn.classList.add('show');
 
+    var batchId = makeId('batch');
     var succeeded = [];
     var failed = [];
 
@@ -4087,7 +4113,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         var text = normalizeOCR(raw);
         var chunks = splitIntoChunks(text, maxLen);
         var label = f.name.replace(/\.[^.]+$/, '');
-        await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text);
+        await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text, batchId, idx, maxLen, text);
         succeeded.push(f.name);
         commitChange();
       }catch(err){
