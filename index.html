@@ -3217,9 +3217,25 @@
     reader.onload = async function(){
       try {
         var rawParsed = JSON.parse(String(reader.result || ''));
+        var format = storageV2.detectBackupFormat(rawParsed);
+        if(format === 'unknown'){
+          throw new Error('ไม่รู้จักรูปแบบไฟล์สำรองนี้ ระบบรองรับ Backup V2 และ Backup รุ่นเก่าก่อน V2 เท่านั้น');
+        }
+
         var checked = await storageV2.validateBackup(rawParsed);
         var r = checked.report;
-        var summary = 'Projects: '+r.projects+'\\nBooks: '+r.books+'\\nChapters: '+r.chapters+'\\nGlossary: '+r.glossary+'\\nRevisions: '+r.revisions+'\\n\\nSHA-256: VALID\\nSchema: 2 (supported)\\n\\nการกู้คืนจะแทนที่ข้อมูลปัจจุบันทั้งหมด และระบบจะสร้าง Safety Backup อัตโนมัติก่อนดำเนินการ';
+        var summary;
+        if(format === 'legacy'){
+          summary = 'พบไฟล์ Backup รุ่นเก่า\n\n' +
+            'ระบบจะทำการแปลง Legacy → V2 Normalized ก่อนกู้คืน\n' +
+            'Projects: '+r.projects+'\nBooks: '+r.books+'\nChapters: '+r.chapters+'\nGlossary: '+r.glossary+'\nRevisions: '+r.revisions+'\n\n' +
+            'SHA-256: VALID (คำนวณใหม่จากข้อมูล V2 ที่แปลงแล้ว)\n' +
+            'Schema ปลายทาง: 2 (supported)\n\n' +
+            'ระบบจะไม่สร้างหรือกู้คืน Translation Jobs และจะสร้าง Safety Backup อัตโนมัติก่อนแทนที่ข้อมูลปัจจุบัน';
+        }else{
+          summary = 'Projects: '+r.projects+'\nBooks: '+r.books+'\nChapters: '+r.chapters+'\nGlossary: '+r.glossary+'\nRevisions: '+r.revisions+'\n\nSHA-256: VALID\nSchema: 2 (supported)\n\nการกู้คืนจะแทนที่ข้อมูลปัจจุบันทั้งหมด และระบบจะสร้าง Safety Backup อัตโนมัติก่อนดำเนินการ';
+        }
+
         if(await showConfirmDialog('ยืนยันการกู้คืนข้อมูล', summary, true, 'ตกลง')){
           var result = await storageV2.restoreBackup(rawParsed);
           if(!result.success) throw new Error('Restore did not complete.');
@@ -3229,15 +3245,20 @@
           renderBottomHistory();
           updateActiveBanner();
           loadProjectDraft(getCurrentProject());
-          await showAlertDialog('กู้คืนสำเร็จ', 'กู้คืนข้อมูลและตรวจสอบฐานข้อมูลหลังการกู้คืนเรียบร้อยแล้ว');
+          await showAlertDialog(
+            'กู้คืนสำเร็จ',
+            format === 'legacy'
+              ? 'กู้คืน Backup รุ่นเก่าเรียบร้อยแล้ว ระบบได้แปลงข้อมูลเป็น V2 และตรวจสอบฐานข้อมูลหลังการกู้คืนสำเร็จ'
+              : 'กู้คืนข้อมูลและตรวจสอบฐานข้อมูลหลังการกู้คืนเรียบร้อยแล้ว'
+          );
         }
       } catch(err) {
         console.error('Backup restore failed:', err);
         var msg = String(err&&err.message || 'ไม่สามารถกู้คืนไฟล์สำรองได้');
         if(msg.indexOf('rolled back safely')>=0){
-          await showAlertDialog('กู้คืนไม่สำเร็จ', msg+'\\n\\nข้อมูลเดิมถูกนำกลับคืนแล้ว');
+          await showAlertDialog('กู้คืนไม่สำเร็จ', msg+'\n\nข้อมูลเดิมถูกนำกลับคืนแล้ว');
         }else if(msg.indexOf('rollback failed')>=0){
-          await showAlertDialog('เกิดข้อผิดพลาดร้ายแรง', msg+'\\n\\nไม่สามารถยืนยันสถานะข้อมูลได้');
+          await showAlertDialog('เกิดข้อผิดพลาดร้ายแรง', msg+'\n\nไม่สามารถยืนยันสถานะข้อมูลได้');
         }else{
           await showAlertDialog('ไฟล์สำรองไม่ถูกต้อง', msg);
         }
