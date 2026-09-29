@@ -1,0 +1,367 @@
+#!/usr/bin/env node
+
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+
+const ROOT = process.cwd();
+
+function readText(file) {
+  const fullPath = path.join(ROOT, file);
+  if (!fs.existsSync(fullPath)) {
+    fail(`Missing required file: ${file}`);
+  }
+  return fs.readFileSync(fullPath, 'utf8');
+}
+
+function fail(message) {
+  throw new Error(message);
+}
+
+function pass(message) {
+  console.log(`PASS  ${message}`);
+}
+
+function assert(condition, message) {
+  if (!condition) fail(message);
+  pass(message);
+}
+
+function parseJavaScript(source, filename) {
+  try {
+    new vm.Script(source, { filename });
+  } catch (error) {
+    fail(`JavaScript syntax error in ${filename}: ${error.message}`);
+  }
+}
+
+function extractInlineScripts(html) {
+  const scripts = [];
+  const pattern = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  let match;
+  while ((match = pattern.exec(html)) !== null) {
+    const attrs = match[1] || '';
+    const body = match[2] || '';
+    if (!/\bsrc\s*=\s*["'][^"']+["']/i.test(attrs)) {
+      scripts.push(body);
+    }
+  }
+  return scripts;
+}
+
+function extractCalls(source, functionName) {
+  const token = `PrungAksornStorageV2.${functionName}(`;
+  const calls = [];
+  let from = 0;
+
+  while (true) {
+    const start = source.indexOf(token, from);
+    if (start < 0) break;
+
+    let index = start + token.length;
+    let depth = 1;
+    let quote = null;
+    let escaped = false;
+
+    for (; index < source.length && depth > 0; index += 1) {
+      const char = source[index];
+
+      if (quote) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === quote) {
+          quote = null;
+        }
+        continue;
+      }
+
+      if (char === "'" || char === '"' || char === '`') {
+        quote = char;
+        continue;
+      }
+
+      if (char === '(') depth += 1;
+      else if (char === ')') depth -= 1;
+    }
+
+    if (depth !== 0) {
+      fail(`Unbalanced call expression for ${functionName}`);
+    }
+
+    calls.push(source.slice(start + token.length, index - 1));
+    from = index;
+  }
+
+  return calls;
+}
+
+function splitTopLevelArguments(expression) {
+  const args = [];
+  let start = 0;
+  let parenDepth = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let quote = null;
+  let escaped = false;
+
+  for (let index = 0; index < expression.length; index += 1) {
+    const char = expression[index];
+
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === "'" || char === '"' || char === '`') {
+      quote = char;
+      continue;
+    }
+
+    if (char === '(') parenDepth += 1;
+    else if (char === ')') parenDepth -= 1;
+    else if (char === '{') braceDepth += 1;
+    else if (char === '}') braceDepth -= 1;
+    else if (char === '[') bracketDepth += 1;
+    else if (char === ']') bracketDepth -= 1;
+    else if (
+      char === ',' &&
+      parenDepth === 0 &&
+      braceDepth === 0 &&
+      bracketDepth === 0
+    ) {
+      args.push(expression.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+
+  const tail = expression.slice(start).trim();
+  if (tail) args.push(tail);
+  return args;
+}
+
+function assertExactArity(calls, functionName, arity) {
+  for (const call of calls) {
+    assert(
+      splitTopLevelArguments(call).length === arity,
+      `${functionName} call preserves expected arity (${arity})`
+    );
+  }
+}
+
+function assertRevisionArgument(call, functionName, requiredArgumentIndex) {
+  const args = splitTopLevelArguments(call);
+  assert(
+    args.length > requiredArgumentIndex,
+    `${functionName} call has required revision argument`
+  );
+
+  const revisionArgument = args[requiredArgumentIndex];
+  assert(
+    /(?:expectedRevision|(?:^|\W)[A-Za-z_$][\w$]*Revision\b|\.revision\b)/.test(
+      revisionArgument
+    ),
+    `${functionName} call revision argument is revision-derived`
+  );
+}
+
+function assertAllRevisionCallSites(indexSource) {
+  const updateCalls = extractCalls(indexSource, 'updateTranslationJob');
+  assert(updateCalls.length > 0, 'updateTranslationJob has call sites');
+  assertExactArity(updateCalls, 'updateTranslationJob', 1);
+  for (const call of updateCalls) {
+    assert(
+      /expectedRevision\s*:/.test(call),
+      'updateTranslationJob call preserves expectedRevision'
+    );
+  }
+
+  const checkpointCalls = extractCalls(indexSource, 'checkpointTranslationJob');
+  assert(checkpointCalls.length > 0, 'checkpointTranslationJob has call sites');
+  assertExactArity(checkpointCalls, 'checkpointTranslationJob', 4);
+  for (const call of checkpointCalls) {
+    const args = splitTopLevelArguments(call);
+    assert(
+      /expectedRevision\s*:/.test(args[0]),
+      'checkpointTranslationJob call preserves expectedRevision'
+    );
+  }
+
+  const completeCalls = extractCalls(indexSource, 'completeTranslationJob');
+  assert(completeCalls.length > 0, 'completeTranslationJob has call sites');
+  assertExactArity(completeCalls, 'completeTranslationJob', 2);
+  for (const call of completeCalls) {
+    assertRevisionArgument(call, 'completeTranslationJob', 1);
+  }
+
+  const failCalls = extractCalls(indexSource, 'failTranslationJob');
+  assert(failCalls.length > 0, 'failTranslationJob has call sites');
+  assertExactArity(failCalls, 'failTranslationJob', 3);
+  for (const call of failCalls) {
+    assertRevisionArgument(call, 'failTranslationJob', 2);
+  }
+
+  const cancelCalls = extractCalls(indexSource, 'cancelTranslationJob');
+  assert(cancelCalls.length > 0, 'cancelTranslationJob has call sites');
+  assertExactArity(cancelCalls, 'cancelTranslationJob', 2);
+  for (const call of cancelCalls) {
+    assertRevisionArgument(call, 'cancelTranslationJob', 1);
+  }
+}
+
+function main() {
+  const indexHtml = readText('index.html');
+  const storage = readText('storage-v2.js');
+  const sw = readText('sw.js');
+  const manifestText = readText('manifest.json');
+
+  parseJavaScript(storage, 'storage-v2.js');
+
+  const inlineScripts = extractInlineScripts(indexHtml);
+  assert(inlineScripts.length > 0, 'index.html contains inline JavaScript');
+  inlineScripts.forEach((source, index) =>
+    parseJavaScript(source, `index.html inline script #${index + 1}`)
+  );
+  pass(`index.html inline JavaScript syntax: ${inlineScripts.length} block(s)`);
+
+  assert(
+    /<script\b[^>]*\bsrc=["'](?:\.\/)?storage-v2\.js["'][^>]*>/i.test(indexHtml),
+    'index.html loads storage-v2.js'
+  );
+
+  assert(
+    /var\s+STORES\s*=\s*\[[^\]]*['"]translationJobs['"]/s.test(storage),
+    'IndexedDB STORES includes translationJobs'
+  );
+  assert(
+    /createObjectStore\(['"]translationJobs['"]\s*,\s*\{\s*keyPath\s*:\s*['"]jobId['"]\s*\}\)/.test(
+      storage
+    ),
+    'translationJobs object store uses jobId keyPath'
+  );
+  assert(
+    /revision\s*:\s*0/.test(storage) &&
+      /expectedRevision/.test(storage) &&
+      /currentRevision/.test(storage),
+    'translation job revision/CAS model remains present'
+  );
+
+  assert(
+    /function checkpointTranslationJob[\s\S]*?expectedRevision[\s\S]*?currentRevision\s*!==\s*expected/.test(
+      storage
+    ),
+    'checkpointTranslationJob enforces expectedRevision'
+  );
+  assert(
+    /function checkpointTranslationJob[\s\S]*?status!==['"]running['"]/.test(storage),
+    'checkpointTranslationJob enforces running status'
+  );
+  assert(
+    /function checkpointTranslationJob[\s\S]*?chunkIndex!==current\.completedChunks/.test(
+      storage
+    ),
+    'checkpointTranslationJob enforces chunk-index continuity'
+  );
+
+  assert(
+    /function completeTranslationJob\(jobId,expectedRevision\)[\s\S]*?requireComplete:true/.test(
+      storage
+    ),
+    'completeTranslationJob requires expectedRevision and final checkpoint'
+  );
+  assert(
+    /if\(requireComplete&&current\.completedChunks!==current\.totalChunks\)/.test(storage),
+    'updateTranslationJob rejects completion before final checkpoint'
+  );
+
+  assert(
+    /function backupData\([\s\S]*?translationJobs\s*:\s*clone\(n\.translationJobs/.test(
+      storage
+    ),
+    'backupData includes translationJobs'
+  );
+  assert(
+    /function restoreNormalized\([\s\S]*?translationJobs\s*\|\|\[\]\)[\s\S]*?objectStore\(['"]translationJobs['"]\)\.put/.test(
+      storage
+    ),
+    'restoreNormalized restores translationJobs'
+  );
+  assert(
+    /function verifyNormalized\([\s\S]*?translationJobs[\s\S]*?Content checksum mismatch after restore/.test(
+      storage
+    ),
+    'verifyNormalized verifies translationJobs'
+  );
+
+  for (const functionName of [
+    'buildTranslatePrompt',
+    'splitIntoChunks',
+    'callOpenAI',
+    'callGemini'
+  ]) {
+    assert(
+      new RegExp(`function\\s+${functionName}\\s*\\(`).test(indexHtml),
+      `core function remains present: ${functionName}`
+    );
+  }
+
+  assertAllRevisionCallSites(indexHtml);
+
+  assert(
+    /const\s+CACHE_NAME\s*=\s*['"]prung-aksorn-v4['"]/.test(sw),
+    'Service Worker cache version remains v4'
+  );
+  assert(
+    /['"]\.\/storage-v2\.js['"]/.test(sw),
+    'Service Worker app shell includes storage-v2.js'
+  );
+  assert(
+    /if\s*\(url\.origin\s*!==\s*self\.location\.origin\)\s*\{\s*return;\s*\}/.test(
+      sw
+    ),
+    'Service Worker preserves cross-origin bypass'
+  );
+  assert(
+    /if\s*\(event\.request\.method\s*!==\s*['"]GET['"]\)\s*\{\s*return;\s*\}/.test(
+      sw
+    ),
+    'Service Worker preserves non-GET bypass'
+  );
+  parseJavaScript(sw, 'sw.js');
+
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestText);
+  } catch (error) {
+    fail(`manifest.json is invalid JSON: ${error.message}`);
+  }
+  assert(manifest && typeof manifest === 'object', 'manifest.json parses as an object');
+  assert(
+    Array.isArray(manifest.icons) &&
+      manifest.icons.some((icon) => icon && /(?:^|\/)icons\/icon-192\.png$/.test(String(icon.src || ''))),
+    'manifest references icon-192.png'
+  );
+  assert(
+    Array.isArray(manifest.icons) &&
+      manifest.icons.some((icon) => icon && /(?:^|\/)icons\/icon-512\.png$/.test(String(icon.src || ''))),
+    'manifest references icon-512.png'
+  );
+
+  console.log('');
+  console.log('Regression Gate: PASS');
+}
+
+try {
+  main();
+} catch (error) {
+  console.error('');
+  console.error(`Regression Gate: FAIL — ${error.message}`);
+  process.exitCode = 1;
+}
