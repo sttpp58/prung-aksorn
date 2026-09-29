@@ -120,6 +120,7 @@
   * ก้าวข้ามขีดจำกัด 5MB ของ localStorage รองรับข้อมูลนิยายหลายร้อยเล่มระดับกิกะไบต์ (GB)
   * **Zero-Loss Auto-Migration:** ย้ายข้อมูลเดิมจาก localStorage เข้าสู่ IndexedDB ให้อัตโนมัติในครั้งแรกที่เปิดใช้งาน
   * **Lifecycle Auto-Flush:** ผูก Event `visibilitychange` บันทึกข้อมูลทันทีเมื่อพับหน้าจอหรือสลับแอปบนมือถือ
+* ⚠️ **Backup Privacy:** ไฟล์ Backup ที่สร้างจากการใช้งานจริงอาจมีต้นฉบับ คำแปล คลังคำ และข้อมูลการกู้คืนงาน จึงควรเก็บไว้นอก Public Repository และไม่เผยแพร่เป็น static asset ของ GitHub Pages
 * 📥 **Super-Resilient Backup Import:** ระบบกู้คืนข้อมูลสำรองที่รองรับไฟล์ JSON ทุกเวอร์ชัน (ทั้งไฟล์เก่าที่ไม่มี `books[]`, ไฟล์แบบ Array ตรงๆ หรือไฟล์ติด BOM `\uFEFF`) พร้อมคลี่โฟลเดอร์เล่ม 1 ให้เห็นบนหน้าจอทันที
 * 📤 **Multi-Format Export:**
   * **Microsoft Word (.docx):** จัดหน้ากระดาษ ฟอนต์ Sarabun และขึ้นหน้าใหม่แยกตามตอนอัตโนมัติ
@@ -130,11 +131,11 @@
 
 ## 7. ความปลอดภัยและสถาปัตยกรรม (Security & Architecture)
 
-* **100% Privacy & Zero-Knowledge:** ไม่มีการเก็บข้อมูลลงเซิร์ฟเวอร์ตัวกลาง ผลงานเป็นความลับในเครื่องผู้ใช้ 100%
-* **Memory-Only API Key:** คีย์ API ถูกเก็บใน RAM ชั่วคราวขณะเปิดแท็บเท่านั้น ไม่บันทึกลงฐานข้อมูลหรือ Hard Drive
-* **Header-Based Authentication:** ส่งคีย์ของ Google Gemini ผ่าน HTTP Header `x-goog-api-key` (ไม่ส่งผ่าน URL Query String ป้องกันประวัติคีย์หลุด)
-* **Error Diagnostics & No-Retry on Block:** ดักจับ `promptFeedback.blockReason` และ `finishReason` แปลงเป็นภาษาไทยชัดเจน และตัดการ Retry เปล่าประโยชน์ทันทีเมื่อติดข้อกำหนดความปลอดภัย
-* **XSS Hardening:** ข้อความพรีวิว, กล่องเตือน, และ Diff ทำงานผ่าน `escapeHtml()` ป้องกันการรันโค้ดไม่พึงประสงค์ 100%
+* **Client-Side Storage & No Application Backend:** ไม่มี application backend สำหรับเก็บโครงการของผู้ใช้ ข้อมูลโครงการ ร่างงาน คลังคำ และประวัติถูกจัดเก็บใน IndexedDB ของเบราว์เซอร์ อย่างไรก็ตาม เมื่อผู้ใช้สั่ง AI ข้อความที่เลือกจะถูกส่งโดยตรงไปยังผู้ให้บริการ AI ที่เลือก (OpenAI หรือ Google Gemini) ตามคำขอของผู้ใช้ จึงไม่ควรส่งข้อมูลที่ไม่ต้องการให้ผู้ให้บริการประมวลผล
+* **Session-Only API Key:** คีย์ API ใช้ในหน้าปัจจุบันและไม่ถูกเขียนลง application storage หรือรวมอยู่ในไฟล์ Backup V2
+* **Header-Based Authentication:** ส่งคีย์ของ Google Gemini ผ่าน HTTP Header `x-goog-api-key` และไม่ส่งผ่าน URL Query String
+* **Error Diagnostics & No-Retry on Block:** ดักจับ `promptFeedback.blockReason` และ `finishReason` แปลงเป็นภาษาไทยชัดเจน และตัดการ Retry ที่ไม่จำเป็นเมื่อคำขอถูกบล็อก
+* **XSS Hardening:** จุดแสดงผลข้อความจากผู้ใช้ที่สำคัญใช้ `textContent` หรือ `escapeHtml()` เพื่อลดความเสี่ยงจากการแทรก HTML/Script
 
 ---
 
@@ -158,7 +159,7 @@
 [![Technology](https://img.shields.io/badge/Pure-Vanilla%20JS-F7DF1E?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Storage](https://img.shields.io/badge/Storage-IndexedDB-blue)](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
 [![PWA Ready](https://img.shields.io/badge/PWA-Enabled-purple?logo=pwa)](https://web.dev/progressive-web-apps/)
-[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Client--Side-green)](#-privacy--zero-knowledge-architecture)
+[![Privacy](https://img.shields.io/badge/Privacy-Client--Side-blue)](#-ความปลอดภัยและสถาปัตยกรรม)
 
 
 <div align="center">
