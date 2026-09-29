@@ -2,11 +2,10 @@
 
 ---
 
-# 📄 `README.md` (ฉบับอัปเดตสำหรับ `index_appDB_V2.html`)
+# 📄 ปรุงอักษร — ห้องทำงานนักแปล / บรรณาธิการนิยาย
 
-# รีวิว "ปรุงอักษร" — ห้องทำงานนักแปล / บรรณาธิการนิยาย (v3.0)
 
-แอปเว็บส่วนตัวระดับสตูดิโอ (**Studio-Grade CAT Tool**) สำหรับงานแปลนิยายและขัดเกลาสำนวนภาษาไทย เชื่อมต่อ AI ของผู้ใช้เองโดยตรง (OpenAI / Google Gemini) พัฒนาในรูปแบบ **Single-File Web Application** ที่ทำงานบนเบราว์เซอร์ 100% จัดเก็บข้อมูลด้วย **IndexedDB** ไร้เซิร์ฟเวอร์ตัวกลาง และติดตั้งเป็น **PWA** ใช้งานออฟไลน์ได้จริง
+แอปเว็บสำหรับงานแปลนิยายและขัดเกลาสำนวนภาษาไทย เชื่อมต่อ AI ของผู้ใช้โดยตรง (OpenAI / Google Gemini) โดยทำงานหลักในเบราว์เซอร์ ใช้ **IndexedDB** สำหรับข้อมูลในเครื่อง และรองรับการติดตั้งเป็น **PWA** ผ่าน URL ที่ให้บริการด้วย HTTPS
 <p align="center">
   <a href="#-เริ่มต้นใช้งาน">เริ่มต้นใช้งาน</a> •
   <a href="#-ฟีเจอร์หลัก">ฟีเจอร์หลัก</a> •
@@ -19,18 +18,20 @@
 
 ## 🚀 เริ่มต้นใช้งาน (Quick Start)
 
-### วิธีที่ 1: เปิดใช้งานผ่านเบราว์เซอร์ทันที (ไม่ต้องติดตั้ง)
-1. ดาวน์โหลดไฟล์ `index.html`
-2. ดับเบิลคลิกเปิดไฟล์ด้วย Google Chrome, Microsoft Edge, Safari หรือ Firefox
-3. กดปุ่ม **เฟือง (⚙️)** มุมขวาบนเพื่อใส่ **API Key** (OpenAI หรือ Google Gemini)
-4. เริ่มสร้างเรื่องนิยายและแปลได้ทันที!
+### วิธีที่ 1: ใช้งานผ่าน GitHub Pages (แนะนำ)
+1. เปิด **https://sttpp58.github.io/prung-aksorn/**
+2. เปิดหน้าตั้งค่าเพื่อใส่ **API Key** (OpenAI หรือ Google Gemini)
+3. เริ่มสร้างเรื่องนิยายและแปลได้ทันที
 
-### วิธีที่ 2: ติดตั้งเป็น Progressive Web App (PWA)
-* บนคอมพิวเตอร์ (Chrome/Edge): กดไอคอน **Install App** ที่แถบ URL ด้านบน
-* บนสมาร์ตโฟน (iOS/Android): กด **Share** $\rightarrow$ เลือก **"Add to Home Screen (เพิ่มไปยังหน้าจอโฮม)"**
+### วิธีที่ 2: รันในเครื่องสำหรับพัฒนา/ทดสอบ
+* ให้เสิร์ฟไฟล์ทั้ง repository ผ่าน local HTTP server แทนการดับเบิลคลิก `index.html`
+* `index.html` โหลด `storage-v2.js` และแอปใช้ `sw.js` สำหรับ Service Worker ดังนั้นการเปิดผ่าน `file://` ไม่ใช่วิธีติดตั้ง PWA ที่รองรับ
+
+### วิธีที่ 3: ติดตั้งเป็น Progressive Web App (PWA)
+* เปิด URL GitHub Pages ผ่าน HTTPS แล้วใช้คำสั่ง **Install App** ของเบราว์เซอร์ที่รองรับ
+* บนสมาร์ตโฟน ให้ใช้เมนู **Add to Home Screen** ตามที่ระบบปฏิบัติการ/เบราว์เซอร์แสดง
 
 ---
-
 ## ⌨️ คีย์ลัดเพื่อการทำงานที่รวดเร็ว (Keyboard Shortcuts)
 
 | คีย์ลัด | คำสั่ง |
@@ -50,9 +51,9 @@
   * **สำนวนภาษา:** ปัจจุบัน / ย้อนยุค / ร่วมสมัย / ทางการ
 * 🧠 **ระบบคัดกรองคลังคำอัจฉริยะ (Smart Relevant Glossary Filter):**
   * สแกนเนื้อหาในแต่ละ Chunk ก่อนส่ง และ **ดึงเฉพาะคำศัพท์ที่ปรากฏตัวจริงๆ ในฉากนั้น** เข้าสู่ Prompt (ตรวจจับแบบ Word Boundary สำหรับภาษาอังกฤษ และ Substring สำหรับภาษาไทย)
-  * **ประหยัด Token ลง 80–90%** และป้องกันปัญหา AI สมาธิหลุด (Lost in the Middle) ทำให้สำนวนแปลลื่นไหลและใช้ศัพท์เฉพาะได้แม่นยำ 100%
+  * ช่วยลดข้อมูล glossary ที่ไม่เกี่ยวข้องกับแต่ละ Chunk; ปริมาณ Token ที่ประหยัดได้ขึ้นอยู่กับเนื้อหาและจำนวนคำศัพท์ที่ตรวจพบ
   * แสดง Badge นับจำนวนคำที่ตรวจพบแบบเรียลไทม์บนแถบสถานะ เช่น `กำลังปรุงส่วนที่ 1/4 (ใช้คลังคำ 5 คำ)`
-* **แบ่งก้อนข้อความ (Chunking) อัจฉริยะ:** ซอยก้อนข้อความตามย่อหน้า หากย่อหน้าเดียวยาวมากเกินกำหนด ระบบมี `splitOversizedParagraph()` ตัดแบ่งตามเครื่องหมายวรรคตอน (รองรับเครื่องหมายจีน `。！？` ด้วย) การันตีไม่มี Chunk ไหนยาวเกินพิกัด
+* **แบ่งก้อนข้อความ (Chunking) อัจฉริยะ:** ซอยก้อนข้อความตามย่อหน้า หากย่อหน้าเดียวยาวมากเกินกำหนด ระบบมี `splitOversizedParagraph()` ตัดแบ่งตามเครื่องหมายวรรคตอน (รองรับเครื่องหมายจีน `。！？` ด้วย) ออกแบบให้ Chunk อยู่ภายใต้ limit ที่กำหนด โดยใช้ `splitOversizedParagraph()` จัดการย่อหน้าที่ยาวเกิน limit
 * **ความต่อเนื่องข้าม Chunk (Contextual Tail):** ส่งท้ายข้อความ 300 ตัวอักษรของ Chunk ก่อนหน้าไปเป็นบริบทช่วยต่อประโยค ทำให้รอยต่อระหว่างส่วนไม่มีการสะดุด
 * **ระบบฟื้นฟูงานแปล (Auto-Retry & Resume):**
   * Retry อัตโนมัติเมื่อเจอ Network Error หรือ Rate Limit (429/5xx) สูงสุด 2 ครั้งแบบ Exponential Backoff
@@ -67,7 +68,7 @@
   1. ล้างอักขระล่องหน (Zero-width spaces, Soft-hyphen `\u00AD`, Word-joiner `\u2060`, BiDi overrides) และแก้สระแอเพี้ยน (`เเ` $\rightarrow$ `แ`)
   2. สแกนหาคำระบุตอนที่บรรทัดแรก (เช่น ตอนที่, Chapter, 第...章, บทนำ) แล้ว **"ดูด"** ไปใส่ช่องชื่อตอนให้อัตโนมัติ พร้อมตัดออกจากเนื้อหาหลักเพื่อไม่ให้ AI แปลซ้ำ
 * 🛠️ **ระบบซ่อม OCR 2 ระดับ (`buildOCRRepairPrompt`):**
-  * 🇹🇭 **โหมดภาษาไทย (Thai De-obfuscation):** ซ่อมสระลอย, วรรณยุกต์หลุดหาย และใช้ AI ถอดรหัสฟอนต์สุ่มกันก๊อปปี้ (Dynamic PUA Font Obfuscation `\uE000-\uF8FF`) จากบริบทภาษาไทยได้ 100% แม้เว็บนิยายจะสุ่มรหัสฟอนต์ใหม่ทุกตอน (ไม่มีการตัดทอนหรือสรุปความ)
+  * 🇹🇭 **โหมดภาษาไทย (Thai De-obfuscation):** ซ่อมสระลอย, วรรณยุกต์หลุดหาย และใช้ AI ช่วยถอดรหัสฟอนต์สุ่มกันก๊อปปี้ (Dynamic PUA Font Obfuscation `\uE000-\uF8FF`) จากบริบทภาษาไทย โดยผลลัพธ์ขึ้นอยู่กับข้อมูลต้นฉบับและโมเดลที่เลือก
   * 🌐 **โหมดภาษาต่างประเทศ (Foreign Raw Source):** คลีนสแกนดิบภาษาอังกฤษ, ต่อคำที่ถูกตัดข้ามบรรทัดด้วยยัติภังค์ (`trans- lation` $\rightarrow$ `translation`), แก้ตัวอักษรติดกันเพี้ยน (`rn` $\rightarrow$ `m`, `cl` $\rightarrow$ `d`) **โดยมีกฎเหล็กห้ามแอบแปลเป็นภาษาไทย**
 * **ระบบตรวจจับข้อความเพี้ยน (`highlightSuspicious`):** สแกนตรวจจับอักขระ PUA, สระลอยที่ไม่มีพยัญชนะนำหน้า (พยัญชนะต้นหาย), สัญลักษณ์ขยะ และตัวอักษรซ้ำ พร้อมแสดงกล่องเตือนสรุปจำนวนบรรทัดและตัวอักษรที่มีปัญหา
 
@@ -117,11 +118,11 @@
 ## 6. ฐานข้อมูล IndexedDB & การส่งออกผลงาน (Persistence & Export)
 
 * 💾 **Native IndexedDB Storage Engine (`PrungAksornDB`):**
-  * ก้าวข้ามขีดจำกัด 5MB ของ localStorage รองรับข้อมูลนิยายหลายร้อยเล่มระดับกิกะไบต์ (GB)
-  * **Zero-Loss Auto-Migration:** ย้ายข้อมูลเดิมจาก localStorage เข้าสู่ IndexedDB ให้อัตโนมัติในครั้งแรกที่เปิดใช้งาน
+  * ใช้ IndexedDB แทน localStorage เพื่อรองรับข้อมูลขนาดใหญ่กว่าเดิมมาก โดยพื้นที่จริงขึ้นอยู่กับ quota ของเบราว์เซอร์ อุปกรณ์ และ origin และระบบจัดเก็บของเบราว์เซอร์อาจมีเงื่อนไขการ eviction
+  * **Auto-Migration with Verification:** ย้ายข้อมูลเดิมจาก localStorage เข้าสู่ IndexedDB ให้อัตโนมัติในครั้งแรกที่เปิดใช้งาน
   * **Lifecycle Auto-Flush:** ผูก Event `visibilitychange` บันทึกข้อมูลทันทีเมื่อพับหน้าจอหรือสลับแอปบนมือถือ
 * ⚠️ **Backup Privacy:** ไฟล์ Backup ที่สร้างจากการใช้งานจริงอาจมีต้นฉบับ คำแปล คลังคำ และข้อมูลการกู้คืนงาน จึงควรเก็บไว้นอก Public Repository และไม่เผยแพร่เป็น static asset ของ GitHub Pages
-* 📥 **Super-Resilient Backup Import:** ระบบกู้คืนข้อมูลสำรองที่รองรับไฟล์ JSON ทุกเวอร์ชัน (ทั้งไฟล์เก่าที่ไม่มี `books[]`, ไฟล์แบบ Array ตรงๆ หรือไฟล์ติด BOM `\uFEFF`) พร้อมคลี่โฟลเดอร์เล่ม 1 ให้เห็นบนหน้าจอทันที
+* 📥 **Legacy-Compatible Backup Import:** ระบบกู้คืนข้อมูลสำรองที่รองรับไฟล์ JSON ทุกเวอร์ชัน (ทั้งไฟล์เก่าที่ไม่มี `books[]`, ไฟล์แบบ Array ตรงๆ หรือไฟล์ติด BOM `\uFEFF`) พร้อมคลี่โฟลเดอร์เล่ม 1 ให้เห็นบนหน้าจอทันที
 * 📤 **Multi-Format Export:**
   * **Microsoft Word (.docx):** จัดหน้ากระดาษ ฟอนต์ Sarabun และขึ้นหน้าใหม่แยกตามตอนอัตโนมัติ
   * **E-Book (.epub):** ประกอบโครงสร้างตามมาตรฐาน E-Book พร้อมสารบัญดิจิทัล และระบบ **Sanitized XML Metadata** ป้องกันไฟล์เสียหายจากอักขระพิเศษ (`& < > "`)
@@ -139,20 +140,31 @@
 
 ---
 
+---
+
+## 8. สถาปัตยกรรมปัจจุบันและการ Deploy (Current Architecture & Deployment)
+
+* **Canonical app entry point:** `index.html` คือ entry point ปัจจุบันของแอป และโหลด `storage-v2.js` เป็น storage layer แยกไฟล์
+* **Persistence:** ข้อมูลโครงการถูกเก็บใน IndexedDB (`PrungAksornDB`) บนเบราว์เซอร์ของผู้ใช้
+* **PWA:** `manifest.json` และ `sw.js` ใช้สำหรับการติดตั้งและ cache เฉพาะ app shell ของ origin เดียวกัน
+* **AI network path:** คำขอ OpenAI / Google Gemini ออกจากเบราว์เซอร์ของผู้ใช้ไปยังผู้ให้บริการโดยตรง และไม่ถูก Service Worker cache
+* **Current deployment target:** GitHub Pages — **https://sttpp58.github.io/prung-aksorn/**
+* **Offline boundary:** app shell และข้อมูลที่บันทึกไว้ในเครื่องสามารถใช้งานต่อได้ในขอบเขตที่ถูก cache/จัดเก็บแล้ว แต่การเรียก AI และทรัพยากรภายนอกต้องใช้เครือข่าย
+
 ## 📊 สรุปความพร้อมใช้งาน
 
 | หมวดหมู่ | สถานะ | รายละเอียด |
 | :--- | :---: | :--- |
-| **สถาปัตยกรรมฐานข้อมูล** | 🟢 สมบูรณ์ | IndexedDB + Auto-migration + Super-Resilient Import |
-| **ระบบประหยัด Token** | 🟢 ยอดเยี่ยม | Smart Relevant Glossary Filter ลด Token 80–90% |
-| **การจัดการคลังคำ** | 🟢 ยอดเยี่ยม | Interactive Modal + Whole-Book Mining + Cross-Book Sync |
-| **การกู้คืนข้อความ OCR** | 🟢 สมบูรณ์ | 2-Level OCR + Dynamic PUA Font Decryption |
-| **โหมดอ่านและ TTS** | 🟢 สมบูรณ์ | Persistent Font Size + Auto-scroll Speech Queue |
-| **ความปลอดภัย** | 🟢 ระดับสูงสุด | Header Auth + RAM Keys + XSS / XML Sanitized |
+| **สถาปัตยกรรมฐานข้อมูล** | 🟢 ใช้งานอยู่ | IndexedDB + Auto-migration + Verified Restore |
+| **ระบบประหยัด Token** | 🟢 ใช้งานอยู่ | Smart Relevant Glossary Filter แบบปรับตามเนื้อหา |
+| **การจัดการคลังคำ** | 🟢 ใช้งานอยู่ | Interactive Modal + Whole-Book Mining + Cross-Book Sync |
+| **การกู้คืนข้อความ OCR** | 🟢 ใช้งานอยู่ | 2-Level OCR + Dynamic PUA Font Decryption |
+| **โหมดอ่านและ TTS** | 🟢 ใช้งานอยู่ | Persistent Font Size + Auto-scroll Speech Queue |
+| **ความปลอดภัย** | 🟢 มีมาตรการหลัก | Header Auth + Session-Only Keys + XSS / XML Sanitized |
 
 ---
 <div align="center">
-  <b>📄 ใบอนุญาต (License) โครงการนี้เผยแพร่ภายใต้ใบอนุญาต MIT License — สามารถนำไปใช้งาน ปรับแต่ง และพัฒนาต่อยอดได้อย่างอิสระ </b>
+  <b>📄 ใบอนุญาต (License) โครงการนี้เผยแพร่ภายใต้ MIT License ตามไฟล์ `LICENSE` ใน repository</b>
 </div>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
