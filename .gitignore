@@ -1,0 +1,2 @@
+# User/runtime backup exports may contain private source and translation data.
+/backup/*.json
