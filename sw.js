@@ -3,10 +3,11 @@
 // ไม่แตะ/ไม่แคชการเรียก AI API (OpenAI, Gemini) หรือฟอนต์จาก Google เด็ดขาด
 // เพื่อไม่ให้คำแปลค้างหรือใช้คีย์/โควตาผิดพลาด
 
-const CACHE_NAME = 'prung-aksorn-v3';
+const CACHE_NAME = 'prung-aksorn-v4';
 const APP_SHELL = [
   './',
   './index.html',
+  './storage-v2.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
