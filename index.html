@@ -1389,7 +1389,11 @@
 </div>
 
 <script src="storage-v2.js"></script>
+<script src="tqg.js"></script>
+<script src="tqg-inspector.js"></script>
+<script src="tqg-repair.js"></script>
 <script src="tqg-ui.js"></script>
+<script src="tqg-integration.js"></script>
 <script>
 (function(){
   var STORAGE_KEY = 'prungAksornData';
@@ -1998,6 +2002,7 @@
         recoveryCompleted=true;
       }
 
+      analyzeTQGCompletedOutput(snapshot.text, results.join('\n\n'), state.proj);
       activeTranslationJobId=null;
       var existingEntry=findEntryById(state.proj,job.chapterId);
       if(!existingEntry){
@@ -2125,6 +2130,7 @@
       }
 
       await PrungAksornStorageV2.completeTranslationJob(job.jobId,job.revision);
+      analyzeTQGCompletedOutput(snapshot.text, results.join('\n\n'), proj);
       activeTranslationJobRevision=null;
       retryCompleted=true;
       activeTranslationJobId=null;
@@ -3401,6 +3407,7 @@
   var qualityWarningBox = document.getElementById('qualityWarningBox');
   var tqgQualityToggleBtn = document.getElementById('tqgQualityToggleBtn');
   var tqgQualityPanel = document.getElementById('tqgQualityPanel');
+  var tqgQualityState = null;
   var outputFontValue = document.getElementById('outputFontValue');
   if(window.TQGQualityUI && tqgQualityToggleBtn && tqgQualityPanel){
     window.TQGQualityUI.bindToggle(tqgQualityToggleBtn, tqgQualityPanel);
@@ -3415,6 +3422,168 @@
   function showQualityWarning(msg){
     qualityWarningBox.textContent = msg;
     qualityWarningBox.style.display = 'block';
+  }
+
+  function resetTQGQualityPanel(){
+    tqgQualityState = null;
+    if(window.TQGQualityUI && tqgQualityPanel){
+      window.TQGQualityUI.mount(tqgQualityPanel, {});
+      tqgQualityPanel.hidden = true;
+      if(tqgQualityToggleBtn) tqgQualityToggleBtn.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function renderTQGQualityPanel(){
+    if(!window.TQGQualityUI || !tqgQualityPanel) return;
+    var stateData = tqgQualityState || {};
+    window.TQGQualityUI.mount(tqgQualityPanel, {
+      analysis: stateData.analysis || null,
+      inspection: stateData.inspection || null,
+      repair: stateData.repair || null
+    }, {
+      onInspect: inspectCurrentTQGQuality,
+      onRepair: repairCurrentTQGQuality
+    });
+  }
+
+  function isTQGQualityContextCurrent(){
+    if(!tqgQualityState || state.source !== 'translate') return false;
+    var currentSource = normalizeOCR(inputText.value || '');
+    var currentTarget = output.textContent || '';
+    return currentSource === tqgQualityState.sourceText &&
+      currentTarget === tqgQualityState.targetText;
+  }
+
+  function createTQGAITransport(){
+    var key = document.getElementById('apiKey').value.trim();
+    if(!key) throw new Error('กรุณาใส่ API Key ก่อนใช้ TQG AI Inspector/Repair');
+    return function(request){
+      return callAIWithRetry(
+        request.systemPrompt,
+        request.userPrompt,
+        key,
+        modelInput.value,
+        activeController.signal,
+        1,
+        providerSel.value
+      );
+    };
+  }
+
+  function analyzeTQGCompletedOutput(sourceText, targetText, proj){
+    if(state.source !== 'translate'){
+      resetTQGQualityPanel();
+      return;
+    }
+    if(!window.TQGIntegration || !window.TQGQualityUI) return;
+    try{
+      var result = window.TQGIntegration.analyzeCompletedOutput({
+        completed: true,
+        sourceText: String(sourceText || ''),
+        targetText: String(targetText || ''),
+        glossaryText: proj && typeof proj.glossary === 'string' ? proj.glossary : ''
+      });
+      if(result.status !== 'COMPLETED'){
+        console.warn('TQG analysis did not complete:', result.reason || result.status);
+        return;
+      }
+      tqgQualityState = {
+        sourceText: String(sourceText || ''),
+        targetText: String(targetText || ''),
+        glossaryText: proj && typeof proj.glossary === 'string' ? proj.glossary : '',
+        analysis: result.analysis,
+        inspection: null,
+        repair: null
+      };
+      renderTQGQualityPanel();
+    }catch(err){
+      console.warn('TQG integration boundary failed safely:', err);
+    }
+  }
+
+  async function inspectCurrentTQGQuality(){
+    if(!tqgQualityState || !tqgQualityState.analysis) return;
+    if(!isTQGQualityContextCurrent()){
+      resetTQGQualityPanel();
+      showQualityWarning('ผลตรวจ TQG เดิมไม่ตรงกับข้อความปัจจุบัน กรุณาแปลให้เสร็จก่อนตรวจซ้ำ');
+      return;
+    }
+    if(warnIfAiBusy()) return;
+    try{
+      activeController = new AbortController();
+      setAiBusy(true);
+      resetActionStats();
+      cancelBtn.classList.add('show');
+      progressText.textContent = 'กำลังตรวจคุณภาพ TQG ด้วย AI Inspector...';
+      var result = await window.TQGIntegration.inspectCompletedOutput({
+        completed: true,
+        analysis: tqgQualityState.analysis,
+        sourceText: tqgQualityState.sourceText,
+        targetText: tqgQualityState.targetText,
+        glossaryText: tqgQualityState.glossaryText,
+        transport: createTQGAITransport(),
+        analyzer: window.TQG ? window.TQG.analyze : null
+      });
+      tqgQualityState.inspection = result;
+      tqgQualityState.repair = null;
+      renderTQGQualityPanel();
+    }catch(err){
+      if(err.name !== 'AbortError') showError('TQG Inspector ไม่สำเร็จ: ' + (err.message || err));
+    }finally{
+      setAiBusy(false);
+      cancelBtn.classList.remove('show');
+      progressText.textContent = '';
+    }
+  }
+
+  async function repairCurrentTQGQuality(){
+    if(!tqgQualityState || !tqgQualityState.analysis || !tqgQualityState.inspection) return;
+    if(!isTQGQualityContextCurrent()){
+      resetTQGQualityPanel();
+      showQualityWarning('ผลตรวจ TQG เดิมไม่ตรงกับข้อความปัจจุบัน กรุณาตรวจผลลัพธ์ใหม่ก่อนซ่อม');
+      return;
+    }
+    if(warnIfAiBusy()) return;
+    try{
+      activeController = new AbortController();
+      setAiBusy(true);
+      resetActionStats();
+      cancelBtn.classList.add('show');
+      progressText.textContent = 'กำลังซ่อมเฉพาะช่วงที่ TQG ยืนยัน...';
+      var inspection = tqgQualityState.inspection;
+      var result = await window.TQGIntegration.repairConfirmedAnomaly({
+        completed: true,
+        analysis: tqgQualityState.analysis,
+        originalAnalysis: tqgQualityState.analysis,
+        sourceText: tqgQualityState.sourceText,
+        targetText: tqgQualityState.targetText,
+        glossaryText: tqgQualityState.glossaryText,
+        findings: tqgQualityState.analysis.findings,
+        suspiciousSpan: inspection.span,
+        inspectorResult: inspection,
+        repairInstruction: inspection.replacementHint || 'Repair only the confirmed suspicious span.',
+        transport: createTQGAITransport(),
+        analyze: window.TQG ? window.TQG.analyze : null
+      });
+      tqgQualityState.repair = result;
+      if(result.status === 'ACCEPTED' && result.accepted === true){
+        tqgQualityState.targetText = result.output;
+        output.textContent = result.output;
+        outCount.textContent = countWords(result.output) + ' คำ';
+        spread.classList.toggle('has-result', !!result.output.trim());
+        copyBtn.disabled = false;
+        downloadBtn.disabled = false;
+        editOutputBtn.disabled = false;
+        saveRevisionBtn.disabled = false;
+      }
+      renderTQGQualityPanel();
+    }catch(err){
+      if(err.name !== 'AbortError') showError('TQG Repair ไม่สำเร็จ: ' + (err.message || err));
+    }finally{
+      setAiBusy(false);
+      cancelBtn.classList.remove('show');
+      progressText.textContent = '';
+    }
   }
 
   function setResultFocus(enabled){
@@ -3466,6 +3635,7 @@
     editOutputBtn.disabled = !hasOutput;
     saveRevisionBtn.disabled = !hasOutput;
     hideQualityWarning();
+    resetTQGQualityPanel();
   }
   
   function loadProjectDraft(proj){
@@ -4551,6 +4721,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         setOutput(results.join('\n\n'));
       }
       await PrungAksornStorageV2.completeTranslationJob(translationJobId, translationJobRevision);
+      analyzeTQGCompletedOutput(sourceSnapshotText || normalizeOCR(originalText || ''), results.join('\n\n'), proj);
       activeTranslationJobRevision = null;
       pendingResume = null;
       activeTranslationJobId = null;
@@ -4670,6 +4841,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         results.push(partTrim);
       }
       await PrungAksornStorageV2.completeTranslationJob(translationJobId,batchJobRevision);
+      analyzeTQGCompletedOutput(normalizedText || normalizeOCR(originalText || ''), results.join('\n\n'), proj);
       batchJobRevision = null;
       activeTranslationJobRevision = null;
       translationJobCompleted = true;
@@ -4703,6 +4875,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
     batchInProgress = true;
     batchCancelled = false;
+    resetTQGQualityPanel();
     setAiBusy(true);
     resetActionStats();
     cancelBtn.classList.add('show');

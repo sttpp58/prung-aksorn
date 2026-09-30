@@ -105,7 +105,7 @@ for (const token of uiForbidden) {
 
 check(/tqg-ui\.js/.test(indexSource), 'index.html loads tqg-ui.js');
 check(/\.\/tqg-ui\.js/.test(swSource), 'Service Worker app shell includes tqg-ui.js');
-check(/prung-aksorn-v5/.test(swSource), 'Service Worker cache version is bumped for UI asset');
+check(/prung-aksorn-v6/.test(swSource), 'Service Worker cache version is bumped for TQG runtime assets');
 
 console.log('');
 console.log('TQG-07 Quality UI Regression: PASS');
