@@ -1,0 +1,3175 @@
+{
+  "schemaVersion": "1.0",
+  "corpusVersion": "TQG-V1-2026-09-30-r1",
+  "project": "TQG V1 — Translation Quality Guard",
+  "phase": "TQG-01",
+  "corpusType": "public-sanitized",
+  "languageTarget": "th-TH",
+  "caseCount": 120,
+  "categoryCounts": {
+    "clean": 12,
+    "legitimate_foreign_name": 10,
+    "legitimate_foreign_term": 10,
+    "glossary_exception": 10,
+    "source_language_residue": 12,
+    "mixed_language_contamination": 10,
+    "full_source_copy": 8,
+    "structural_truncation": 8,
+    "paragraph_loss": 8,
+    "repeated_text": 8,
+    "prompt_meta_leakage": 8,
+    "pua_anomaly": 6,
+    "quote_anomaly": 4,
+    "targeted_repair": 6
+  },
+  "expectedStatusCounts": {
+    "PASS": 42,
+    "HIGH_SUSPICION": 48,
+    "REVIEW": 30
+  },
+  "policy": {
+    "purpose": "Regression corpus for detecting obvious contamination and output anomalies from small translation models.",
+    "publicDataPolicy": "Synthetic or minimal sanitized examples only; no full copyrighted chapters, user backups, or API keys.",
+    "detectorPolicy": "Corpus expectations are labels/specification; detector implementation begins in TQG-02.",
+    "ambiguityPolicy": "Cases labeled REVIEW are intended to exercise cautious detection and/or later AI inspection.",
+    "foreignTextPolicy": "Foreign text is not an error when it is a legitimate name, technical token, glossary-approved term, or otherwise explicitly justified."
+  },
+  "cases": [
+    {
+      "id": "TQG-CLEAN-001",
+      "category": "clean",
+      "sourceText": "He closed the door quietly.",
+      "targetText": "เขาปิดประตูอย่างเงียบๆ",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-002",
+      "category": "clean",
+      "sourceText": "The rain stopped before dawn.",
+      "targetText": "ฝนหยุดตกก่อนรุ่งสาง",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-003",
+      "category": "clean",
+      "sourceText": "She placed the letter on the table.",
+      "targetText": "นางวางจดหมายไว้บนโต๊ะ",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-004",
+      "category": "clean",
+      "sourceText": "The soldiers waited outside the gate.",
+      "targetText": "เหล่าทหารรออยู่ด้านนอกประตูเมือง",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-005",
+      "category": "clean",
+      "sourceText": "He raised his hand and pointed north.",
+      "targetText": "เขายกมือขึ้นและชี้ไปทางทิศเหนือ",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-006",
+      "category": "clean",
+      "sourceText": "The room was empty when they arrived.",
+      "targetText": "เมื่อพวกเขามาถึง ห้องนั้นก็ว่างเปล่า",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-007",
+      "category": "clean",
+      "sourceText": "She smiled after hearing the news.",
+      "targetText": "นางยิ้มหลังจากได้ยินข่าว",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-008",
+      "category": "clean",
+      "sourceText": "The old merchant counted the coins twice.",
+      "targetText": "พ่อค้าชรานับเหรียญสองครั้ง",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-009",
+      "category": "clean",
+      "sourceText": "They crossed the river before sunset.",
+      "targetText": "พวกเขาข้ามแม่น้ำก่อนพระอาทิตย์ตก",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-010",
+      "category": "clean",
+      "sourceText": "He lowered his voice and continued speaking.",
+      "targetText": "เขาลดเสียงลงแล้วพูดต่อ",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-011",
+      "category": "clean",
+      "sourceText": "The village became quiet after midnight.",
+      "targetText": "หมู่บ้านเงียบสงัดหลังเที่ยงคืน",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-CLEAN-012",
+      "category": "clean",
+      "sourceText": "She opened the window to let in the wind.",
+      "targetText": "นางเปิดหน้าต่างเพื่อรับสายลม",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-001",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Ye Fan entered the hall.",
+      "targetText": "Ye Fan เดินเข้ามาในโถง",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-002",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Long Chen stood beside the stone bridge.",
+      "targetText": "Long Chen ยืนอยู่ข้างสะพานหิน",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-003",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Mei Lin waited near the temple.",
+      "targetText": "Mei Lin รออยู่ใกล้กับวิหาร",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-004",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Han Yue looked toward the mountain.",
+      "targetText": "Han Yue มองไปทางภูเขา",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-005",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Jiang Rui carried the wooden box.",
+      "targetText": "Jiang Rui ถือกล่องไม้",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-006",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Lin Xue returned before sunset.",
+      "targetText": "Lin Xue กลับมาก่อนพระอาทิตย์ตก",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-007",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Zhao Ming spoke to the captain.",
+      "targetText": "Zhao Ming พูดคุยกับกัปตัน",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-008",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Su Yan walked through the garden.",
+      "targetText": "Su Yan เดินผ่านสวน",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-009",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Qin Luo waited at the north gate.",
+      "targetText": "Qin Luo รออยู่ที่ประตูทิศเหนือ",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-NAME-010",
+      "category": "legitimate_foreign_name",
+      "sourceText": "Wei Chen placed the sword on the table.",
+      "targetText": "Wei Chen วางดาบไว้บนโต๊ะ",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-name-preserved",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-001",
+      "category": "legitimate_foreign_term",
+      "sourceText": "The device connected through Wi-Fi.",
+      "targetText": "อุปกรณ์เชื่อมต่อผ่าน Wi-Fi",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-002",
+      "category": "legitimate_foreign_term",
+      "sourceText": "The interface displayed GPT-5 in the settings.",
+      "targetText": "หน้าตั้งค่าแสดง GPT-5",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-003",
+      "category": "legitimate_foreign_term",
+      "sourceText": "His HP fell below half.",
+      "targetText": "HP ของเขาลดลงต่ำกว่าครึ่ง",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-004",
+      "category": "legitimate_foreign_term",
+      "sourceText": "She had only 30 MP remaining.",
+      "targetText": "นางเหลือ MP เพียง 30",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-005",
+      "category": "legitimate_foreign_term",
+      "sourceText": "The character reached Lv.99.",
+      "targetText": "ตัวละครขึ้นถึง Lv.99",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-006",
+      "category": "legitimate_foreign_term",
+      "sourceText": "The file was saved as a PDF.",
+      "targetText": "ไฟล์ถูกบันทึกเป็น PDF",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-007",
+      "category": "legitimate_foreign_term",
+      "sourceText": "He copied the URL from the message.",
+      "targetText": "เขาคัดลอก URL จากข้อความ",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-008",
+      "category": "legitimate_foreign_term",
+      "sourceText": "The robot used a USB connection.",
+      "targetText": "หุ่นยนต์ใช้การเชื่อมต่อ USB",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-009",
+      "category": "legitimate_foreign_term",
+      "sourceText": "The scene was rendered in 3D.",
+      "targetText": "ฉากถูกเรนเดอร์เป็น 3D",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TERM-010",
+      "category": "legitimate_foreign_term",
+      "sourceText": "The game displayed the RPG battle menu.",
+      "targetText": "เกมแสดงเมนูต่อสู้แบบ RPG",
+      "glossaryText": "",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "technical-token"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-001",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Azure Dragon Sect.",
+      "targetText": "เขาเดินทางไปยัง Azure Dragon Sect",
+      "glossaryText": "Azure Dragon Sect = Azure Dragon Sect",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-002",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Moonlight City.",
+      "targetText": "เขาเดินทางไปยัง Moonlight City",
+      "glossaryText": "Moonlight City = Moonlight City",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-003",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Black Flame.",
+      "targetText": "เขาเดินทางไปยัง Black Flame",
+      "glossaryText": "Black Flame = Black Flame",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-004",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Heavenly Sword.",
+      "targetText": "เขาเดินทางไปยัง Heavenly Sword",
+      "glossaryText": "Heavenly Sword = Heavenly Sword",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-005",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Spirit Ring.",
+      "targetText": "เขาเดินทางไปยัง Spirit Ring",
+      "glossaryText": "Spirit Ring = Spirit Ring",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-006",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Sky Palace.",
+      "targetText": "เขาเดินทางไปยัง Sky Palace",
+      "glossaryText": "Sky Palace = Sky Palace",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-007",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Blood Lotus.",
+      "targetText": "เขาเดินทางไปยัง Blood Lotus",
+      "glossaryText": "Blood Lotus = Blood Lotus",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-008",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Void Gate.",
+      "targetText": "เขาเดินทางไปยัง Void Gate",
+      "glossaryText": "Void Gate = Void Gate",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-009",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Dragon Core.",
+      "targetText": "เขาเดินทางไปยัง Dragon Core",
+      "glossaryText": "Dragon Core = Dragon Core",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-GLOSS-010",
+      "category": "glossary_exception",
+      "sourceText": "He traveled to the Starfall.",
+      "targetText": "เขาเดินทางไปยัง Starfall",
+      "glossaryText": "Starfall = Starfall",
+      "expected": {
+        "status": "PASS",
+        "findings": [],
+        "inspectorVerdict": "NOT_REQUIRED",
+        "repairable": false
+      },
+      "evidence": [
+        "glossary-approved-term"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-001",
+      "category": "source_language_residue",
+      "sourceText": "He looked at me and smiled.",
+      "targetText": "เขามองมาที่ฉัน and smiled",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-002",
+      "category": "source_language_residue",
+      "sourceText": "She turned around because she heard a noise.",
+      "targetText": "นางหันกลับ because she heard a noise",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-003",
+      "category": "source_language_residue",
+      "sourceText": "Then he opened the gate and walked inside.",
+      "targetText": "จากนั้นเขาเปิดประตูและ walked inside",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-004",
+      "category": "source_language_residue",
+      "sourceText": "Why are you here?",
+      "targetText": "ทำไมเจ้าถึงมาอยู่ที่นี่ Why are you here?",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-005",
+      "category": "source_language_residue",
+      "sourceText": "They waited until the rain stopped.",
+      "targetText": "พวกเขารอจนกระทั่ง until the rain stopped",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-006",
+      "category": "source_language_residue",
+      "sourceText": "He lowered his head and whispered softly.",
+      "targetText": "เขาก้มศีรษะลง and whispered softly",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-007",
+      "category": "source_language_residue",
+      "sourceText": "The servant bowed and left the room.",
+      "targetText": "คนรับใช้โค้งคำนับ然后离开了房间",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "UNCERTAIN",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-008",
+      "category": "source_language_residue",
+      "sourceText": "She looked at him and said nothing.",
+      "targetText": "นางมองเขาแล้ว said nothing",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "UNCERTAIN",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-009",
+      "category": "source_language_residue",
+      "sourceText": "The battle ended before sunrise.",
+      "targetText": "การต่อสู้จบลงก่อนรุ่งสาง before sunrise",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "UNCERTAIN",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-010",
+      "category": "source_language_residue",
+      "sourceText": "He knew the answer but refused to speak.",
+      "targetText": "เขารู้คำตอบแต่ refused to speak",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "UNCERTAIN",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-011",
+      "category": "source_language_residue",
+      "sourceText": "The door opened slowly.",
+      "targetText": "ประตูเปิดออกช้าๆ ゆっくり",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "UNCERTAIN",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-RESIDUE-012",
+      "category": "source_language_residue",
+      "sourceText": "He promised that he would return tomorrow.",
+      "targetText": "เขาสัญญาว่าจะกลับมาในวันพรุ่งนี้ 明天回来",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "UNCERTAIN",
+        "repairable": false
+      },
+      "evidence": [
+        "foreign-span",
+        "source-overlap"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-001",
+      "category": "mixed_language_contamination",
+      "sourceText": "He kept walking without looking back.",
+      "targetText": "เขาเดินต่อไปโดยไม่หันกลับ but did not stop",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-002",
+      "category": "mixed_language_contamination",
+      "sourceText": "She was angry but remained calm.",
+      "targetText": "นางกำลังโกรธแต่ remained calm อยู่",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-003",
+      "category": "mixed_language_contamination",
+      "sourceText": "The captain ordered everyone to retreat.",
+      "targetText": "กัปตันสั่งให้ทุกคนถอย back immediately",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-004",
+      "category": "mixed_language_contamination",
+      "sourceText": "He entered the room and closed the door.",
+      "targetText": "เขาเข้าไปในห้อง แล้ว closed the door",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-005",
+      "category": "mixed_language_contamination",
+      "sourceText": "The child began to cry after falling.",
+      "targetText": "เด็กเริ่มร้องไห้หลังจากล้ม down",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-006",
+      "category": "mixed_language_contamination",
+      "sourceText": "They waited at the river until dawn.",
+      "targetText": "พวกเขารอที่ริมแม่น้ำ until dawn",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-007",
+      "category": "mixed_language_contamination",
+      "sourceText": "She whispered that someone was coming.",
+      "targetText": "นางกระซิบว่า someone was coming",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-008",
+      "category": "mixed_language_contamination",
+      "sourceText": "He looked at the map and chose the eastern road.",
+      "targetText": "เขาดูแผนที่แล้ว chose the eastern road",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-009",
+      "category": "mixed_language_contamination",
+      "sourceText": "The old man shook his head in silence.",
+      "targetText": "ชายชราส่ายหน้า in silence",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-MIXED-010",
+      "category": "mixed_language_contamination",
+      "sourceText": "The messenger delivered the letter and left.",
+      "targetText": "ผู้ส่งสารนำจดหมายมาให้แล้ว left immediately",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "MIXED_LANGUAGE_SPAN"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "mixed-language-target"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-COPY-001",
+      "category": "full_source_copy",
+      "sourceText": "He opened the door and walked into the empty room.",
+      "targetText": "He opened the door and walked into the empty room.",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "full-target-source-match"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-COPY-002",
+      "category": "full_source_copy",
+      "sourceText": "The rain fell all night and flooded the street.",
+      "targetText": "The rain fell all night and flooded the street.",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "full-target-source-match"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-COPY-003",
+      "category": "full_source_copy",
+      "sourceText": "She looked at the moon and remembered her childhood.",
+      "targetText": "She looked at the moon and remembered her childhood.",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "full-target-source-match"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-COPY-004",
+      "category": "full_source_copy",
+      "sourceText": "The captain raised his sword and gave the signal.",
+      "targetText": "The captain raised his sword and gave the signal.",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "full-target-source-match"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-COPY-005",
+      "category": "full_source_copy",
+      "sourceText": "They crossed the bridge before the guards noticed them.",
+      "targetText": "They crossed the bridge before the guards noticed them.",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "full-target-source-match"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-COPY-006",
+      "category": "full_source_copy",
+      "sourceText": "He read the letter twice but found no answer.",
+      "targetText": "He read the letter twice but found no answer.",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "full-target-source-match"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-COPY-007",
+      "category": "full_source_copy",
+      "sourceText": "The merchant closed his shop and returned home.",
+      "targetText": "The merchant closed his shop and returned home.",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "full-target-source-match"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-COPY-008",
+      "category": "full_source_copy",
+      "sourceText": "She waited beside the river until sunset.",
+      "targetText": "She waited beside the river until sunset.",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "full-target-source-match"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TRUNC-001",
+      "category": "structural_truncation",
+      "sourceText": "He opened the door. The room was dark. He lit a candle and walked inside.",
+      "targetText": "เขาเปิดประตู ห้องนั้นมืดมิด",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "STRUCTURAL_TRUNCATION"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "shortened-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TRUNC-002",
+      "category": "structural_truncation",
+      "sourceText": "She crossed the bridge. A guard saw her. She hid behind a tree and waited.",
+      "targetText": "นางข้ามสะพาน",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "STRUCTURAL_TRUNCATION"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "shortened-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TRUNC-003",
+      "category": "structural_truncation",
+      "sourceText": "The storm arrived at noon. The ships returned to the harbor. Everyone waited for the wind to calm.",
+      "targetText": "พายุเข้ามาตอนเที่ยง",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "STRUCTURAL_TRUNCATION"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "shortened-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TRUNC-004",
+      "category": "structural_truncation",
+      "sourceText": "He picked up the sword. The blade was cold. He tested its weight and nodded.",
+      "targetText": "เขาหยิบดาบขึ้นมา ใบดาบเย็นเยียบ",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "STRUCTURAL_TRUNCATION"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "shortened-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TRUNC-005",
+      "category": "structural_truncation",
+      "sourceText": "They reached the village. The villagers gathered around them. The elder asked what happened.",
+      "targetText": "พวกเขาไปถึงหมู่บ้าน",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "STRUCTURAL_TRUNCATION"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "shortened-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TRUNC-006",
+      "category": "structural_truncation",
+      "sourceText": "She opened the chest. Inside was an old map. She unfolded it carefully.",
+      "targetText": "นางเปิดหีบ",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "STRUCTURAL_TRUNCATION"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "shortened-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TRUNC-007",
+      "category": "structural_truncation",
+      "sourceText": "The battle continued until midnight. Reinforcements arrived before dawn. The enemy finally retreated.",
+      "targetText": "การต่อสู้ดำเนินต่อไปจนถึงเที่ยงคืน",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "STRUCTURAL_TRUNCATION"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "shortened-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-TRUNC-008",
+      "category": "structural_truncation",
+      "sourceText": "He entered the library. Dust covered the shelves. He searched for the ancient record.",
+      "targetText": "เขาเข้าไปในห้องสมุด",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "STRUCTURAL_TRUNCATION"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "shortened-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PARALOSS-001",
+      "category": "paragraph_loss",
+      "sourceText": "He entered the courtyard and looked around.\n\nThe eastern gate was already open.",
+      "targetText": "เขาเข้าไปในลานแล้วมองไปรอบๆ",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PARAGRAPH_LOSS"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "paragraph-count-loss"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PARALOSS-002",
+      "category": "paragraph_loss",
+      "sourceText": "She placed the book on the table.\n\nThen she walked to the window.",
+      "targetText": "นางวางหนังสือไว้บนโต๊ะ",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PARAGRAPH_LOSS"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "paragraph-count-loss"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PARALOSS-003",
+      "category": "paragraph_loss",
+      "sourceText": "The messenger arrived before noon.\n\nHe carried a sealed letter from the capital.",
+      "targetText": "ผู้ส่งสารมาถึงก่อนเที่ยง",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PARAGRAPH_LOSS"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "paragraph-count-loss"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PARALOSS-004",
+      "category": "paragraph_loss",
+      "sourceText": "The old man raised his cup.\n\nEveryone at the table became silent.",
+      "targetText": "ชายชรายกถ้วยขึ้น",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PARAGRAPH_LOSS"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "paragraph-count-loss"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PARALOSS-005",
+      "category": "paragraph_loss",
+      "sourceText": "They reached the mountain pass.\n\nSnow covered the road ahead.",
+      "targetText": "พวกเขาไปถึงช่องเขา",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PARAGRAPH_LOSS"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "paragraph-count-loss"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PARALOSS-006",
+      "category": "paragraph_loss",
+      "sourceText": "She heard a strange sound.\n\nA shadow moved behind the curtain.",
+      "targetText": "นางได้ยินเสียงประหลาด",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PARAGRAPH_LOSS"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "paragraph-count-loss"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PARALOSS-007",
+      "category": "paragraph_loss",
+      "sourceText": "He opened the chest.\n\nInside was a key wrapped in cloth.",
+      "targetText": "เขาเปิดหีบ",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PARAGRAPH_LOSS"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "paragraph-count-loss"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PARALOSS-008",
+      "category": "paragraph_loss",
+      "sourceText": "The soldiers formed a line.\n\nThe captain gave the order to advance.",
+      "targetText": "เหล่าทหารตั้งแถว",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PARAGRAPH_LOSS"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "paragraph-count-loss"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPEAT-001",
+      "category": "repeated_text",
+      "sourceText": "He knocked on the door and waited.",
+      "targetText": "เขาเคาะประตูแล้วรอ เขาเคาะประตูแล้วรอ",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "REPEATED_TEXT"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "duplicate-target-span"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPEAT-002",
+      "category": "repeated_text",
+      "sourceText": "She looked toward the mountain.",
+      "targetText": "นางมองไปทางภูเขา นางมองไปทางภูเขา",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "REPEATED_TEXT"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "duplicate-target-span"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPEAT-003",
+      "category": "repeated_text",
+      "sourceText": "The fire burned through the night.",
+      "targetText": "ไฟลุกไหม้ตลอดทั้งคืน ไฟลุกไหม้ตลอดทั้งคืน",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "REPEATED_TEXT"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "duplicate-target-span"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPEAT-004",
+      "category": "repeated_text",
+      "sourceText": "He lowered his voice.",
+      "targetText": "เขาลดเสียงลง เขาลดเสียงลง เขาลดเสียงลง",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "REPEATED_TEXT"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "duplicate-target-span"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPEAT-005",
+      "category": "repeated_text",
+      "sourceText": "They returned before dawn.",
+      "targetText": "พวกเขากลับมาก่อนรุ่งสาง พวกเขากลับมาก่อนรุ่งสาง",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "REPEATED_TEXT"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "duplicate-target-span"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPEAT-006",
+      "category": "repeated_text",
+      "sourceText": "She closed the window.",
+      "targetText": "นางปิดหน้าต่าง นางปิดหน้าต่าง",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "REPEATED_TEXT"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "duplicate-target-span"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPEAT-007",
+      "category": "repeated_text",
+      "sourceText": "The guard raised his spear.",
+      "targetText": "ยามยกหอกขึ้น ยามยกหอกขึ้น",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "REPEATED_TEXT"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "duplicate-target-span"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPEAT-008",
+      "category": "repeated_text",
+      "sourceText": "He took a deep breath.",
+      "targetText": "เขาสูดหายใจลึก เขาสูดหายใจลึก",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "REPEATED_TEXT"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "duplicate-target-span"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PROMPT-001",
+      "category": "prompt_meta_leakage",
+      "sourceText": "Translate the sentence faithfully.",
+      "targetText": "Here is the translation: เขาเปิดประตู",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PROMPT_LEAKAGE"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "meta-text-in-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PROMPT-002",
+      "category": "prompt_meta_leakage",
+      "sourceText": "Keep the original paragraph structure.",
+      "targetText": "As an AI language model, I translated the text as follows: เขาเปิดประตู",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PROMPT_LEAKAGE"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "meta-text-in-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PROMPT-003",
+      "category": "prompt_meta_leakage",
+      "sourceText": "Return only the translated text.",
+      "targetText": "Sure! เขาเปิดประตู และเดินเข้าไป",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PROMPT_LEAKAGE"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "meta-text-in-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PROMPT-004",
+      "category": "prompt_meta_leakage",
+      "sourceText": "Do not add explanations.",
+      "targetText": "คำแปลคือ: เขาเดินออกจากบ้าน",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PROMPT_LEAKAGE"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "meta-text-in-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PROMPT-005",
+      "category": "prompt_meta_leakage",
+      "sourceText": "Preserve the dialogue exactly.",
+      "targetText": "I hope this helps. นางยิ้มแล้วเดินจากไป",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PROMPT_LEAKAGE"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "meta-text-in-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PROMPT-006",
+      "category": "prompt_meta_leakage",
+      "sourceText": "Translate into natural Thai.",
+      "targetText": "Translation: เขามองไปที่ภูเขา",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PROMPT_LEAKAGE"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "meta-text-in-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PROMPT-007",
+      "category": "prompt_meta_leakage",
+      "sourceText": "Do not mention the translation process.",
+      "targetText": "I cannot guarantee accuracy, but: เขาก้มศีรษะ",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PROMPT_LEAKAGE"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "meta-text-in-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PROMPT-008",
+      "category": "prompt_meta_leakage",
+      "sourceText": "Output only Thai prose.",
+      "targetText": "Here is the requested Thai translation: เขาปิดประตู",
+      "glossaryText": "",
+      "expected": {
+        "status": "HIGH_SUSPICION",
+        "findings": [
+          {
+            "code": "PROMPT_LEAKAGE"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "meta-text-in-output"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PUA-001",
+      "category": "pua_anomaly",
+      "sourceText": "He entered the room.",
+      "targetText": "เขาเข้าสู่ห้อง",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "PUA_OR_REPLACEMENT_CHAR"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "private-use-area-character"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PUA-002",
+      "category": "pua_anomaly",
+      "sourceText": "She opened the chest.",
+      "targetText": "นางเปิดหีบ",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "PUA_OR_REPLACEMENT_CHAR"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "private-use-area-character"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PUA-003",
+      "category": "pua_anomaly",
+      "sourceText": "The guard looked around.",
+      "targetText": "ยามมองไปรอบๆ",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "PUA_OR_REPLACEMENT_CHAR"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "private-use-area-character"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PUA-004",
+      "category": "pua_anomaly",
+      "sourceText": "They waited outside.",
+      "targetText": "พวกเขารออยู่ด้านนอก",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "PUA_OR_REPLACEMENT_CHAR"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "private-use-area-character"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PUA-005",
+      "category": "pua_anomaly",
+      "sourceText": "He carried the letter.",
+      "targetText": "เขาถือจดหมาย",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "PUA_OR_REPLACEMENT_CHAR"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "private-use-area-character"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-PUA-006",
+      "category": "pua_anomaly",
+      "sourceText": "The old man smiled.",
+      "targetText": "ชายชรายิ้ม",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "PUA_OR_REPLACEMENT_CHAR"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "private-use-area-character"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-QUOTE-001",
+      "category": "quote_anomaly",
+      "sourceText": "He said, \"We should leave now.\"",
+      "targetText": "เขากล่าวว่า \"พวกเราควรไปตอนนี้",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "QUOTE_ANOMALY"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "quote-structure-mismatch"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-QUOTE-002",
+      "category": "quote_anomaly",
+      "sourceText": "She asked, \"Are you ready?\"",
+      "targetText": "นางถามว่า พวกเจ้าพร้อมหรือยัง?\"",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "QUOTE_ANOMALY"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "quote-structure-mismatch"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-QUOTE-003",
+      "category": "quote_anomaly",
+      "sourceText": "The captain shouted, \"Move!\"",
+      "targetText": "\"เคลื่อนที่!\"",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "QUOTE_ANOMALY"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "quote-structure-mismatch"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-QUOTE-004",
+      "category": "quote_anomaly",
+      "sourceText": "He whispered, \"Do not open it.\"",
+      "targetText": "เขากระซิบว่า \"อย่าเปิดมัน",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "QUOTE_ANOMALY"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": false
+      },
+      "evidence": [
+        "quote-structure-mismatch"
+      ],
+      "repair": null,
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPAIR-001",
+      "category": "targeted_repair",
+      "sourceText": "He looked at me and smiled.",
+      "targetText": "เขามองมาที่ฉัน and smiled",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "bounded-repair-span"
+      ],
+      "repair": {
+        "targetText": "เขามองมาที่ฉัน and smiled",
+        "replacementText": "และยิ้ม",
+        "expectedTarget": "เขามองมาที่ฉัน และยิ้ม"
+      },
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPAIR-002",
+      "category": "targeted_repair",
+      "sourceText": "She opened the door and walked inside.",
+      "targetText": "นางเปิดประตูแล้ว walked inside",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "bounded-repair-span"
+      ],
+      "repair": {
+        "targetText": "นางเปิดประตูแล้ว walked inside",
+        "replacementText": "เดินเข้าไปข้างใน",
+        "expectedTarget": "นางเปิดประตูแล้ว เดินเข้าไปข้างใน"
+      },
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPAIR-003",
+      "category": "targeted_repair",
+      "sourceText": "Why are you here?",
+      "targetText": "ทำไมเจ้าถึงมาอยู่ที่นี่ Why are you here?",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "bounded-repair-span"
+      ],
+      "repair": {
+        "targetText": "ทำไมเจ้าถึงมาอยู่ที่นี่ Why are you here?",
+        "replacementText": "ทำไมเจ้าถึงมาอยู่ที่นี่",
+        "expectedTarget": "ทำไมเจ้าถึงมาอยู่ที่นี่ ทำไมเจ้าถึงมาอยู่ที่นี่"
+      },
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPAIR-004",
+      "category": "targeted_repair",
+      "sourceText": "The captain told everyone to retreat.",
+      "targetText": "กัปตันสั่งให้ทุกคน to retreat",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "bounded-repair-span"
+      ],
+      "repair": {
+        "targetText": "กัปตันสั่งให้ทุกคน to retreat",
+        "replacementText": "ถอยทัพ",
+        "expectedTarget": "กัปตันสั่งให้ทุกคน ถอยทัพ"
+      },
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPAIR-005",
+      "category": "targeted_repair",
+      "sourceText": "He knew the answer but refused to speak.",
+      "targetText": "เขารู้คำตอบแต่ refused to speak",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "bounded-repair-span"
+      ],
+      "repair": {
+        "targetText": "เขารู้คำตอบแต่ refused to speak",
+        "replacementText": "ปฏิเสธที่จะพูด",
+        "expectedTarget": "เขารู้คำตอบแต่ ปฏิเสธที่จะพูด"
+      },
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    },
+    {
+      "id": "TQG-REPAIR-006",
+      "category": "targeted_repair",
+      "sourceText": "She closed the window and sat down.",
+      "targetText": "นางปิดหน้าต่างแล้ว sat down",
+      "glossaryText": "",
+      "expected": {
+        "status": "REVIEW",
+        "findings": [
+          {
+            "code": "FOREIGN_SCRIPT_SPAN"
+          },
+          {
+            "code": "SOURCE_LANGUAGE_RESIDUE"
+          },
+          {
+            "code": "SOURCE_TEXT_OVERLAP"
+          }
+        ],
+        "inspectorVerdict": "TRUE_ANOMALY",
+        "repairable": true
+      },
+      "evidence": [
+        "bounded-repair-span"
+      ],
+      "repair": {
+        "targetText": "นางปิดหน้าต่างแล้ว sat down",
+        "replacementText": "นั่งลง",
+        "expectedTarget": "นางปิดหน้าต่างแล้ว นั่งลง"
+      },
+      "safety": {
+        "publicSafe": true,
+        "syntheticOrMinimal": true,
+        "copyrightedFullText": false
+      }
+    }
+  ]
+}
