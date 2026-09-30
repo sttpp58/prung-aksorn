@@ -220,9 +220,15 @@ function main() {
   const indexHtml = readText('index.html');
   const storage = readText('storage-v2.js');
   const sw = readText('sw.js');
+  const tqgUi = readText('tqg-ui.js');
   const manifestText = readText('manifest.json');
 
   parseJavaScript(storage, 'storage-v2.js');
+  parseJavaScript(tqgUi, 'tqg-ui.js');
+
+  assert(/TQG-07-2026-09-30/.test(tqgUi), 'TQG Quality UI module version is present');
+  assert(!/[\u{1F000}-\u{1FAFF}]/u.test(tqgUi), 'TQG Quality UI module contains no emoji');
+  assert(/TQGQualityUI/.test(indexHtml), 'index.html references TQG Quality UI');
 
   const inlineScripts = extractInlineScripts(indexHtml);
   assert(inlineScripts.length > 0, 'index.html contains inline JavaScript');
@@ -315,12 +321,16 @@ function main() {
   assertAllRevisionCallSites(indexHtml);
 
   assert(
-    /const\s+CACHE_NAME\s*=\s*['"]prung-aksorn-v4['"]/.test(sw),
-    'Service Worker cache version remains v4'
+    /const\s+CACHE_NAME\s*=\s*['"]prung-aksorn-v5['"]/.test(sw),
+    'Service Worker cache version is v5 for TQG UI asset'
   );
   assert(
     /['"]\.\/storage-v2\.js['"]/.test(sw),
     'Service Worker app shell includes storage-v2.js'
+  );
+  assert(
+    /['"]\.\/tqg-ui\.js['"]/.test(sw),
+    'Service Worker app shell includes tqg-ui.js'
   );
   assert(
     /if\s*\(url\.origin\s*!==\s*self\.location\.origin\)\s*\{\s*return;\s*\}/.test(
