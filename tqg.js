@@ -1,12 +1,12 @@
 /*
- * TQG V1 — Deterministic Detector (TQG-02)
+ * TQG V1 — Deterministic Detector + Exception Layer (TQG-03)
  *
  * Local-only, deterministic analysis for completed translation output.
  * No AI provider, network request, storage mutation, or translation-core
  * dependency is allowed in this module.
  *
- * TQG-03 may extend the exception surface later. The built-in protections
- * here are conservative token recognition only; they do not disable TQG.
+ * TQG-03 formalizes exception handling without globally disabling detection.
+ * Built-in and explicit exceptions suppress only the finding codes they explain.
  */
 (function initTQG(global) {
   'use strict';
@@ -50,6 +50,38 @@
     /^[a-z]{1,5}\.[a-z0-9]+$/i, /^[a-z]+-\d+(?:\.\d+)*$/i,
     /^[a-z]+\d+[a-z0-9]*$/i
   ]);
+
+  const EXCEPTION_CODES = Object.freeze([
+    'FOREIGN_SCRIPT_SPAN',
+    'SOURCE_LANGUAGE_RESIDUE',
+    'SOURCE_TEXT_OVERLAP',
+    'MIXED_LANGUAGE_SPAN'
+  ]);
+
+  const EXCEPTION_TYPES = Object.freeze([
+    'glossary',
+    'preserved_name',
+    'known_term',
+    'abbreviation',
+    'unit',
+    'url',
+    'email',
+    'code_like'
+  ]);
+
+  const DEFAULT_EXCEPTION_CODES = Object.freeze({
+    glossary: EXCEPTION_CODES,
+    preserved_name: EXCEPTION_CODES,
+    known_term: EXCEPTION_CODES,
+    abbreviation: EXCEPTION_CODES,
+    unit: EXCEPTION_CODES,
+    url: EXCEPTION_CODES,
+    email: EXCEPTION_CODES,
+    code_like: EXCEPTION_CODES
+  });
+
+  const UNIT_PATTERN = /(?:^|[^\p{L}])\d+(?:[.,]\d+)?\s*(?:kg|g|mg|km|m|cm|mm|°c|°f|v|kv|mv|a|ma|w|kw|hz|khz|mhz|ghz|%)(?=$|[^\p{L}])/giu;
+  const CODE_LIKE_PATTERN = /\b[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+\b|\b[A-Za-z][A-Za-z0-9]*\.[A-Za-z0-9_.]+\b/g;
 
   const FOREIGN_LETTER = /\p{L}/u;
   const THAI_LETTER = /\p{Script=Thai}/u;
@@ -148,46 +180,117 @@
     return { ...range, end };
   }
 
-  function buildProtectedRanges(targetText, sourceText, glossaryText) {
-    const ranges = [];
-    const promptRanges = mergeRanges(findLiteralRanges(targetText, PROMPT_MARKERS))
-      .map((range) => expandPromptRange(targetText, range));
-    promptRanges.forEach((range) => {
-      range.reason = 'prompt-marker';
-      ranges.push(range);
-    });
+  function exceptionCodesFor(type, requestedCodes) {
+    if (Array.isArray(requestedCodes)) {
+      return Object.freeze([...new Set(
+        requestedCodes.filter((code) => EXCEPTION_CODES.includes(code))
+      )]);
+    }
+    return DEFAULT_EXCEPTION_CODES[type] || Object.freeze([]);
+  }
+
+  function addExceptionRule(rules, targetText, term, type, reason, findingCodes) {
+    const normalized = normalizeSpace(term);
+    if (!normalized || !EXCEPTION_TYPES.includes(type)) return;
+    const codes = exceptionCodesFor(type, findingCodes);
+    if (!codes.length) return;
+
+    for (const range of findLiteralRanges(targetText, [normalized])) {
+      const duplicate = rules.some((existing) =>
+        existing.type === type &&
+        existing.start === range.start &&
+        existing.end === range.end &&
+        existing.text === normalized &&
+        existing.reason === (reason || type) &&
+        existing.findingCodes.length === codes.length &&
+        existing.findingCodes.every((code, index) => code === codes[index])
+      );
+      if (duplicate) continue;
+      rules.push({
+        type,
+        text: normalized,
+        start: range.start,
+        end: range.end,
+        reason: reason || type,
+        findingCodes: codes
+      });
+    }
+  }
+
+  function buildExceptionRules(targetText, sourceText, glossaryText, explicitExceptions) {
+    const rules = [];
+
+    for (const term of normalizeGlossary(glossaryText)) {
+      addExceptionRule(rules, targetText, term, 'glossary', 'glossary-approved-term');
+    }
 
     const urlPattern = /(?:https?:\/\/|www\.)\S+|[^\s@]+@[^\s@]+\.[^\s@]+/giu;
     let match;
     while ((match = urlPattern.exec(text(targetText))) !== null) {
-      addRange(ranges, match.index, match.index + match[0].length, 'url-or-email');
+      const value = match[0];
+      const type = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value) ? 'email' : 'url';
+      addExceptionRule(rules, targetText, value, type, type + '-token');
     }
 
-    for (const term of normalizeGlossary(glossaryText)) {
-      let from = 0;
-      const haystack = text(targetText);
-      while (true) {
-        const index = haystack.toLocaleLowerCase().indexOf(term.toLocaleLowerCase(), from);
-        if (index < 0) break;
-        addRange(ranges, index, index + term.length, 'glossary-term');
-        from = index + term.length;
-      }
-    }
     const tokens = wordTokens(targetText);
-    for (let index = 0; index < tokens.length; index += 1) {
-      const token = tokens[index].text;
-      if (!LATIN_LETTER.test(token) || !isTechnicalToken(token)) continue;
-      addRange(ranges, tokens[index].start, tokens[index].end, 'technical-token');
-    }
-
-    const foreignSpans = collectForeignSpans(targetText);
-    for (const span of foreignSpans) {
-      if (isLikelyName(span.text, sourceText)) {
-        addRange(ranges, span.start, span.end, 'preserved-source-name');
+    for (const token of tokens) {
+      if (LATIN_LETTER.test(token.text) && isTechnicalToken(token.text)) {
+        addExceptionRule(
+          rules,
+          targetText,
+          token.text,
+          'known_term',
+          'recognized-technical-token'
+        );
       }
     }
-    return mergeRanges(ranges);
+
+    const unitMatches = text(targetText).matchAll(UNIT_PATTERN);
+    for (const unitMatch of unitMatches) {
+      addExceptionRule(rules, targetText, unitMatch[0], 'unit', 'recognized-unit');
+    }
+
+    const codeMatches = text(targetText).matchAll(CODE_LIKE_PATTERN);
+    for (const codeMatch of codeMatches) {
+      addExceptionRule(rules, targetText, codeMatch[0], 'code_like', 'recognized-code-like-token');
+    }
+
+    for (const span of collectForeignSpans(targetText)) {
+      if (isLikelyName(span.text, sourceText)) {
+        addExceptionRule(
+          rules,
+          targetText,
+          span.text,
+          'preserved_name',
+          'source-preserved-name'
+        );
+      }
+    }
+
+    if (Array.isArray(explicitExceptions)) {
+      for (const entry of explicitExceptions) {
+        if (!entry || typeof entry !== 'object') continue;
+        addExceptionRule(
+          rules,
+          targetText,
+          entry.text,
+          entry.type,
+          entry.reason || 'explicit-exception',
+          entry.findingCodes
+        );
+      }
+    }
+
+    return rules;
   }
+
+  function buildForeignScanExclusions(targetText) {
+    return mergeRanges(
+      findLiteralRanges(targetText, PROMPT_MARKERS)
+        .map((range) => expandPromptRange(targetText, range))
+    );
+  }
+
 
   function mergeRanges(ranges) {
     if (!ranges.length) return [];
@@ -203,6 +306,80 @@
       }
     }
     return merged;
+  }
+
+  function splitForeignSpanByExceptions(span, rules, targetText) {
+    const boundaries = new Set([span.start, span.end]);
+    for (const rule of rules) {
+      if (!rule.findingCodes.includes('FOREIGN_SCRIPT_SPAN')) continue;
+      if (rule.end <= span.start || rule.start >= span.end) continue;
+      boundaries.add(Math.max(span.start, rule.start));
+      boundaries.add(Math.min(span.end, rule.end));
+    }
+
+    const sorted = [...boundaries].sort((a, b) => a - b);
+    const segments = [];
+    for (let index = 0; index < sorted.length - 1; index += 1) {
+      const start = sorted[index];
+      const end = sorted[index + 1];
+      if (
+        end > start &&
+        [...text(targetText).slice(start, end)].some((char) => isForeignChar(char))
+      ) {
+        segments.push({
+          start,
+          end,
+          text: text(targetText).slice(start, end)
+        });
+      }
+    }
+    return segments;
+  }
+
+  function findingMatchesException(finding, rule) {
+    return rule.findingCodes.includes(finding.code) &&
+      finding.start >= rule.start &&
+      finding.end <= rule.end;
+  }
+
+  function applyExceptionLayer(findings, rules) {
+    const active = [];
+    const suppressed = [];
+    const applied = [];
+
+    for (const finding of findings) {
+      const matches = rules.filter((rule) => findingMatchesException(finding, rule));
+      if (!matches.length) {
+        active.push(finding);
+        continue;
+      }
+
+      suppressed.push({
+        code: finding.code,
+        severity: finding.severity,
+        text: finding.text,
+        start: finding.start,
+        end: finding.end,
+        exception: matches[0]
+      });
+
+      for (const match of matches) {
+        applied.push({
+          type: match.type,
+          text: match.text,
+          reason: match.reason,
+          findingCode: finding.code,
+          start: finding.start,
+          end: finding.end
+        });
+      }
+    }
+
+    return {
+      findings: active,
+      suppressedFindings: suppressed,
+      exceptionsApplied: applied
+    };
   }
 
   function isForeignChar(char) {
@@ -416,7 +593,13 @@
     }
 
     const sourceCopy = findExactSourceCopy(sourceText, targetText);
-    const protectedRanges = buildProtectedRanges(targetText, sourceText, glossaryText);
+    const exceptionRules = buildExceptionRules(
+      targetText,
+      sourceText,
+      glossaryText,
+      input.exceptions
+    );
+    const foreignScanExclusions = buildForeignScanExclusions(targetText);
 
     if (sourceCopy) {
       addFinding('SOURCE_LANGUAGE_RESIDUE', {
@@ -428,10 +611,19 @@
     }
 
     if (!sourceCopy) {
-      for (const span of collectForeignSpans(targetText)) {
-        if (rangeContains(protectedRanges, span.start, span.end)) continue;
+      for (const rawSpan of collectForeignSpans(targetText)) {
+        if (rangeContains(foreignScanExclusions, rawSpan.start, rawSpan.end)) continue;
 
-        const overlap = findOverlap(span, sourceText);
+        const foreignSpans = splitForeignSpanByExceptions(
+          rawSpan,
+          exceptionRules,
+          targetText
+        );
+
+        for (const span of foreignSpans) {
+          if (rangeContains(foreignScanExclusions, span.start, span.end)) continue;
+
+          const overlap = findOverlap(span, sourceText);
         const nonLatinForeign = !LATIN_LETTER.test(span.text);
         const thaiContext = THAI_CODEPOINT.test(targetText);
         const contextualOverlap = !overlap && nonLatinForeign && thaiContext &&
@@ -489,6 +681,7 @@
           addFinding('FOREIGN_SCRIPT_SPAN', span, {
             reason: 'foreign-script-span', protected: false
           });
+        }
         }
       }
     }
@@ -562,27 +755,35 @@
       });
     }
 
-    findings.sort((a, b) =>
+    const exceptionResult = applyExceptionLayer(findings, exceptionRules);
+    const activeFindings = exceptionResult.findings;
+    activeFindings.sort((a, b) =>
       a.start - b.start ||
       a.end - b.end ||
       a.code.localeCompare(b.code)
     );
 
     return {
-      status: findings.length ? 'REVIEW' : 'PASS',
-      findings,
+      status: activeFindings.length ? 'REVIEW' : 'PASS',
+      findings: activeFindings,
+      suppressedFindings: exceptionResult.suppressedFindings,
+      exceptionsApplied: exceptionResult.exceptionsApplied,
       meta: {
-        detectorVersion: 'TQG-02-2026-09-30',
+        detectorVersion: 'TQG-03-2026-09-30',
         deterministic: true,
         aiCalls: 0,
-        networkAccess: false
+        networkAccess: false,
+        exceptionRuleCount: exceptionRules.length
       }
     };
   }
 
   const TQG = Object.freeze({
-    version: 'TQG-02-2026-09-30',
+    version: 'TQG-03-2026-09-30',
     FINDING_CODES: CODES,
+    EXCEPTION_CODES,
+    EXCEPTION_TYPES,
+    DEFAULT_EXCEPTION_CODES,
     CONFIG,
     analyze
   });
