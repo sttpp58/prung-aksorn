@@ -1,2 +1,5 @@
 # User/runtime backup exports may contain private source and translation data.
 /backup/*.json
+# Local C2 gold-label corpus contains private/copyrighted production-derived text.
+/tests/tqg/c2-private/*.json
+/tests/tqg/c2-private/**/*.json
