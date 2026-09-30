@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import { spawnSync } from 'node:child_process';
 
 const ROOT = process.cwd();
 
@@ -220,9 +221,18 @@ function main() {
   const indexHtml = readText('index.html');
   const storage = readText('storage-v2.js');
   const sw = readText('sw.js');
+  const tqgUi = readText('tqg-ui.js');
+  const tqgIntegration = readText('tqg-integration.js');
   const manifestText = readText('manifest.json');
 
   parseJavaScript(storage, 'storage-v2.js');
+  parseJavaScript(tqgUi, 'tqg-ui.js');
+  parseJavaScript(tqgIntegration, 'tqg-integration.js');
+
+  assert(/TQG-07-2026-09-30/.test(tqgUi), 'TQG Quality UI module version is present');
+  assert(!/[\u{1F000}-\u{1FAFF}]/u.test(tqgUi), 'TQG Quality UI module contains no emoji');
+  assert(/TQG-08-2026-09-30/.test(tqgIntegration), 'TQG Integration module version is present');
+  assert(/TQGQualityUI/.test(indexHtml), 'index.html references TQG Quality UI');
 
   const inlineScripts = extractInlineScripts(indexHtml);
   assert(inlineScripts.length > 0, 'index.html contains inline JavaScript');
@@ -315,13 +325,16 @@ function main() {
   assertAllRevisionCallSites(indexHtml);
 
   assert(
-    /const\s+CACHE_NAME\s*=\s*['"]prung-aksorn-v4['"]/.test(sw),
-    'Service Worker cache version remains v4'
+    /const\s+CACHE_NAME\s*=\s*['"]prung-aksorn-v6['"]/.test(sw),
+    'Service Worker cache version is v6 for TQG integration assets'
   );
   assert(
     /['"]\.\/storage-v2\.js['"]/.test(sw),
     'Service Worker app shell includes storage-v2.js'
   );
+  for (const asset of ['tqg.js','tqg-inspector.js','tqg-repair.js','tqg-ui.js','tqg-integration.js']) {
+    assert(new RegExp("['\\\"]\\./" + asset + "['\\\"]").test(sw), 'Service Worker app shell includes ' + asset);
+  }
   assert(
     /if\s*\(url\.origin\s*!==\s*self\.location\.origin\)\s*\{\s*return;\s*\}/.test(
       sw
@@ -353,6 +366,18 @@ function main() {
       manifest.icons.some((icon) => icon && /(?:^|\/)icons\/icon-512\.png$/.test(String(icon.src || ''))),
     'manifest references icon-512.png'
   );
+
+  const tqgRegressionPath = path.join(ROOT, 'scripts', 'tqg-regression.mjs');
+  assert(fs.existsSync(tqgRegressionPath), 'TQG regression runner is present');
+  const tqgRegression = spawnSync(process.execPath, [tqgRegressionPath], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024
+  });
+  if (tqgRegression.status !== 0) {
+    fail('TQG regression suite failed' + (tqgRegression.stderr ? `: ${tqgRegression.stderr.trim()}` : ''));
+  }
+  assert(/TQG-09 Regression: PASS/.test(tqgRegression.stdout), 'TQG regression suite passes');
 
   console.log('');
   console.log('Regression Gate: PASS');
