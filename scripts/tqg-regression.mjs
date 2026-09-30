@@ -98,7 +98,8 @@ for (const phase of [
   'tests/tqg/tqg05-ai-inspector-regression.mjs',
   'tests/tqg/tqg06-targeted-repair-regression.mjs',
   'tests/tqg/tqg07-quality-ui-regression.mjs',
-  'tests/tqg/tqg08-integration-regression.mjs'
+  'tests/tqg/tqg08-integration-regression.mjs',
+  'tests/tqg/tqg-c1-equivalence-regression.mjs'
 ]) {
   runPhaseRegression(phase);
 }

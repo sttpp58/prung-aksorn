@@ -517,24 +517,59 @@
 
   function findRepeatedText(targetText) {
     const tokens = wordTokens(targetText);
+    const tokenCount = tokens.length;
+    if (tokenCount < 2) return null;
+
+    // Preserve the exact "largest repeated adjacent token sequence" semantics
+    // while avoiding the previous slice/join work inside a cubic nested loop.
+    // Rolling LCP rows compute how many normalized tokens match from every
+    // pair of token positions in O(n^2) time and O(n) memory.
+    let nextRow = new Uint32Array(tokenCount + 1);
+    let currentRow = new Uint32Array(tokenCount + 1);
+
     let best = null;
-    for (let start = 0; start < tokens.length; start += 1) {
-      const maxLength = Math.floor((tokens.length - start) / 2);
-      for (let length = maxLength; length >= 1; length -= 1) {
-        const left = tokens.slice(start, start + length).map((token) => token.normalized);
-        const right = tokens.slice(start + length, start + length * 2)
-          .map((token) => token.normalized);
-        if (left.join(' ') !== right.join(' ')) continue;
-        const repeatStart = tokens[start].start;
-        const repeatEnd = tokens[start + length * 2 - 1].end;
-        const repeated = text(targetText).slice(repeatStart, repeatEnd);
-        if (repeated.length < CONFIG.minRepeatChars) continue;
-        if (!best || repeated.length > best.text.length) {
-          best = { start: repeatStart, end: repeatEnd, text: repeated, repeats: 2 };
+
+    for (let start = tokenCount - 1; start >= 0; start -= 1) {
+      const maxLength = Math.floor((tokenCount - start) / 2);
+      const maxJ = start + maxLength;
+
+      // Compute the complete LCP row because a later valid repeat can depend
+      // on an LCP pair whose second position lies outside that row's own
+      // possible-repeat range.
+      for (let j = start + 1; j < tokenCount; j += 1) {
+        if (tokens[start].normalized === tokens[j].normalized) {
+          currentRow[j] = nextRow[j + 1] + 1;
+        } else {
+          currentRow[j] = 0;
         }
-        break;
+
+        if (j <= maxJ && currentRow[j] >= j - start) {
+          const length = j - start;
+          const repeatStart = tokens[start].start;
+          const repeatEnd = tokens[start + length * 2 - 1].end;
+          const repeated = text(targetText).slice(repeatStart, repeatEnd);
+
+          if (
+            repeated.length >= CONFIG.minRepeatChars &&
+            (!best ||
+              repeated.length > best.text.length ||
+              (repeated.length === best.text.length && repeatStart < best.start))
+          ) {
+            best = {
+              start: repeatStart,
+              end: repeatEnd,
+              text: repeated,
+              repeats: 2
+            };
+          }
+        }
       }
+
+      const swap = nextRow;
+      nextRow = currentRow;
+      currentRow = swap;
     }
+
     return best;
   }
 
