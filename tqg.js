@@ -1,5 +1,5 @@
 /*
- * TQG V1 — Deterministic Detector + Exception Layer (TQG-03)
+ * TQG V1 — Deterministic Detector + Exception Layer + Suspicion Classification (TQG-04)
  *
  * Local-only, deterministic analysis for completed translation output.
  * No AI provider, network request, storage mutation, or translation-core
@@ -550,6 +550,81 @@
     return 'medium';
   }
 
+  function classifySuspicion(findings) {
+    const activeFindings = Array.isArray(findings) ? findings : [];
+    const triggerCodes = [...new Set(activeFindings.map((finding) => finding.code))].sort();
+
+    if (!activeFindings.length) {
+      return {
+        status: 'PASS',
+        reasons: ['no-active-findings'],
+        triggerCodes: []
+      };
+    }
+
+    const hasCode = (code) => activeFindings.some((finding) => finding.code === code);
+    const highReasons = [];
+
+    if (hasCode('PROMPT_LEAKAGE')) {
+      highReasons.push('prompt-leakage-detected');
+    }
+
+    if (hasCode('STRUCTURAL_TRUNCATION')) {
+      highReasons.push('structural-truncation-detected');
+    }
+
+    if (hasCode('PARAGRAPH_LOSS')) {
+      highReasons.push('paragraph-loss-detected');
+    }
+
+    if (activeFindings.some((finding) =>
+      ['SOURCE_LANGUAGE_RESIDUE', 'SOURCE_TEXT_OVERLAP'].includes(finding.code) &&
+      finding.evidence?.matchType === 'exact-source-copy'
+    )) {
+      highReasons.push('exact-source-copy-detected');
+    }
+
+    const hasForeignSpan = hasCode('FOREIGN_SCRIPT_SPAN');
+    const hasSourceResidue = hasCode('SOURCE_LANGUAGE_RESIDUE');
+    const hasSourceOverlap = hasCode('SOURCE_TEXT_OVERLAP');
+    if (hasCode('MIXED_LANGUAGE_SPAN')) {
+      highReasons.push('mixed-language-span-detected');
+    }
+
+    const residueOverlapFindings = activeFindings.filter((finding) =>
+      ['SOURCE_LANGUAGE_RESIDUE', 'SOURCE_TEXT_OVERLAP'].includes(finding.code) &&
+      finding.evidence?.matchType === 'exact-normalized-token-overlap'
+    );
+    const hasLatinResidueCluster = activeFindings.some((finding) =>
+      ['FOREIGN_SCRIPT_SPAN', 'SOURCE_LANGUAGE_RESIDUE', 'SOURCE_TEXT_OVERLAP'].includes(finding.code) &&
+      LATIN_LETTER.test(finding.text)
+    );
+
+    if (
+      hasForeignSpan &&
+      hasSourceResidue &&
+      hasSourceOverlap &&
+      residueOverlapFindings.length > 0 &&
+      hasLatinResidueCluster
+    ) {
+      highReasons.push('latin-source-residue-cluster-detected');
+    }
+
+    if (highReasons.length) {
+      return {
+        status: 'HIGH_SUSPICION',
+        reasons: highReasons,
+        triggerCodes
+      };
+    }
+
+    return {
+      status: 'REVIEW',
+      reasons: triggerCodes.map((code) => 'review-level-finding:' + code),
+      triggerCodes
+    };
+  }
+
   function analyze(input = {}) {
     const sourceText = text(input.sourceText);
     const targetText = text(input.targetText);
@@ -762,14 +837,17 @@
       a.end - b.end ||
       a.code.localeCompare(b.code)
     );
+    const classification = classifySuspicion(activeFindings);
 
     return {
-      status: activeFindings.length ? 'REVIEW' : 'PASS',
+      status: classification.status,
+      classification,
       findings: activeFindings,
       suppressedFindings: exceptionResult.suppressedFindings,
       exceptionsApplied: exceptionResult.exceptionsApplied,
       meta: {
         detectorVersion: 'TQG-03-2026-09-30',
+        classificationVersion: 'TQG-04-2026-09-30',
         deterministic: true,
         aiCalls: 0,
         networkAccess: false,
@@ -779,12 +857,13 @@
   }
 
   const TQG = Object.freeze({
-    version: 'TQG-03-2026-09-30',
+    version: 'TQG-04-2026-09-30',
     FINDING_CODES: CODES,
     EXCEPTION_CODES,
     EXCEPTION_TYPES,
     DEFAULT_EXCEPTION_CODES,
     CONFIG,
+    classifySuspicion,
     analyze
   });
 
