@@ -1,8 +1,9 @@
 # TQG V1 — C5 Phase C Final Audit
 
 Repository: sttpp58/prung-aksorn
-Audited branch: main
-Audited commit: b40a347cf9a7b91d60b072e5bf39be492e11b5ef
+Audited branch: tqg-phase-c5-reconciled
+Audited commit: 83a78374b88fde007a1b8d3d83f166d2a5b1eef5
+Reconciliation inputs: C4 4d676bcd69f9076b889605cec7857b68a93eac1a + C5 97c0c286a2cbaa7e806256cb1887a526b4c831db
 Baseline commit: 7659d7514cc389f7fc2f1cc23521b3c533a737f9
 Audit date: 2026-09-30
 Audit scope: C5 Phase C Final Audit / Gate
@@ -25,7 +26,7 @@ This limitation is retained intentionally. It is a semantic-evaluation limitatio
 | C1 Performance Hardening | PASS | Carried forward from the TQG-10 audit result; C5 does not change detector performance logic. |
 | C2 Real-World Gold Dataset | PASS | Carried forward. The public repository verifies the sanitized 120-case corpus; private real-world gold data is not directly auditable here. |
 | C3 Detector Effectiveness Audit | CONDITIONAL PASS | Carried forward. Deterministic evidence, exception handling, classification, and all 10 locked finding codes remain covered. |
-| C4 Real-World Repair Validation | PASS WITH LIMITATION | Carried forward. Boundaries, re-validation, fail-closed behavior, preservation, and regression remain enforced. |
+| C4 Real-World Repair Validation | PASS WITH LIMITATION | Re-audited on the reconciled C1+C2+C4 tree; real-world repair validation, boundaries, re-validation, fail-closed behavior, preservation, and regression remain enforced. |
 | C5 Phase C Final Audit / Gate | PASS | Engineering safety gate passes; the semantic gold limitation remains explicit. |
 
 ## C5 objectives
