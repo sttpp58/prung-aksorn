@@ -378,6 +378,17 @@ function main() {
     fail('TQG regression suite failed' + (tqgRegression.stderr ? `: ${tqgRegression.stderr.trim()}` : ''));
   }
   assert(/TQG-09 Regression: PASS/.test(tqgRegression.stdout), 'TQG regression suite passes');
+  const c5AuditPath = path.join(ROOT, 'scripts', 'tqg-phase-c-final-audit.mjs');
+  assert(fs.existsSync(c5AuditPath), 'C5 final audit runner is present');
+  const c5Audit = spawnSync(process.execPath, [c5AuditPath], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024
+  });
+  if (c5Audit.status !== 0) {
+    fail('TQG C5 final audit failed' + (c5Audit.stderr ? `: ${c5Audit.stderr.trim()}` : ''));
+  }
+  assert(/TQG Phase C Final Audit: PASS WITH LIMITATION/.test(c5Audit.stdout), 'TQG C5 final audit passes');
 
   console.log('');
   console.log('Regression Gate: PASS');
