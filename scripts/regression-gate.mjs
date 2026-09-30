@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import { spawnSync } from 'node:child_process';
 
 const ROOT = process.cwd();
 
@@ -365,6 +366,18 @@ function main() {
       manifest.icons.some((icon) => icon && /(?:^|\/)icons\/icon-512\.png$/.test(String(icon.src || ''))),
     'manifest references icon-512.png'
   );
+
+  const tqgRegressionPath = path.join(ROOT, 'scripts', 'tqg-regression.mjs');
+  assert(fs.existsSync(tqgRegressionPath), 'TQG regression runner is present');
+  const tqgRegression = spawnSync(process.execPath, [tqgRegressionPath], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024
+  });
+  if (tqgRegression.status !== 0) {
+    fail('TQG regression suite failed' + (tqgRegression.stderr ? `: ${tqgRegression.stderr.trim()}` : ''));
+  }
+  assert(/TQG-09 Regression: PASS/.test(tqgRegression.stdout), 'TQG regression suite passes');
 
   console.log('');
   console.log('Regression Gate: PASS');
