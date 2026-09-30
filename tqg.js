@@ -632,8 +632,15 @@
     const findings = [];
     const seen = new Set();
 
-    const addFinding = (code, range, evidence = {}) => {
-      if (!CODES.includes(code) || !range || range.end <= range.start) return;
+    const addFinding = (code, range, evidence = {}, options = {}) => {
+      const allowEmptyRange = code === 'STRUCTURAL_TRUNCATION' &&
+        options.allowEmptyRange === true;
+      if (
+        !CODES.includes(code) ||
+        !range ||
+        range.end < range.start ||
+        (range.end === range.start && !allowEmptyRange)
+      ) return;
       const key = [
         code, range.start, range.end, normalizeComparable(range.text)
       ].join('|');
@@ -770,20 +777,34 @@
     if (sourceComparable && !targetComparable) {
       addFinding('STRUCTURAL_TRUNCATION', {
         start: 0, end: targetText.length, text: targetText
-      }, { reason: 'empty-target-output' });
-    } else if (
-      sourceSentences.length >= 3 &&
-      targetSentences.length <= sourceSentences.length - 2 &&
-      targetComparable.length / Math.max(sourceComparable.length, 1) < CONFIG.truncationRatio
-    ) {
-      addFinding('STRUCTURAL_TRUNCATION', {
-        start: 0, end: targetText.length, text: targetText
-      }, {
-        reason: 'source-sentence-count-minus-two-and-length-ratio',
-        sourceSentences: sourceSentences.length,
-        targetSentences: targetSentences.length,
-        lengthRatio: targetComparable.length / Math.max(sourceComparable.length, 1)
-      });
+      }, { reason: 'empty-target-output' }, { allowEmptyRange: true });
+    } else {
+      const lengthRatio = targetComparable.length / Math.max(sourceComparable.length, 1);
+      const severeSentenceDrop =
+        (
+          sourceSentences.length >= 3 &&
+          targetSentences.length <= sourceSentences.length - 2
+        ) ||
+        (
+          sourceSentences.length === 2 &&
+          targetSentences.length === 1
+        );
+
+      if (
+        severeSentenceDrop &&
+        lengthRatio < CONFIG.truncationRatio
+      ) {
+        addFinding('STRUCTURAL_TRUNCATION', {
+          start: 0, end: targetText.length, text: targetText
+        }, {
+          reason: sourceSentences.length === 2
+            ? 'source-sentence-count-drop-and-length-ratio'
+            : 'source-sentence-count-minus-two-and-length-ratio',
+          sourceSentences: sourceSentences.length,
+          targetSentences: targetSentences.length,
+          lengthRatio
+        });
+      }
     }
 
     if (

@@ -138,7 +138,15 @@ for (const testCase of corpus.cases) {
   for (const finding of first.findings) {
     observedFindingCodes.add(finding.code);
     check(TQG.FINDING_CODES.includes(finding.code), testCase.id + ': finding code is valid');
-    check(finding.start >= 0 && finding.end > finding.start, testCase.id + ': finding span is valid');
+    const emptyStructuralAnchor = finding.code === 'STRUCTURAL_TRUNCATION' &&
+      testCase.targetText.length === 0 &&
+      finding.start === 0 &&
+      finding.end === 0 &&
+      finding.text === '';
+    check(
+      emptyStructuralAnchor || (finding.start >= 0 && finding.end > finding.start),
+      testCase.id + ': finding span is valid'
+    );
     check(finding.end <= testCase.targetText.length, testCase.id + ': finding span stays in target');
     check(
       finding.text === testCase.targetText.slice(finding.start, finding.end),
@@ -290,6 +298,111 @@ check(
   paragraphs.findings.some((finding) => finding.code === 'PARAGRAPH_LOSS'),
   'paragraph loss remains detectable'
 );
+
+const emptyTarget = TQG.analyze({
+  sourceText: 'Something happened.',
+  targetText: '',
+  glossaryText: ''
+});
+check(
+  emptyTarget.status === 'HIGH_SUSPICION',
+  'empty target output cannot classify as PASS'
+);
+check(
+  emptyTarget.findings.some(
+    (finding) =>
+      finding.code === 'STRUCTURAL_TRUNCATION' &&
+      finding.start === 0 &&
+      finding.end === 0 &&
+      finding.text === '' &&
+      finding.evidence?.reason === 'empty-target-output'
+  ),
+  'empty target output records a zero-width structural truncation anchor'
+);
+const whitespaceTarget = TQG.analyze({
+  sourceText: 'Something happened.',
+  targetText: '   \n\t',
+  glossaryText: ''
+});
+check(
+  whitespaceTarget.status === 'HIGH_SUSPICION',
+  'whitespace-only target output cannot classify as PASS'
+);
+check(
+  whitespaceTarget.findings.some((finding) => finding.code === 'STRUCTURAL_TRUNCATION'),
+  'whitespace-only target output records structural truncation'
+);
+
+const multiSentenceEmptyTarget = TQG.analyze({
+  sourceText: 'First event. Second event. Third event.',
+  targetText: '',
+  glossaryText: ''
+});
+check(
+  multiSentenceEmptyTarget.status === 'HIGH_SUSPICION',
+  'multi-sentence empty target output cannot classify as PASS'
+);
+
+const paragraphEmptyTarget = TQG.analyze({
+  sourceText: 'First paragraph has content.\n\nSecond paragraph has content.',
+  targetText: '',
+  glossaryText: ''
+});
+check(
+  paragraphEmptyTarget.status === 'HIGH_SUSPICION',
+  'paragraph-level empty target output cannot classify as PASS'
+);
+
+const twoToOneTruncation = TQG.analyze({
+  sourceText: 'First event. Second event.',
+  targetText: 'เหตุการณ์แรก',
+  glossaryText: ''
+});
+check(
+  twoToOneTruncation.status === 'HIGH_SUSPICION',
+  '2-to-1 low-ratio sentence truncation is detected'
+);
+check(
+  twoToOneTruncation.findings.some(
+    (finding) =>
+      finding.code === 'STRUCTURAL_TRUNCATION' &&
+      finding.evidence?.reason === 'source-sentence-count-drop-and-length-ratio'
+  ),
+  '2-to-1 truncation records explicit structural evidence'
+);
+
+const twoToOneMergedTranslation = TQG.analyze({
+  sourceText: 'He opened the door. The room was dark.',
+  targetText: 'เขาเปิดประตู จากนั้นเขาพบว่าห้องนั้นมืดและไม่มีแสงไฟ',
+  glossaryText: ''
+});
+check(
+  twoToOneMergedTranslation.status === 'PASS',
+  '2-to-1 full translation with sufficient length is not flagged'
+);
+
+let emptyInspectorCalls = 0;
+const emptyInspector = await Inspector.inspect({
+  analysis: emptyTarget,
+  sourceContext: 'Something happened.',
+  targetContext: '',
+  findings: emptyTarget.findings,
+  suspiciousSpan: emptyTarget.findings[0],
+  transport: async () => {
+    emptyInspectorCalls += 1;
+    return JSON.stringify({
+      verdict: 'TRUE_ANOMALY',
+      repairable: true,
+      reason: 'Empty target output is a confirmed structural anomaly.',
+      replacementHint: 'Do not reconstruct missing output in V1.'
+    });
+  }
+});
+check(emptyInspector.status === 'COMPLETED', 'empty-target structural anchor is inspectable');
+check(emptyInspector.verdict === 'TRUE_ANOMALY', 'empty-target Inspector verdict is preserved');
+check(emptyInspector.span.end === emptyInspector.span.start, 'empty-target Inspector preserves zero-width anchor');
+check(emptyInspector.repairable === false, 'empty-target Inspector disallows bounded repair');
+check(emptyInspectorCalls === 1, 'empty-target Inspector uses one transport call');
 
 const promptLeak = TQG.analyze({
   sourceText: 'The gate opened.',

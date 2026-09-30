@@ -70,7 +70,12 @@
       targetText.length,
       start + text(candidate.text).length
     );
-    if (end <= start) return null;
+    const allowEmptyStructuralAnchor =
+      text(candidate.code) === 'STRUCTURAL_TRUNCATION' &&
+      targetText.length === 0 &&
+      start === 0 &&
+      end === 0;
+    if (end < start || (end === start && !allowEmptyStructuralAnchor)) return null;
 
     return {
       code: text(candidate.code),
@@ -307,10 +312,12 @@
         userPrompt: request.userPrompt
       });
       const result = parseInspectorResponse(response);
+      const repairable = request.span.end > request.span.start && result.repairable;
 
       return {
         status: 'COMPLETED',
         ...result,
+        repairable,
         span: request.span,
         contextMeta: request.contextMeta,
         meta: {

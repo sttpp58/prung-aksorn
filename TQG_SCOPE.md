@@ -232,7 +232,7 @@ V1 does not reconstruct missing chunks or rewrite whole chapters.
 
 Targeted repair is user-triggered in V1.
 
-### TQG-07 — Re-validation
+### Re-validation requirement (TQG-06 gate)
 
 Every targeted repair must be re-validated.
 
@@ -251,7 +251,7 @@ Reject repair
 Keep original output
 ```
 
-### TQG-08 — Quality UI
+### TQG-07 — Quality UI
 
 Add a dedicated TQG quality panel.
 
@@ -273,7 +273,7 @@ No automatic whole-chapter rewrite is allowed.
 
 New TQG controls follow the application's SVG/vector icon policy and must not introduce emoji-based controls.
 
-### TQG-09 — Integration
+### TQG-08 — Integration
 
 TQG may be integrated at completion boundaries:
 
@@ -285,7 +285,7 @@ TQG must not run against incomplete checkpoint output.
 
 Integration must preserve existing translation, batch, and recovery behavior when no TQG action is required.
 
-### TQG-10 — Regression + Final Audit
+### TQG-09 — Regression
 
 Extend the existing dependency-free regression gate to cover TQG.
 
@@ -304,6 +304,8 @@ Regression must cover:
 - re-validation
 - integration boundaries
 - no out-of-scope core modification
+
+### TQG-10 — Final Audit
 
 Final TQG audit must cover:
 
