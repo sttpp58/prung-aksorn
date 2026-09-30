@@ -4190,7 +4190,10 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
   }
 
   function getTranslationRecoveryLogicalKey(job){
-    return [job && job.projectId || '', job && job.bookId || '', job && job.chapterId || ''].join('|');
+    if(job && job.chapterId){
+      return [job.projectId || '', job.bookId || '', job.chapterId].join('|');
+    }
+    return 'job|' + String(job && job.jobId || '');
   }
 
   function hasCompletedTranslationHistory(job){
@@ -4523,7 +4526,6 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         pendingResume = null;
         activeTranslationJobId = null;
       }
-        refreshTranslationRecoveryUI();
     } finally {
       setAiBusy(false);
       cancelBtn.classList.remove('show');
@@ -5749,7 +5751,7 @@ function setReaderFontSize(size, persist) {
   /* เริ่มต้นระบบแบบ Asynchronous */
   (async function initApp(){
     await loadData();
-        loadTranslationRecoveryUIState();
+            loadTranslationRecoveryUIState();
     applySettingsToUI();
     renderProjects();
     renderBottomHistory();
