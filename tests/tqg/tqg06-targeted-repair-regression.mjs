@@ -257,6 +257,21 @@ assert.ok(oversizedRequest.contextMeta.glossaryChars <= 800);
 assert.ok(oversizedRequest.contextMeta.targetContextChars <= 1250);
 assert.ok(oversizedRequest.contextMeta.instructionChars <= 1000);
 
+assert.throws(
+  () => Repair.buildRepairRequest({
+    sourceContext: 'source',
+    targetContext: 'x'.repeat(2001),
+    suspiciousSpan: {
+      code: 'QUOTE_ANOMALY',
+      start: 0,
+      end: 2001,
+      text: 'x'.repeat(2001)
+    },
+    findings: []
+  }),
+  /span.*bounded/i
+);
+
 let abortCalls = 0;
 const abortTarget = 'เขากลับ and smiled';
 const abortSpanStart = abortTarget.indexOf('and smiled');

@@ -21,6 +21,7 @@
     glossaryMaxChars: 800,
     maxFindings: 8,
     maxReplacementChars: 1000,
+    maxRepairSpanChars: 2000,
     maxInstructionChars: 1000
   });
 
@@ -64,6 +65,9 @@
 
     if (start < 0 || end <= start) {
       throw new TypeError('TQG Repair suspicious span is invalid.');
+    }
+    if (end - start > DEFAULTS.maxRepairSpanChars) {
+      throw new RangeError('TQG Repair suspicious span exceeds the bounded length.');
     }
 
     const actualText = targetText.slice(start, end);
