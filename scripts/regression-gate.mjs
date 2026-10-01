@@ -260,6 +260,61 @@ function main() {
   );
 
   assert(
+    /var\s+draftSaveContext\s*=\s*null/.test(indexHtml) &&
+      /var\s+draftSaveGeneration\s*=\s*0/.test(indexHtml),
+    'draft save tracks explicit context and generation'
+  );
+
+  assert(
+    /function\s+flushPendingDraftSave\s*\([\s\S]*?draftSaveContext\s*=\s*null[\s\S]*?draftSaveGeneration\s*\+=\s*1[\s\S]*?proj\.draft\s*=\s*context\.draft[\s\S]*?proj\.chapterTitle\s*=\s*context\.chapterTitle/.test(indexHtml),
+    'pending draft is transferred to its captured project before context switches'
+  );
+
+  const draftSaveStart = indexHtml.indexOf('function saveDraftSoon(){');
+  const draftSaveEnd = indexHtml.indexOf('\n  function viewHistoryEntry', draftSaveStart);
+  assert(draftSaveStart >= 0 && draftSaveEnd > draftSaveStart, 'saveDraftSoon function can be audited');
+  const draftSaveBody = indexHtml.slice(draftSaveStart, draftSaveEnd);
+  assert(
+    draftSaveBody.includes('projectId: proj.id') &&
+      draftSaveBody.includes('bookId: proj.currentBookId || null') &&
+      draftSaveBody.includes('draft: inputText.value') &&
+      draftSaveBody.includes('chapterTitle: chapterTitle.value.trim()'),
+    'saveDraftSoon captures editor values with project/book context'
+  );
+  const draftTimerStart = draftSaveBody.indexOf('draftSaveTimer = setTimeout(function(){');
+  assert(draftTimerStart >= 0, 'saveDraftSoon has a debounced timer');
+  const draftTimerBody = draftSaveBody.slice(draftTimerStart);
+  assert(
+    draftTimerBody.includes('draftSaveContext.generation !== context.generation') &&
+      draftTimerBody.includes('context.draft') &&
+      draftTimerBody.includes('context.chapterTitle') &&
+      draftTimerBody.includes('targetProj') &&
+      !draftTimerBody.includes('inputText.value') &&
+      !draftTimerBody.includes('chapterTitle.value'),
+    'debounced draft callback writes only its captured snapshot'
+  );
+
+  const projectSwitchStart = indexHtml.indexOf("row.addEventListener('click', function(){");
+  const projectSwitch = indexHtml.slice(projectSwitchStart, projectSwitchStart + 360);
+  assert(
+    projectSwitchStart >= 0 &&
+      projectSwitch.includes('flushPendingDraftSave();') &&
+      projectSwitch.includes('saveData();') &&
+      projectSwitch.includes('loadProjectDraft(proj);'),
+    'project switch flushes pending draft and reloads editor context'
+  );
+
+  const bookSwitchStart = indexHtml.indexOf("btitle.addEventListener('click', function(e){");
+  const bookSwitch = indexHtml.slice(bookSwitchStart, bookSwitchStart + 260);
+  assert(
+    bookSwitchStart >= 0 &&
+      bookSwitch.includes('flushPendingDraftSave();') &&
+      bookSwitch.includes('commitChange();') &&
+      bookSwitch.includes('loadProjectDraft(proj);'),
+    'book switch flushes pending draft and reloads editor context'
+  );
+
+  assert(
     /var\s+STORES\s*=\s*\[[^\]]*['"]translationJobs['"]/s.test(storage),
     'IndexedDB STORES includes translationJobs'
   );
