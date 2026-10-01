@@ -3035,13 +3035,13 @@
 
       row.addEventListener('click', function(){
         flushPendingDraftSave();
-        advanceAppContextGeneration();
         appData.currentProjectId = proj.id;
         expandedProjects[proj.id] = !expandedProjects[proj.id];
         saveData();
         renderProjects();
         updateActiveBanner();
         loadProjectDraft(proj);
+        advanceAppContextGeneration();
       });
 
       item.appendChild(row);
@@ -3093,10 +3093,10 @@
           btitle.addEventListener('click', function(e){
             e.stopPropagation();
             flushPendingDraftSave();
-            advanceAppContextGeneration();
             proj.currentBookId = book.id;
             commitChange();
             loadProjectDraft(proj);
+            advanceAppContextGeneration();
           });
           brow.appendChild(btitle);
 
