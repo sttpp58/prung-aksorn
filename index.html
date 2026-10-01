@@ -1574,6 +1574,30 @@
     return (proj.books || []).find(function(b){ return b.id === proj.currentBookId; }) || null;
   }
 
+  var appContextGeneration = 0;
+
+  function captureAppContext(proj, book){
+    return {
+      generation: appContextGeneration,
+      projectId: proj ? proj.id : null,
+      bookId: book ? book.id : null
+    };
+  }
+
+  function isAppContextCurrent(context){
+    if(!context) return false;
+    var proj = getCurrentProject();
+    var book = proj ? getActiveBook(proj) : null;
+    return context.generation === appContextGeneration &&
+      context.projectId === (proj ? proj.id : null) &&
+      context.bookId === (book ? book.id : null);
+  }
+
+  function advanceAppContextGeneration(){
+    appContextGeneration += 1;
+    return appContextGeneration;
+  }
+
   function getActiveHistoryList(proj){
     var book = getActiveBook(proj);
     return book ? (book.history || []) : (proj.history || []);
@@ -1885,6 +1909,7 @@
       var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
       if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
 
+      advanceAppContextGeneration();
       appData.currentProjectId=proj.id;
       proj.currentBookId=book.id;
       chapterTitle.value=snapshot.title||chapterTitle.value||'';
@@ -1935,6 +1960,7 @@
     var job=null;
     var recoveryStarted=false;
     var recoveryCompleted=false;
+    var recoveryContext=null;
     var activeRetryCount=Number(state.retryCount||0);
     try{
       job=await PrungAksornStorageV2.getTranslationJob(state.jobId);
@@ -1949,6 +1975,7 @@
       var key=document.getElementById('apiKey').value.trim();
       if(!key)throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
 
+      recoveryContext=captureAppContext(state.proj,state.book);
       var snapshot=job.sourceSnapshot;
       if(!snapshot||snapshot.text!==state.sourceSnapshotText||snapshot.normalized!==true)throw new Error('Recovery Source Snapshot ของ Job เปลี่ยนแปลงไป');
       if(typeof snapshot.originalText!=='string')throw new Error('Original Source Snapshot ไม่ถูกต้อง');
@@ -1978,10 +2005,13 @@
         activeTranslationJobId=job.jobId;
         batchCancelled=false;
         setAiBusy(true);
+        setTranslationSettingsLocked(true);
         resetActionStats();
         cancelBtn.classList.add('show');
-        progressText.textContent='กำลังกู้คืน Batch Item '+(job.batchIndex+1)+' จากจุด '+job.completedChunks+'/'+job.totalChunks;
-        setOutput(results.join('\n\n'));
+        if(isAppContextCurrent(recoveryContext)){
+          progressText.textContent='กำลังกู้คืน Batch Item '+(job.batchIndex+1)+' จากจุด '+job.completedChunks+'/'+job.totalChunks;
+          setOutput(results.join('\n\n'));
+        }
 
         for(var i=job.completedChunks;i<chunks.length;i++){
           if(batchCancelled){
@@ -1989,7 +2019,7 @@
             cancelError.name='AbortError';
             throw cancelError;
           }
-          progressText.textContent='กำลังกู้คืน Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
+          if(isAppContextCurrent(recoveryContext)) progressText.textContent='กำลังกู้คืน Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
           var sys=buildTranslatePrompt(state.proj,previousTail,chunks[i]);
           var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
           var partTrim=part.trim();
@@ -1997,14 +2027,16 @@
           job=await PrungAksornStorageV2.checkpointTranslationJob({jobId:job.jobId,retryCount:activeRetryCount,expectedRevision:job.revision},i,partTrim,previousTail);
           activeTranslationJobRevision=job.revision;
           results.push(partTrim);
-          setOutput(results.join('\n\n'));
+          if(isAppContextCurrent(recoveryContext)) setOutput(results.join('\n\n'));
         }
 
         await PrungAksornStorageV2.completeTranslationJob(job.jobId,job.revision);
         recoveryCompleted=true;
       }
 
-      analyzeTQGCompletedOutput(snapshot.text, results.join('\n\n'), state.proj);
+      if(isAppContextCurrent(recoveryContext)){
+        analyzeTQGCompletedOutput(snapshot.text, results.join('\n\n'), state.proj);
+      }
       activeTranslationJobId=null;
       var existingEntry=findEntryById(state.proj,job.chapterId);
       if(!existingEntry){
@@ -2021,15 +2053,19 @@
       await restoreBatchHistoryOrder(state.proj,state.book,job.batchId);
       commitChange();
       pendingBatchResume=null;
-      refreshTranslationRecoveryUI();
-      if(resumeBtn){
-        resumeBtn.classList.remove('show');
-        resumeBtn.textContent='ดำเนินการต่อ';
+      if(isAppContextCurrent(recoveryContext)){
+        refreshTranslationRecoveryUI();
+        if(resumeBtn){
+          resumeBtn.classList.remove('show');
+          resumeBtn.textContent='ดำเนินการต่อ';
+        }
       }
-      progressText.textContent='Batch Recovery สำเร็จ';
-      setTimeout(function(){
-        if(progressText.textContent==='Batch Recovery สำเร็จ')progressText.textContent='';
-      },4000);
+      if(isAppContextCurrent(recoveryContext)){
+        progressText.textContent='Batch Recovery สำเร็จ';
+        setTimeout(function(){
+          if(progressText.textContent==='Batch Recovery สำเร็จ')progressText.textContent='';
+        },4000);
+      }
     }catch(err){
       if(recoveryStarted&&!recoveryCompleted){
         try{
@@ -2050,11 +2086,16 @@
       }
       activeTranslationJobId=null;
       pendingBatchResume=null;
-      if(err.name!=='AbortError')showError('Batch Recovery ไม่สำเร็จ: '+(err.message||err));
+      if(err.name!=='AbortError' && (!recoveryContext || isAppContextCurrent(recoveryContext))){
+        showError('Batch Recovery ไม่สำเร็จ: '+(err.message||err));
+      }
     }finally{
+      setTranslationSettingsLocked(false);
       setAiBusy(false);
-      cancelBtn.classList.remove('show');
-      if(progressText.textContent!=='Batch Recovery สำเร็จ')progressText.textContent='';
+      if(!recoveryContext || isAppContextCurrent(recoveryContext)){
+        cancelBtn.classList.remove('show');
+        if(progressText.textContent!=='Batch Recovery สำเร็จ')progressText.textContent='';
+      }
     }
   }
 
@@ -2064,6 +2105,7 @@
     var job=null;
     var retryStarted=false;
     var retryCompleted=false;
+    var retryContext=null;
     var retryCount=0;
     try{
       job=await PrungAksornStorageV2.getTranslationJob(jobId);
@@ -2077,6 +2119,7 @@
       if(!proj) throw new Error('ไม่พบ Project ต้นทางของ Job');
       var book=(proj.books||[]).find(function(b){return b.id===job.bookId;});
       if(!book) throw new Error('ไม่พบ Book ต้นทางของ Job');
+      retryContext=captureAppContext(proj,book);
       var snapshot=job.sourceSnapshot;
       if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true) throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
       if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0) throw new Error('Job มี chunkSize ไม่ถูกต้อง');
@@ -2106,13 +2149,14 @@
       activeTranslationJobRevision=job.revision;
       batchCancelled=false;
       setAiBusy(true);
+      setTranslationSettingsLocked(true);
       resetActionStats();
       cancelBtn.classList.add('show');
-      progressText.textContent='กำลัง Retry Batch Item '+(job.batchIndex+1)+' จากจุด '+job.completedChunks+'/'+job.totalChunks;
+      if(isAppContextCurrent(retryContext)) progressText.textContent='กำลัง Retry Batch Item '+(job.batchIndex+1)+' จากจุด '+job.completedChunks+'/'+job.totalChunks;
 
       var results=job.partialResults.map(function(x){return x.text;});
       var previousTail=String(job.previousTail||'');
-      setOutput(results.join('\n\n'));
+      if(isAppContextCurrent(retryContext)) setOutput(results.join('\n\n'));
 
       for(var i=job.completedChunks;i<chunks.length;i++){
         if(batchCancelled){
@@ -2120,7 +2164,7 @@
           cancelError.name='AbortError';
           throw cancelError;
         }
-        progressText.textContent='กำลัง Retry Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
+        if(isAppContextCurrent(retryContext)) progressText.textContent='กำลัง Retry Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
         var sys=buildTranslatePrompt(proj,previousTail,chunks[i]);
         var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
         var partTrim=part.trim();
@@ -2128,11 +2172,13 @@
         job=await PrungAksornStorageV2.checkpointTranslationJob({jobId:job.jobId,retryCount:retryCount,expectedRevision:job.revision},i,partTrim,previousTail);
         activeTranslationJobRevision=job.revision;
         results.push(partTrim);
-        setOutput(results.join('\n\n'));
+        if(isAppContextCurrent(retryContext)) setOutput(results.join('\n\n'));
       }
 
       await PrungAksornStorageV2.completeTranslationJob(job.jobId,job.revision);
-      analyzeTQGCompletedOutput(snapshot.text, results.join('\n\n'), proj);
+      if(isAppContextCurrent(retryContext)){
+        analyzeTQGCompletedOutput(snapshot.text, results.join('\n\n'), proj);
+      }
       activeTranslationJobRevision=null;
       retryCompleted=true;
       activeTranslationJobId=null;
@@ -2151,11 +2197,13 @@
       }
       await restoreBatchHistoryOrder(proj,book,job.batchId);
       commitChange();
-      refreshTranslationRecoveryUI();
-      progressText.textContent='Retry Batch Item สำเร็จ';
-      setTimeout(function(){
-        if(progressText.textContent==='Retry Batch Item สำเร็จ') progressText.textContent='';
-      },4000);
+      if(isAppContextCurrent(retryContext)) refreshTranslationRecoveryUI();
+      if(isAppContextCurrent(retryContext)){
+        progressText.textContent='Retry Batch Item สำเร็จ';
+        setTimeout(function(){
+          if(progressText.textContent==='Retry Batch Item สำเร็จ') progressText.textContent='';
+        },4000);
+      }
     }catch(err){
       if(retryStarted&&!retryCompleted){
         try{
@@ -2175,11 +2223,14 @@
         }
       }
       activeTranslationJobId=null;
-      if(err.name!=='AbortError') showError('Retry ไม่สำเร็จ: '+(err.message||err));
+      if(err.name!=='AbortError' && (!retryContext || isAppContextCurrent(retryContext))) showError('Retry ไม่สำเร็จ: '+(err.message||err));
     }finally{
+      setTranslationSettingsLocked(false);
       setAiBusy(false);
-      cancelBtn.classList.remove('show');
-      if(progressText.textContent!=='Retry Batch Item สำเร็จ') progressText.textContent='';
+      if(!retryContext || isAppContextCurrent(retryContext)){
+        cancelBtn.classList.remove('show');
+        if(progressText.textContent!=='Retry Batch Item สำเร็จ') progressText.textContent='';
+      }
     }
   }
 
@@ -2210,6 +2261,7 @@
       if(providerSel.value!==job.provider)throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อนกู้คืน');
       if(modelInput.value!==job.model)throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อนกู้คืน');
       if(!document.getElementById('apiKey').value.trim())throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
+      advanceAppContextGeneration();
       appData.currentProjectId=proj.id;
       proj.currentBookId=book.id;
       chapterTitle.value=snapshot.title||chapterTitle.value||'';
@@ -2971,8 +3023,10 @@
         e.stopPropagation();
         var ok = await showConfirmDialog('ลบเรื่องนิยาย', 'ลบเรื่อง "' + proj.name + '" พร้อมประวัติทั้งหมด? การลบไม่สามารถย้อนกลับได้', true);
         if(ok){
+          var wasCurrentProject = appData.currentProjectId === proj.id;
+          if(wasCurrentProject) advanceAppContextGeneration();
           appData.projects = appData.projects.filter(function(p){ return p !== proj; });
-          if(appData.currentProjectId === proj.id) appData.currentProjectId = null;
+          if(wasCurrentProject) appData.currentProjectId = null;
           commitChange();
           updateActiveBanner();
         }
@@ -2981,6 +3035,7 @@
 
       row.addEventListener('click', function(){
         flushPendingDraftSave();
+        advanceAppContextGeneration();
         appData.currentProjectId = proj.id;
         expandedProjects[proj.id] = !expandedProjects[proj.id];
         saveData();
@@ -3038,6 +3093,7 @@
           btitle.addEventListener('click', function(e){
             e.stopPropagation();
             flushPendingDraftSave();
+            advanceAppContextGeneration();
             proj.currentBookId = book.id;
             commitChange();
             loadProjectDraft(proj);
@@ -3079,6 +3135,7 @@
             if(ok){
               var wasActiveBook = proj.currentBookId === book.id;
               flushPendingDraftSave();
+              if(wasActiveBook) advanceAppContextGeneration();
               proj.books = proj.books.filter(function(b){ return b.id !== book.id; });
               if(wasActiveBook) proj.currentBookId = proj.books[0].id;
               commitChange();
@@ -3187,6 +3244,7 @@
           if(bname && bname.trim()){
             var newBook = { id: makeId('b'), title: bname.trim(), history: [], draft: '', chapterTitle: '' };
             flushPendingDraftSave();
+            advanceAppContextGeneration();
             proj.books.push(newBook);
             proj.currentBookId = newBook.id;
             commitChange();
@@ -3218,6 +3276,7 @@
     if(!name || !name.trim()) return;
     var proj = { id: makeId('p'), name: name.trim(), glossary: '', context: '', books: [] };
     var defaultBook = { id: makeId('b'), title: 'เล่ม 1', history: [], draft: '', chapterTitle: '' };
+    advanceAppContextGeneration();
     proj.books.push(defaultBook);
     proj.currentBookId = defaultBook.id;
     appData.projects.push(proj);
@@ -3521,7 +3580,8 @@
     if(!tqgQualityState || state.source !== 'translate') return false;
     var currentSource = normalizeOCR(inputText.value || '');
     var currentTarget = output.textContent || '';
-    return currentSource === tqgQualityState.sourceText &&
+    return isAppContextCurrent(tqgQualityState.context) &&
+      currentSource === tqgQualityState.sourceText &&
       currentTarget === tqgQualityState.targetText;
   }
 
@@ -3559,6 +3619,7 @@
         return;
       }
       tqgQualityState = {
+        context: captureAppContext(proj, getActiveBook(proj)),
         sourceText: String(sourceText || ''),
         targetText: String(targetText || ''),
         glossaryText: proj && typeof proj.glossary === 'string' ? proj.glossary : '',
@@ -3586,6 +3647,9 @@
       resetActionStats();
       cancelBtn.classList.add('show');
       progressText.textContent = 'กำลังตรวจคุณภาพ TQG ด้วย AI Inspector...';
+      var inspectionContext = captureAppContext(getCurrentProject(), getActiveBook(getCurrentProject()));
+      var inspectionSourceText = tqgQualityState.sourceText;
+      var inspectionTargetText = tqgQualityState.targetText;
       var result = await window.TQGIntegration.inspectCompletedOutput({
         completed: true,
         analysis: tqgQualityState.analysis,
@@ -3595,15 +3659,23 @@
         transport: createTQGAITransport(),
         analyzer: window.TQG ? window.TQG.analyze : null
       });
+      if(!isAppContextCurrent(inspectionContext) ||
+         !tqgQualityState ||
+         tqgQualityState.sourceText !== inspectionSourceText ||
+         tqgQualityState.targetText !== inspectionTargetText){
+        return;
+      }
       tqgQualityState.inspection = result;
       tqgQualityState.repair = null;
       renderTQGQualityPanel();
     }catch(err){
-      if(err.name !== 'AbortError') showError('TQG Inspector ไม่สำเร็จ: ' + (err.message || err));
+      if(err.name !== 'AbortError' && isAppContextCurrent(inspectionContext)) showError('TQG Inspector ไม่สำเร็จ: ' + (err.message || err));
     }finally{
       setAiBusy(false);
-      cancelBtn.classList.remove('show');
-      progressText.textContent = '';
+      if(isAppContextCurrent(inspectionContext)){
+        cancelBtn.classList.remove('show');
+        progressText.textContent = '';
+      }
     }
   }
 
@@ -3621,6 +3693,9 @@
       resetActionStats();
       cancelBtn.classList.add('show');
       progressText.textContent = 'กำลังซ่อมเฉพาะช่วงที่ TQG ยืนยัน...';
+      var repairContext = captureAppContext(getCurrentProject(), getActiveBook(getCurrentProject()));
+      var repairSourceText = tqgQualityState.sourceText;
+      var repairTargetText = tqgQualityState.targetText;
       var inspection = tqgQualityState.inspection;
       var result = await window.TQGIntegration.repairConfirmedAnomaly({
         completed: true,
@@ -3636,6 +3711,12 @@
         transport: createTQGAITransport(),
         analyze: window.TQG ? window.TQG.analyze : null
       });
+      if(!isAppContextCurrent(repairContext) ||
+         !tqgQualityState ||
+         tqgQualityState.sourceText !== repairSourceText ||
+         tqgQualityState.targetText !== repairTargetText){
+        return;
+      }
       tqgQualityState.repair = result;
       if(result.status === 'ACCEPTED' && result.accepted === true){
         tqgQualityState.targetText = result.output;
@@ -3649,11 +3730,13 @@
       }
       renderTQGQualityPanel();
     }catch(err){
-      if(err.name !== 'AbortError') showError('TQG Repair ไม่สำเร็จ: ' + (err.message || err));
+      if(err.name !== 'AbortError' && isAppContextCurrent(repairContext)) showError('TQG Repair ไม่สำเร็จ: ' + (err.message || err));
     }finally{
       setAiBusy(false);
-      cancelBtn.classList.remove('show');
-      progressText.textContent = '';
+      if(isAppContextCurrent(repairContext)){
+        cancelBtn.classList.remove('show');
+        progressText.textContent = '';
+      }
     }
   }
 
@@ -4570,6 +4653,12 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
                Number(b.revision || 0) - Number(a.revision || 0);
       });
   }
+  function setTranslationSettingsLocked(locked){
+    document.querySelectorAll('#sourceSeg button, #levelSeg button, #genreChips button, #styleSeg button').forEach(function(btn){
+      btn.disabled = !!locked;
+    });
+  }
+
   function setAiBusy(busy){
     aiBusy = busy;
     processBtn.disabled = busy;
@@ -4774,9 +4863,11 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     hideGlossaryEnforce();
 
     var results = existingResults.slice();
+    var activeBook = getActiveBook(proj);
+    var translationContext = captureAppContext(proj, activeBook);
+    var translationTitle = String(chapterTitle.value || 'แปลใหม่');
     setOutput(results.join('\n\n'));
     var previousTail = results.length ? getTail(results[results.length - 1], 300) : '';
-    var activeBook = getActiveBook(proj);
     var translationJobId = jobId || makeId('tj');
     var translationChapterId = chapterId || makeId('h');
     var translationRetryCount = 0;
@@ -4789,8 +4880,10 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         translationJobRevision = runningJob.revision;
       }catch(jobErr){
         setAiBusy(false);
-        cancelBtn.classList.remove('show');
-        showError('ไม่สามารถสร้าง Translation Job ได้: ' + (jobErr.message || jobErr));
+        if(isAppContextCurrent(translationContext)){
+          cancelBtn.classList.remove('show');
+          showError('ไม่สามารถสร้าง Translation Job ได้: ' + (jobErr.message || jobErr));
+        }
         return;
       }
     }else{
@@ -4800,6 +4893,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     }
     activeTranslationJobId = translationJobId;
     activeTranslationJobRevision = translationJobRevision;
+    setTranslationSettingsLocked(true);
     var chunkRatios = [];
     var suspiciousChunks = [];
 
@@ -4809,7 +4903,9 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         var termCheck = filterRelevantGlossary(proj.glossary, chunks[i]);
         var badge = termCheck.count > 0 ? (' (ใช้คลังคำ ' + termCheck.count + ' คำ)') : '';
 
-        progressText.textContent = 'กำลังปรุงส่วนที่ ' + (i + 1) + '/' + chunks.length + badge;
+        if(isAppContextCurrent(translationContext)){
+          progressText.textContent = 'กำลังปรุงส่วนที่ ' + (i + 1) + '/' + chunks.length + badge;
+        }
         
         // ส่ง chunks[i] เข้าไปเพื่อให้ Prompt สร้างเฉพาะคลังคำที่เกี่ยวข้อง
         var sys = buildTranslatePrompt(proj, previousTail, chunks[i]);
@@ -4828,60 +4924,78 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         translationJobRevision = checkpointedJob.revision;
         activeTranslationJobRevision = translationJobRevision;
         results.push(partTrim);
-        setOutput(results.join('\n\n'));
+        if(isAppContextCurrent(translationContext)){
+          setOutput(results.join('\n\n'));
+        }
       }
       await PrungAksornStorageV2.completeTranslationJob(translationJobId, translationJobRevision);
-      analyzeTQGCompletedOutput(sourceSnapshotText || normalizeOCR(originalText || ''), results.join('\n\n'), proj);
+      var translationOutput = results.join('\n\n');
+      var translationContextCurrent = isAppContextCurrent(translationContext);
+      if(translationContextCurrent){
+        analyzeTQGCompletedOutput(sourceSnapshotText || normalizeOCR(originalText || ''), translationOutput, proj);
+      }
       activeTranslationJobRevision = null;
       pendingResume = null;
       activeTranslationJobId = null;
-      clearTranslationRecoveryUI();
-      stamp.classList.add('show');
-      setResultFocus(true);
-      switchMobileTab('output');
-      scrollToTopTarget();
+      if(translationContextCurrent) clearTranslationRecoveryUI();
 
-      var newEntry = { id: translationChapterId, ts: Date.now(), label: (chapterTitle.value || 'แปลใหม่'), input: originalText, output: output.textContent };
-      var activeBook = getActiveBook(proj);
+      var newEntry = { id: translationChapterId, ts: Date.now(), label: translationTitle, input: originalText, output: translationOutput };
       if(activeBook) activeBook.history.push(newEntry);
       else (proj.history = proj.history || []).push(newEntry);
 
-      viewingHistoryId = newEntry.id;
       commitChange();
-      refreshTranslationRecoveryUI();
 
-      if(suspiciousChunks.length){
-        var warnMsg = '⚠ พบ ' + suspiciousChunks.length + ' ส่วนที่คำแปลอาจไม่ครบถ้วน แนะนำให้ตรวจทานเพิ่มเติม:\n' +
-          suspiciousChunks.map(function(s){ return '• ส่วนที่ ' + (s.index + 1) + ': ' + s.reasons.join('; '); }).join('\n');
-        showQualityWarning(warnMsg);
+      if(translationContextCurrent){
+        setOutput(translationOutput);
+        viewingHistoryId = newEntry.id;
+        stamp.classList.add('show');
+        setResultFocus(true);
+        switchMobileTab('output');
+        scrollToTopTarget();
+        refreshTranslationRecoveryUI();
+
+        if(suspiciousChunks.length){
+          var warnMsg = '⚠ พบ ' + suspiciousChunks.length + ' ส่วนที่คำแปลอาจไม่ครบถ้วน แนะนำให้ตรวจทานเพิ่มเติม:\n' +
+            suspiciousChunks.map(function(s){ return '• ส่วนที่ ' + (s.index + 1) + ': ' + s.reasons.join('; '); }).join('\n');
+          showQualityWarning(warnMsg);
+        }
+
+        var missed = checkMissedGlossaryTerms(originalText, translationOutput, proj.glossary);
+        renderGlossaryEnforceWarning(missed);
+
+        var statsStr = '';
+        if(currentActionTokens > 0) statsStr = ' (ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
+        progressText.textContent = 'ปรุงอักษรเสร็จสิ้น' + statsStr;
+        setTimeout(function(){ progressText.textContent = ''; }, 4000);
+      } else {
+        refreshTranslationRecoveryUI();
       }
-
-      var missed = checkMissedGlossaryTerms(originalText, output.textContent, proj.glossary);
-      renderGlossaryEnforceWarning(missed);
-
-      var statsStr = '';
-      if(currentActionTokens > 0) statsStr = ' (ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
-      progressText.textContent = 'ปรุงอักษรเสร็จสิ้น' + statsStr;
-      setTimeout(function(){ progressText.textContent = ''; }, 4000);
       
     } catch(err){
       if(err.name !== 'AbortError'){
         var failedJob = await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:i,retryCount:translationRetryCount,timestamp:Date.now()},translationJobRevision);
         translationJobRevision = failedJob.revision;
-        pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision };
         activeTranslationJobId = null;
-        showError((err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)');
-        if(resumeBtn) resumeBtn.classList.add('show');
-        refreshTranslationRecoveryUI();
+        if(isAppContextCurrent(translationContext)){
+          pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision };
+          showError((err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)');
+          if(resumeBtn) resumeBtn.classList.add('show');
+          refreshTranslationRecoveryUI();
+        }else{
+          pendingResume = null;
+        }
       } else {
         await PrungAksornStorageV2.cancelTranslationJob(translationJobId,translationJobRevision);
         pendingResume = null;
         activeTranslationJobId = null;
       }
     } finally {
+      setTranslationSettingsLocked(false);
       setAiBusy(false);
-      cancelBtn.classList.remove('show');
-      if(!progressText.textContent.includes('ปรุงอักษรเสร็จสิ้น')) progressText.textContent = '';
+      if(isAppContextCurrent(translationContext)){
+        cancelBtn.classList.remove('show');
+        if(!progressText.textContent.includes('ปรุงอักษรเสร็จสิ้น')) progressText.textContent = '';
+      }
     }
   }
 
@@ -4922,15 +5036,17 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     return segments.length >= 2 ? segments : null;
   }
 
-  async function runSingleTranslationForBatch(chunks, proj, key, model, label, originalText, batchId, batchIndex, chunkSize, normalizedText){
+  async function runSingleTranslationForBatch(chunks, proj, key, model, label, originalText, batchId, batchIndex, chunkSize, normalizedText, targetBookId){
     var results = [];
     var previousTail = '';
-    var activeBook = getActiveBook(proj);
+    var activeBook = (proj.books || []).find(function(b){ return b.id === targetBookId; }) || null;
+    if(!activeBook) throw new Error('ไม่พบ Book ต้นทางของ Batch');
     var translationJobId = makeId('tj');
     var translationChapterId = makeId('h');
     var jobCreated = false;
     var translationJobCompleted = false;
     var batchProvider = providerSel.value;
+    var batchContext = captureAppContext(proj, activeBook);
     var batchJobRevision = null;
     try{
       var batchCreatedJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'batch',batchId:batchId,batchIndex:batchIndex,provider:batchProvider,model:model,chunkSize:chunkSize,totalChunks:chunks.length,sourceSnapshot:{text:String(normalizedText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(label || ''),normalized:true}});
@@ -4951,7 +5067,9 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         results.push(partTrim);
       }
       await PrungAksornStorageV2.completeTranslationJob(translationJobId,batchJobRevision);
-      analyzeTQGCompletedOutput(normalizedText || normalizeOCR(originalText || ''), results.join('\n\n'), proj);
+      if(isAppContextCurrent(batchContext)){
+        analyzeTQGCompletedOutput(normalizedText || normalizeOCR(originalText || ''), results.join('\n\n'), proj);
+      }
       batchJobRevision = null;
       activeTranslationJobRevision = null;
       translationJobCompleted = true;
@@ -4980,6 +5098,9 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     if(!proj){ showError('กรุณาเลือกหรือสร้างเรื่องนิยายก่อน'); return; }
     if(!key){ showError('กรุณาใส่ API Key ก่อน'); return; }
     if(batchInProgress || warnIfAiBusy()) return;
+    var batchTargetBook = getActiveBook(proj);
+    if(!batchTargetBook){ showError('ไม่พบเล่มต้นทางของ Batch'); return; }
+    var batchTargetBookId = batchTargetBook.id;
 
     hideError();
     var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
@@ -4987,6 +5108,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     batchCancelled = false;
     resetTQGQualityPanel();
     setAiBusy(true);
+    setTranslationSettingsLocked(true);
     resetActionStats();
     cancelBtn.classList.add('show');
 
@@ -5004,7 +5126,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
         var text = normalizeOCR(raw);
         var chunks = splitIntoChunks(text, maxLen);
         var label = f.name.replace(/\.[^.]+$/, '');
-        await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text, batchId, idx, maxLen, text);
+        await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text, batchId, idx, maxLen, text, batchTargetBookId);
         succeeded.push(f.name);
         commitChange();
       }catch(err){
@@ -5014,6 +5136,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     }
 
     batchInProgress = false;
+    setTranslationSettingsLocked(false);
     setAiBusy(false);
     cancelBtn.classList.remove('show');
     progressText.textContent = '';
@@ -5920,6 +6043,8 @@ function setReaderFontSize(size, persist) {
       return;
     }
 
+    clearTimeout(readerScrollTimer);
+    readerScrollTimer = null;
     readerCurrentBook = book;
     readerBookTitle.textContent = proj.name + ' - ' + book.title;
     readerContent.innerHTML = '';
@@ -5963,9 +6088,12 @@ function setReaderFontSize(size, persist) {
         var target = document.getElementById(chId);
         if(target) {
           target.scrollIntoView({ behavior: 'smooth' });
-          setTimeout(function() {
-            if (readerCurrentBook) {
-              readerCurrentBook.readerScrollPos = readerOverlay.scrollTop;
+          clearTimeout(readerScrollTimer);
+          var readerScrollBook = book;
+          readerScrollTimer = setTimeout(function() {
+            readerScrollTimer = null;
+            if (readerCurrentBook === readerScrollBook && readerOverlay.classList.contains('show')) {
+              readerScrollBook.readerScrollPos = readerOverlay.scrollTop;
               saveData();
             }
           }, 600);
@@ -5993,6 +6121,8 @@ function setReaderFontSize(size, persist) {
 
   async function closeReaderMode() {
     stopTts();
+    clearTimeout(readerScrollTimer);
+    readerScrollTimer = null;
     if(readerCurrentBook){
       readerCurrentBook.readerScrollPos = readerOverlay.scrollTop;
       await saveDataImmediate();
@@ -6038,6 +6168,12 @@ function setReaderFontSize(size, persist) {
       showError('กรุณาสร้างหรือเลือกเรื่องนิยายก่อนรับข้อมูลจากเว็บ');
       return;
     }
+    var ingestBook = getActiveBook(proj);
+    if(!ingestBook){
+      showError('ไม่พบเล่มต้นทางของข้อมูลที่นำเข้า');
+      return;
+    }
+    var ingestContext = captureAppContext(proj, ingestBook);
     hideError();
     hideGlossaryEnforce();
 
@@ -6078,8 +6214,12 @@ function setReaderFontSize(size, persist) {
           var translatedSub = await callAIWithRetry(sysTitle, rawSubtitle, key, modelInput.value, null, 1);
           if (translatedSub && translatedSub.trim()) {
             var finalTitle = chapNum ? ('บทที่ ' + chapNum + ': ' + translatedSub.trim()) : translatedSub.trim();
-            chapterTitle.value = finalTitle;
-            saveDraftSoon(); // บันทึกชื่อตอนภาษาไทยลง IndexedDB
+            var targetProj = appData.projects.find(function(p){ return p.id === ingestContext.projectId; }) || null;
+            var targetBook = targetProj && (targetProj.books || []).find(function(b){ return b.id === ingestContext.bookId; }) || null;
+            if(!targetBook) return;
+            targetBook.chapterTitle = finalTitle;
+            if(isAppContextCurrent(ingestContext)) chapterTitle.value = finalTitle;
+            saveData();
           }
         } catch(e) {
           console.warn('แปลชื่อตอนไม่สำเร็จ ใช้ชื่อเดิม:', e);

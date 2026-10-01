@@ -510,6 +510,103 @@ function main() {
   }
   assert(/TQG Phase C Final Audit: PASS WITH LIMITATION/.test(c5Audit.stdout), 'TQG C5 final audit passes');
 
+
+  const relevantAsyncNames = [
+    'runTranslation',
+    'runBatchTranslationRecovery',
+    'retryBatchTranslationJob',
+    'inspectCurrentTQGQuality',
+    'repairCurrentTQGQuality'
+  ];
+  for (const name of relevantAsyncNames) {
+    const start = indexHtml.indexOf('async function ' + name + '(');
+    assert(start >= 0, name + ' remains present for async-isolation audit');
+  }
+
+  const singleTranslationBody = runTranslationBody;
+  assert(
+    singleTranslationBody.includes('if(isAppContextCurrent(translationContext)){') &&
+      singleTranslationBody.includes("if(err.name !== 'AbortError' && isAppContextCurrent(translationContext))") &&
+      singleTranslationBody.includes('if(translationContextCurrent) clearTranslationRecoveryUI();'),
+    'single translation gates stale success/error/recovery UI'
+  );
+
+  const recoveryStart = indexHtml.indexOf('async function runBatchTranslationRecovery(');
+  const recoveryEnd = indexHtml.indexOf('\n  async function retryBatchTranslationJob', recoveryStart);
+  const recoveryBody = indexHtml.slice(recoveryStart, recoveryEnd);
+  assert(
+    recoveryBody.includes('var recoveryContext=null;') &&
+      recoveryBody.includes('captureAppContext(state.proj,state.book)') &&
+      recoveryBody.includes('if(isAppContextCurrent(recoveryContext)) refreshTranslationRecoveryUI();') &&
+      recoveryBody.includes("(!recoveryContext || isAppContextCurrent(recoveryContext))"),
+    'Batch Recovery gates stale UI and retains explicit context'
+  );
+
+  const retryStart = indexHtml.indexOf('async function retryBatchTranslationJob(');
+  const retryEnd = indexHtml.indexOf('\n  async function scanTranslationJobs', retryStart);
+  const retryBody = indexHtml.slice(retryStart, retryEnd);
+  assert(
+    retryBody.includes('var retryContext=null;') &&
+      retryBody.includes('captureAppContext(proj,book)') &&
+      retryBody.includes('if(isAppContextCurrent(retryContext)) refreshTranslationRecoveryUI();') &&
+      retryBody.includes("(!retryContext || isAppContextCurrent(retryContext))"),
+    'Batch Retry gates stale UI and retains explicit context'
+  );
+
+  const inspectorStart = indexHtml.indexOf('async function inspectCurrentTQGQuality(');
+  const inspectorEnd = indexHtml.indexOf('\n  async function repairCurrentTQGQuality', inspectorStart);
+  const inspectorBody = indexHtml.slice(inspectorStart, inspectorEnd);
+  assert(
+    inspectorBody.includes('var inspectionContext = captureAppContext') &&
+      inspectorBody.includes('if(!isAppContextCurrent(inspectionContext)') &&
+      inspectorBody.includes("isAppContextCurrent(inspectionContext)) showError") &&
+      inspectorBody.includes('if(isAppContextCurrent(inspectionContext)){'),
+    'TQG Inspector rejects stale result/error/finally UI'
+  );
+
+  const repairStart = indexHtml.indexOf('async function repairCurrentTQGQuality(');
+  const repairEnd = indexHtml.indexOf('\n  function setResultFocus', repairStart);
+  const repairBody = indexHtml.slice(repairStart, repairEnd);
+  assert(
+    repairBody.includes('var repairContext = captureAppContext') &&
+      repairBody.includes('if(!isAppContextCurrent(repairContext)') &&
+      repairBody.includes("isAppContextCurrent(repairContext)) showError") &&
+      repairBody.includes('if(isAppContextCurrent(repairContext)){'),
+    'TQG Repair rejects stale result/error/finally UI'
+  );
+
+  const ingestImportStart = indexHtml.indexOf('async function importExternalChapter(');
+  const ingestImportEnd = indexHtml.indexOf('\n\n  // ดักฟังสัญญาณ', ingestImportStart);
+  const ingestImportBody = indexHtml.slice(ingestImportStart, ingestImportEnd);
+  assert(
+    ingestImportBody.includes('targetBook.chapterTitle = finalTitle;') &&
+      ingestImportBody.includes('saveData();') &&
+      !ingestImportBody.includes('translatedSub && translatedSub.trim()) {\n            var finalTitle = chapNum ? (\'บทที่ \' + chapNum + \': \' + translatedSub.trim()) : translatedSub.trim();\n            chapterTitle.value = finalTitle;\n            saveDraftSoon();'),
+    'background title translation never rebinds stale work through current editor debounce'
+  );
+
+
+  assert(
+    /var\s+appContextGeneration\s*=\s*0/.test(indexHtml) &&
+      /function\s+captureAppContext\s*\(/.test(indexHtml) &&
+      /function\s+isAppContextCurrent\s*\(/.test(indexHtml) &&
+      /function\s+advanceAppContextGeneration\s*\(/.test(indexHtml) &&
+      (indexHtml.match(/advanceAppContextGeneration\(\)/g) || []).length >= 9,
+    'WORK 2 context-generation guards are present at all audited switch points'
+  );
+
+  const settingsLockTrue = (indexHtml.match(/setTranslationSettingsLocked\(true\)/g) || []).length;
+  const settingsLockFalse = (indexHtml.match(/setTranslationSettingsLocked\(false\)/g) || []).length;
+  assert(settingsLockTrue === 4 && settingsLockFalse === 4, 'WORK 2 translation settings locks are balanced');
+
+  assert(
+    /async function runTranslation\([\s\S]*?if\(isAppContextCurrent\(translationContext\)\)\{[\s\S]*?pendingResume\s*=\s*\{[\s\S]*?showError\(/.test(indexHtml),
+    'single translation error UI remains context-bound'
+  );
+
+  const staleTimerPattern = /setTimeout\(function\(\)\s*\{\s*if\s*\(readerCurrentBook\)\s*\{/;
+  assert(!staleTimerPattern.test(indexHtml), 'Reader stale mutable-book timer pattern is absent');
+
   console.log('');
   console.log('Regression Gate: PASS');
 }
