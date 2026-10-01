@@ -223,14 +223,19 @@
     if (!value || typeof value !== 'object') return false;
     if (seen.has(value)) return false;
     seen.add(value);
-    for (const key of Object.keys(value)) {
-      if (FORBIDDEN_OBSERVABILITY_KEYS.has(normalizeTelemetryKey(key))) {
-        return true;
+    try {
+      for (const key of Object.keys(value)) {
+        if (FORBIDDEN_OBSERVABILITY_KEYS.has(normalizeTelemetryKey(key))) {
+          return true;
+        }
+        const nested = value[key];
+        if (nested && typeof nested === 'object' && containsForbiddenTelemetryKey(nested, seen)) {
+          return true;
+        }
       }
-      const nested = value[key];
-      if (nested && typeof nested === 'object' && containsForbiddenTelemetryKey(nested, seen)) {
-        return true;
-      }
+    } catch (_error) {
+      // Malformed or hostile telemetry input must fail closed.
+      return true;
     }
     return false;
   }
@@ -380,26 +385,33 @@
   });
 
   function resolveObservabilityObserver(input) {
-    if (input && input.observer && typeof input.observer.emit === 'function') {
-      return input.observer;
+    try {
+      const candidate = input && input.observer;
+      if (candidate && typeof candidate.emit === 'function') {
+        return candidate;
+      }
+    } catch (_error) {
+      // Observer configuration is outside the TQG decision path.
     }
     return defaultObservabilityObserver;
   }
 
-  function deepFreezeObservationEvent(event) {
-    if (!event || typeof event !== 'object') return event;
-    for (const value of Object.values(event)) {
-      if (value && typeof value === 'object') Object.freeze(value);
+  function deepFreezeObservationEvent(value, seen = new Set()) {
+    if (!value || typeof value !== 'object' || seen.has(value)) return value;
+    seen.add(value);
+    for (const nested of Object.values(value)) {
+      deepFreezeObservationEvent(nested, seen);
     }
-    return Object.freeze(event);
+    return Object.freeze(value);
   }
 
   function emitObservation(observer, eventName, fields) {
-    const event = buildObservationEvent(eventName, fields);
-    if (!validateObservationEvent(event)) return false;
     try {
+      const event = buildObservationEvent(eventName, fields);
+      if (!validateObservationEvent(event)) return false;
+      const frozenEvent = deepFreezeObservationEvent(event);
       const result = observer && typeof observer.emit === 'function'
-        ? observer.emit(deepFreezeObservationEvent(event))
+        ? observer.emit(frozenEvent)
         : true;
       if (result && typeof result.then === 'function') {
         Promise.resolve(result).catch(() => {});
@@ -421,7 +433,8 @@
   }
 
   function observabilityMetrics() {
-    return JSON.parse(JSON.stringify(runtimeObservabilityMetrics));
+    const snapshot = JSON.parse(JSON.stringify(runtimeObservabilityMetrics));
+    return deepFreezeObservationEvent(snapshot);
   }
 
   function resetObservabilityMetrics() {
