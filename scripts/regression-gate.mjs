@@ -591,6 +591,47 @@ function main() {
     'background title translation never rebinds stale work through current editor debounce'
   );
 
+  const ingestValidatorStart = indexHtml.indexOf('function validatePrungIngestMessage(');
+  const ingestListenerStart = indexHtml.indexOf("  window.addEventListener('message'", ingestValidatorStart);
+  const ingestValidatorBody = indexHtml.slice(ingestValidatorStart, ingestListenerStart);
+  const ingestListenerBody = indexHtml.slice(ingestListenerStart);
+  assert(
+    ingestValidatorStart >= 0 &&
+      ingestValidatorBody.includes('e.source !== window') &&
+      ingestValidatorBody.includes('e.origin !== window.location.origin') &&
+      ingestValidatorBody.includes("data.type !== 'PRUNG_INGEST'") &&
+      ingestValidatorBody.includes('Array.isArray(data)') &&
+      ingestValidatorBody.includes("data.title !== undefined") &&
+      ingestValidatorBody.includes("typeof data.title !== 'string'") &&
+      ingestValidatorBody.includes('data.title.length > 500') &&
+      ingestValidatorBody.includes("typeof data.content !== 'string'") &&
+      ingestValidatorBody.includes('data.content.length > 500000') &&
+      ingestValidatorBody.includes('!data.content.trim()') &&
+      ingestValidatorBody.includes('typeof data.autoStart !== \'boolean\'') &&
+      ingestValidatorBody.includes('autoStart: data.autoStart === true') &&
+      ingestListenerBody.includes('var ingestMessage = validatePrungIngestMessage(e);') &&
+      ingestListenerBody.includes('if (ingestMessage) {') &&
+      !ingestListenerBody.includes('importExternalChapter(e.data.title') ,
+    'WORK 3 PRUNG_INGEST receiver enforces source/origin/schema/size boundary before import'
+  );
+
+  const sandboxWindow = { location: { origin: 'https://example.test' } };
+  const validator = vm.runInNewContext(`(${ingestValidatorBody})`, { window: sandboxWindow });
+  const valid = { source: sandboxWindow, origin: 'https://example.test', data: { type: 'PRUNG_INGEST', title: 'Chapter 1', content: 'Hello world', autoStart: true } };
+  const normalizedValid = validator(valid);
+  assert(normalizedValid && normalizedValid.title === 'Chapter 1' && normalizedValid.content === 'Hello world' && normalizedValid.autoStart === true, 'WORK 3 accepts valid same-origin PRUNG_INGEST message');
+  assert(validator({ source: sandboxWindow, origin: 'https://evil.example', data: valid.data }) === null, 'WORK 3 rejects foreign PRUNG_INGEST origin');
+  assert(validator({ source: sandboxWindow, origin: 'https://example.test', data: { type: 'NOPE', title: 'x', content: 'y' } }) === null, 'WORK 3 rejects wrong PRUNG_INGEST message type');
+  assert(validator({ source: sandboxWindow, origin: 'https://example.test', data: ['PRUNG_INGEST', 'x'] }) === null, 'WORK 3 rejects array payload');
+  assert(validator({ source: sandboxWindow, origin: 'https://example.test', data: { type: 'PRUNG_INGEST', title: 1, content: 'y' } }) === null, 'WORK 3 rejects non-string title');
+  assert(validator({ source: sandboxWindow, origin: 'https://example.test', data: { type: 'PRUNG_INGEST', title: 'x'.repeat(501), content: 'y' } }) === null, 'WORK 3 rejects oversized title');
+  assert(validator({ source: sandboxWindow, origin: 'https://example.test', data: { type: 'PRUNG_INGEST', title: 'x', content: '   ' } }) === null, 'WORK 3 rejects blank content');
+  assert(validator({ source: sandboxWindow, origin: 'https://example.test', data: { type: 'PRUNG_INGEST', title: 'x', content: 'x'.repeat(500001) } }) === null, 'WORK 3 rejects oversized content');
+  assert(validator({ source: sandboxWindow, origin: 'https://example.test', data: { type: 'PRUNG_INGEST', title: 'x', content: 'y', autoStart: 'true' } }) === null, 'WORK 3 rejects non-boolean autoStart');
+  const defaultAutoStart = validator({ source: sandboxWindow, origin: 'https://example.test', data: { type: 'PRUNG_INGEST', title: 'x', content: 'y' } });
+  assert(defaultAutoStart && defaultAutoStart.autoStart === false, 'WORK 3 normalizes omitted autoStart to false');
+  const optionalTitle = validator({ source: sandboxWindow, origin: 'https://example.test', data: { type: 'PRUNG_INGEST', content: 'y' } });
+  assert(optionalTitle && optionalTitle.title === '', 'WORK 3 preserves optional title compatibility');
 
   assert(
     /var\s+appContextGeneration\s*=\s*0/.test(indexHtml) &&
