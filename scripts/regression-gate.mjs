@@ -606,6 +606,101 @@ function main() {
   assert(settingsLockTrue === 4 && settingsLockFalse === 4, 'WORK 2 translation settings locks are balanced');
 
   assert(
+    /function\s+captureTranslationSettingsSnapshot\s*\(/.test(indexHtml) &&
+      /function\s+normalizeTranslationSettingsSnapshot\s*\(/.test(indexHtml) &&
+      /function\s+buildTranslatePromptWithSettings\s*\(/.test(indexHtml),
+    'WORK 2 translation settings snapshot helpers are present'
+  );
+
+  const translationStart = indexHtml.indexOf('async function runTranslation(');
+  const translationEnd = indexHtml.indexOf('\n  var batchInProgress', translationStart);
+  const translationBody = indexHtml.slice(translationStart, translationEnd);
+  assert(
+    translationBody.includes('settingsSnapshot') &&
+      translationBody.includes('settingsSnapshot:translationSettingsSnapshot') &&
+      translationBody.includes('buildTranslatePromptWithSettings(proj, previousTail, chunks[i], translationSettingsSnapshot)') &&
+      translationBody.includes('pendingResume = {') &&
+      translationBody.includes('settingsSnapshot: translationSettingsSnapshot'),
+    'single translation snapshots settings through job, prompt, and resume context'
+  );
+
+  assert(
+    /async function prepareTranslationRecovery\([\s\S]*?settingsSnapshot:\s*normalizeTranslationSettingsSnapshot\(job\.settingsSnapshot, job\.provider, job\.model, job\.chunkSize\)/.test(indexHtml),
+    'single-job recovery preserves translation settings snapshot'
+  );
+
+  const batchTranslationStart = indexHtml.indexOf('async function runSingleTranslationForBatch(');
+  const batchTranslationEnd = indexHtml.indexOf('\n  async function runBatchImport', batchTranslationStart);
+  const batchTranslationBody = indexHtml.slice(batchTranslationStart, batchTranslationEnd);
+  assert(
+    batchTranslationBody.includes('batchSettingsSnapshot') &&
+      batchTranslationBody.includes('settingsSnapshot:batchSettingsSnapshot') &&
+      batchTranslationBody.includes('buildTranslatePromptWithSettings(proj, previousTail, chunks[i], batchSettingsSnapshot)'),
+    'batch translation snapshots settings through job and prompt context'
+  );
+
+  const batchRecoveryBody = indexHtml.slice(
+    indexHtml.indexOf('async function runBatchTranslationRecovery('),
+    indexHtml.indexOf('\n  async function retryBatchTranslationJob', indexHtml.indexOf('async function runBatchTranslationRecovery('))
+  );
+  assert(
+    batchRecoveryBody.includes('recoverySettingsSnapshot') &&
+      batchRecoveryBody.includes('settingsSnapshot:recoverySettingsSnapshot') &&
+      batchRecoveryBody.includes('buildTranslatePromptWithSettings(state.proj,previousTail,chunks[i],recoverySettingsSnapshot)'),
+    'batch recovery preserves translation settings snapshot'
+  );
+
+  const retryBodyForSettings = indexHtml.slice(
+    indexHtml.indexOf('async function retryBatchTranslationJob('),
+    indexHtml.indexOf('\n  async function prepareTranslationRecovery', indexHtml.indexOf('async function retryBatchTranslationJob('))
+  );
+  assert(
+    retryBodyForSettings.includes('retrySettingsSnapshot') &&
+      retryBodyForSettings.includes('settingsSnapshot:retrySettingsSnapshot') &&
+      retryBodyForSettings.includes('buildTranslatePromptWithSettings(proj,previousTail,chunks[i],retrySettingsSnapshot)'),
+    'batch retry preserves translation settings snapshot'
+  );
+
+  const repairHandlerStart = indexHtml.indexOf("repairBtn.addEventListener('click', async function(){");
+  const repairHandlerEnd = indexHtml.indexOf('\n  cancelBtn.addEventListener', repairHandlerStart);
+  const repairHandlerBody = indexHtml.slice(repairHandlerStart, repairHandlerEnd);
+  assert(
+    repairHandlerStart >= 0 &&
+      repairHandlerBody.includes('var repairContext = captureAppContext') &&
+      repairHandlerBody.includes('var repairSourceSnapshot = text') &&
+      repairHandlerBody.includes('if(!isAppContextCurrent(repairContext) || inputText.value.trim() !== repairSourceSnapshot) return;') &&
+      repairHandlerBody.includes('if(err.name !== \'AbortError\' && isAppContextCurrent(repairContext))'),
+    'OCR Repair rejects stale result/error UI and stale source writes'
+  );
+
+  const surgicalStart = indexHtml.indexOf('async function runSurgicalGlossaryFixWithAI(');
+  const surgicalEnd = indexHtml.indexOf('\n  async function runTranslation(', surgicalStart);
+  const surgicalBody = indexHtml.slice(surgicalStart, surgicalEnd);
+  assert(
+    surgicalBody.includes('var surgicalContext = captureAppContext') &&
+      surgicalBody.includes('var surgicalOutputSnapshot = output.textContent') &&
+      surgicalBody.includes('if(!isAppContextCurrent(surgicalContext) || output.textContent !== surgicalOutputSnapshot) return;') &&
+      surgicalBody.includes('if(err.name !== \'AbortError\' && isAppContextCurrent(surgicalContext))'),
+    'Surgical Glossary AI rejects stale result/error UI and stale output writes'
+  );
+
+  const ingestStart = indexHtml.indexOf('async function importExternalChapter(');
+  const ingestEnd = indexHtml.indexOf('\n\n  // ดักฟังสัญญาณ', ingestStart);
+  const ingestBody = indexHtml.slice(ingestStart, ingestEnd);
+  assert(
+    ingestBody.includes('advanceAppContextGeneration();') &&
+      /setTimeout\(function\(\)\s*\{[\s\S]*?if\(!isAppContextCurrent\(ingestContext\)\s*\|\|\s*aiBusy\)\s*return;/.test(ingestBody) &&
+      /if\(!targetBook\s*\|\|\s*!isAppContextCurrent\(ingestContext\)\)\s*return;/.test(ingestBody) &&
+      ingestBody.includes('chapterTitle.value = finalTitle;'),
+    'background title translation invalidates stale ingestion and auto-start timer'
+  );
+
+  assert(
+    /readerOverlay\.addEventListener\('scroll',[\s\S]*?var readerScrollBook = readerCurrentBook;[\s\S]*?readerCurrentBook === readerScrollBook[\s\S]*?readerOverlay\.classList\.contains\('show'\)/.test(indexHtml),
+    'Reader scroll debounce writes only to captured visible Book'
+  );
+
+  assert(
     /async function runTranslation\([\s\S]*?if\(isAppContextCurrent\(translationContext\)\)\{[\s\S]*?pendingResume\s*=\s*\{[\s\S]*?showError\(/.test(indexHtml),
     'single translation error UI remains context-bound'
   );
