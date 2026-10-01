@@ -746,6 +746,62 @@ function main() {
     'single translation error UI remains context-bound'
   );
 
+  const ttsPlayStart = indexHtml.indexOf('function playTts(){');
+  const ttsPauseStart = indexHtml.indexOf('function pauseTts(){', ttsPlayStart);
+  const ttsStopStart = indexHtml.indexOf('function stopTts(){', ttsPauseStart);
+  assert(ttsPlayStart >= 0 && ttsPauseStart > ttsPlayStart && ttsStopStart > ttsPauseStart, 'WORK 4 TTS controls remain auditable');
+  const ttsPlayBody = indexHtml.slice(ttsPlayStart, ttsPauseStart);
+  const ttsPauseBody = indexHtml.slice(ttsPauseStart, ttsStopStart);
+  assert(
+    ttsPlayBody.includes("ttsState === 'paused' && ttsIndex >= 0") &&
+      ttsPlayBody.includes('window.speechSynthesis.resume();') &&
+      ttsPlayBody.includes('updatePlayPauseIcon();') &&
+      !ttsPlayBody.includes('speakIndex(ttsIndex);'),
+    'B09 TTS resume uses speechSynthesis.resume without restarting the current item'
+  );
+  assert(
+    ttsPauseBody.includes("ttsState = 'paused';") &&
+      ttsPauseBody.includes('window.speechSynthesis.pause();') &&
+      !ttsPauseBody.includes('window.speechSynthesis.cancel();'),
+    'B09 TTS pause preserves the active utterance for resume'
+  );
+
+  const ttsNextStart = indexHtml.indexOf("ttsNextBtn.addEventListener('click', function(){");
+  const ttsNextEnd = indexHtml.indexOf('\n  });', ttsNextStart);
+  const ttsNextBody = indexHtml.slice(ttsNextStart, ttsNextEnd);
+  assert(
+    ttsNextStart >= 0 &&
+      ttsNextEnd > ttsNextStart &&
+      ttsNextBody.includes('if(ttsIndex >= ttsQueue.length - 1) return;') &&
+      ttsNextBody.includes('var newIdx = ttsIndex + 1;') &&
+      !ttsNextBody.includes('Math.min(ttsQueue.length - 1, ttsIndex + 1)'),
+    'B10 TTS Next stops at the final queue item without replaying it'
+  );
+
+  const copyStart = indexHtml.indexOf("copyBtn.addEventListener('click', function(){");
+  const copyEnd = indexHtml.indexOf('downloadBtn.addEventListener', copyStart + 1);
+  const copyBody = indexHtml.slice(copyStart, copyEnd);
+  assert(
+    copyStart >= 0 &&
+      copyEnd > copyStart &&
+      copyBody.includes('.catch(function(err){') &&
+      copyBody.includes("console.error('Clipboard copy failed:'") &&
+      copyBody.includes('showError('),
+    'B11 clipboard rejection is handled without an unhandled Promise rejection'
+  );
+
+  const downloadStart = indexHtml.indexOf("downloadBtn.addEventListener('click', function(){");
+  const downloadEnd = indexHtml.indexOf('var SRI_MAP', downloadStart + 1);
+  const downloadBody = indexHtml.slice(downloadStart, downloadEnd);
+  assert(
+    downloadStart >= 0 &&
+      downloadEnd > downloadStart &&
+      downloadBody.includes('var objectUrl = URL.createObjectURL(blob);') &&
+      downloadBody.includes('URL.revokeObjectURL(objectUrl);') &&
+      downloadBody.includes('setTimeout(function(){ URL.revokeObjectURL(objectUrl); }, 0);'),
+    'B12 result download revokes its object URL after triggering the download'
+  );
+
   const staleTimerPattern = /setTimeout\(function\(\)\s*\{\s*if\s*\(readerCurrentBook\)\s*\{/;
   assert(!staleTimerPattern.test(indexHtml), 'Reader stale mutable-book timer pattern is absent');
 
