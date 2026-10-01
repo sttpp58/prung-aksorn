@@ -530,8 +530,9 @@ function main() {
     singleTranslationStart >= 0 &&
       singleTranslationEnd > singleTranslationStart &&
       singleTranslationBody.includes('if(isAppContextCurrent(translationContext)){') &&
-      singleTranslationBody.includes("if(err.name !== 'AbortError' && isAppContextCurrent(translationContext))") &&
-      singleTranslationBody.includes('if(translationContextCurrent) clearTranslationRecoveryUI();'),
+      singleTranslationBody.includes('pendingResume = {') &&
+      singleTranslationBody.includes('translationContextCurrent') &&
+      singleTranslationBody.includes('clearTranslationRecoveryUI();'),
     'single translation gates stale success/error/recovery UI'
   );
 
