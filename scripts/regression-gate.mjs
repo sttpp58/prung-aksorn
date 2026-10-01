@@ -891,6 +891,27 @@ function main() {
       backupRestoreWorkflow.includes('actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'),
     'Backup / Restore CI action references remain pinned'
   );
+
+  const recoveryStressE2EPath = path.join(ROOT, 'tests', 'e2e', 'translation-job-recovery-stress.mjs');
+  const recoveryStressWorkflowPath = path.join(ROOT, '.github', 'workflows', 'translation-job-recovery-stress.yml');
+  const recoveryStressDocPath = path.join(ROOT, 'docs', 'TRANSLATION_JOB_RECOVERY_STRESS.md');
+  assert(fs.existsSync(recoveryStressE2EPath), 'Translation Job Recovery Stress runner is present');
+  assert(fs.existsSync(recoveryStressWorkflowPath), 'Translation Job Recovery Stress CI workflow is present');
+  assert(fs.existsSync(recoveryStressDocPath), 'Translation Job Recovery Stress scope document is present');
+  const recoveryStressE2E = fs.readFileSync(recoveryStressE2EPath, 'utf8');
+  const recoveryStressWorkflow = fs.readFileSync(recoveryStressWorkflowPath, 'utf8');
+  assert(
+    recoveryStressE2E.includes('RS-01 Repeated Browser-Restart Translation Recovery') &&
+      recoveryStressE2E.includes('RS-02 Failed Translation Job Recovery After Reload') &&
+      recoveryStressE2E.includes('Page.navigate'),
+    'Translation Job Recovery Stress covers repeated reload and failed-job recovery'
+  );
+  assert(
+    recoveryStressWorkflow.includes('actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1') &&
+      recoveryStressWorkflow.includes('actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'),
+    'Translation Job Recovery Stress CI action references remain pinned'
+  );
+
   const staleTimerPattern = /setTimeout\(function\(\)\s*\{\s*if\s*\(readerCurrentBook\)\s*\{/;
   assert(!staleTimerPattern.test(indexHtml), 'Reader stale mutable-book timer pattern is absent');
 
