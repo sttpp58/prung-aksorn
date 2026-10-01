@@ -524,7 +524,7 @@ function main() {
   }
 
   const singleTranslationStart = indexHtml.indexOf('async function runTranslation(');
-  const singleTranslationEnd = indexHtml.indexOf('\\n  var batchInProgress', singleTranslationStart);
+  const singleTranslationEnd = indexHtml.indexOf('\n  var batchInProgress', singleTranslationStart);
   const singleTranslationBody = indexHtml.slice(singleTranslationStart, singleTranslationEnd);
   assert(
     singleTranslationStart >= 0 &&
@@ -542,13 +542,14 @@ function main() {
   assert(
     recoveryBody.includes('var recoveryContext=null;') &&
       recoveryBody.includes('captureAppContext(state.proj,state.book)') &&
-      recoveryBody.includes('if(isAppContextCurrent(recoveryContext)) refreshTranslationRecoveryUI();') &&
+      recoveryBody.includes('if(isAppContextCurrent(recoveryContext)){') &&
+      recoveryBody.includes('refreshTranslationRecoveryUI();') &&
       recoveryBody.includes("(!recoveryContext || isAppContextCurrent(recoveryContext))"),
     'Batch Recovery gates stale UI and retains explicit context'
   );
 
   const retryStart = indexHtml.indexOf('async function retryBatchTranslationJob(');
-  const retryEnd = indexHtml.indexOf('\n  async function scanTranslationJobs', retryStart);
+  const retryEnd = indexHtml.indexOf('\n  async function prepareTranslationRecovery', retryStart);
   const retryBody = indexHtml.slice(retryStart, retryEnd);
   assert(
     retryBody.includes('var retryContext=null;') &&
