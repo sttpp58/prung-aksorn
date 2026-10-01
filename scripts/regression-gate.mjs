@@ -867,6 +867,18 @@ function main() {
     'Production hardening installs runtime error observability boundaries'
   );
 
+  const cancelHandlerStart = indexHtml.indexOf("cancelBtn.addEventListener('click', function(){");
+  const cancelHandlerEnd = indexHtml.indexOf("\n  copyBtn.addEventListener", cancelHandlerStart);
+  const cancelHandlerBody = indexHtml.slice(cancelHandlerStart, cancelHandlerEnd);
+  assert(
+    cancelHandlerStart >= 0 &&
+      cancelHandlerEnd > cancelHandlerStart &&
+      cancelHandlerBody.includes('batchCancelled = true;') &&
+      cancelHandlerBody.includes('activeController.abort();') &&
+      !cancelHandlerBody.includes('PrungAksornStorageV2.cancelTranslationJob('),
+    'Failure Injection cancellation fix keeps terminal Job persistence single-owner'
+  );
+
   const staleTimerPattern = /setTimeout\(function\(\)\s*\{\s*if\s*\(readerCurrentBook\)\s*\{/;
   assert(!staleTimerPattern.test(indexHtml), 'Reader stale mutable-book timer pattern is absent');
 

@@ -5361,9 +5361,6 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
 
   cancelBtn.addEventListener('click', function(){
     batchCancelled = true;
-    if(activeTranslationJobId){
-      PrungAksornStorageV2.cancelTranslationJob(activeTranslationJobId,activeTranslationJobRevision).catch(function(err){ console.warn('Translation job cancellation checkpoint failed:', err); });
-    }
     if(activeController) activeController.abort();
   });
 
