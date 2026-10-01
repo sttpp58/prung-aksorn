@@ -879,6 +879,18 @@ function main() {
     'Failure Injection cancellation fix keeps terminal Job persistence single-owner'
   );
 
+  const backupRestoreE2EPath = path.join(ROOT, 'tests', 'e2e', 'backup-restore-real-world.mjs');
+  const backupRestoreWorkflowPath = path.join(ROOT, '.github', 'workflows', 'backup-restore-real-world.yml');
+  const backupRestoreDocPath = path.join(ROOT, 'docs', 'BACKUP_RESTORE_REAL_WORLD_VALIDATION.md');
+  assert(fs.existsSync(backupRestoreE2EPath), 'Backup / Restore real-world validation runner is present');
+  assert(fs.existsSync(backupRestoreWorkflowPath), 'Backup / Restore real-world validation CI workflow is present');
+  assert(fs.existsSync(backupRestoreDocPath), 'Backup / Restore real-world validation scope document is present');
+  const backupRestoreWorkflow = fs.readFileSync(backupRestoreWorkflowPath, 'utf8');
+  assert(
+    backupRestoreWorkflow.includes('actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1') &&
+      backupRestoreWorkflow.includes('actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'),
+    'Backup / Restore CI action references remain pinned'
+  );
   const staleTimerPattern = /setTimeout\(function\(\)\s*\{\s*if\s*\(readerCurrentBook\)\s*\{/;
   assert(!staleTimerPattern.test(indexHtml), 'Reader stale mutable-book timer pattern is absent');
 
