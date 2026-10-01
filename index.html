@@ -6308,9 +6308,26 @@ function setReaderFontSize(size, persist) {
   }
 
   // ดักฟังสัญญาณที่ส่งมาจาก Tampermonkey
+  function validatePrungIngestMessage(e) {
+    if (!e || e.source !== window || e.origin !== window.location.origin) return null;
+    var data = e.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    if (data.type !== 'PRUNG_INGEST') return null;
+    if (data.title !== undefined && (typeof data.title !== 'string' || data.title.length > 500)) return null;
+    if (typeof data.content !== 'string' || !data.content.trim() || data.content.length > 500000) return null;
+    if (data.autoStart !== undefined && typeof data.autoStart !== 'boolean') return null;
+    return {
+      title: typeof data.title === 'string' ? data.title : '',
+      content: data.content,
+      autoStart: data.autoStart === true
+    };
+  }
+
+  // External ingestion receiver
   window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'PRUNG_INGEST') {
-      importExternalChapter(e.data.title, e.data.content, e.data.autoStart);
+    var ingestMessage = validatePrungIngestMessage(e);
+    if (ingestMessage) {
+      importExternalChapter(ingestMessage.title, ingestMessage.content, ingestMessage.autoStart);
     }
   });
 
