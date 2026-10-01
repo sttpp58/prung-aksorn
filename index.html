@@ -1406,6 +1406,7 @@
 
   var state = { source: 'translate', level: 'edit', genre: 'ทั่วไป', style: 'สำนวนปัจจุบัน' };
   var appData = { projects: [], currentProjectId: null };
+  var storageReady = false;
   var expandedProjects = {};
   var viewingHistoryId = null;
   var activeController = null;
@@ -2354,7 +2355,9 @@
       var data = await storageV2.load();
       if(data && typeof data === 'object') appData = data;
     }catch(e){
+      storageReady = false;
       console.error('Error loading data from IndexedDB V2:', e);
+      return false;
     }
     if(!appData || typeof appData !== 'object') appData = { projects: [], currentProjectId: null };
     if(!Array.isArray(appData.projects)) appData.projects = [];
@@ -2413,9 +2416,11 @@
       p.context = typeof p.context === 'string' ? p.context : '';
       return p;
     });
+    storageReady = true;
     if(migratedBookDrafts) saveData();
     appData.settings = Object.assign({}, defaultSettings, appData.settings || {});
     if(!appData.settings.apiStats) appData.settings.apiStats = { tokens: 0, cost: 0 };
+    return true;
   }
 
   function saveSettings(){
@@ -2469,6 +2474,13 @@
   }
 
   async function saveDataImmediate(){
+    if(!storageReady){
+      if(saveStatusText){
+        saveStatusText.textContent = '⚠ ฐานข้อมูลยังไม่พร้อม';
+        saveStatusText.classList.remove('saving');
+      }
+      return false;
+    }
     try{
       await storageV2.save(appData);
       if(saveStatusText){
@@ -2489,26 +2501,65 @@
   var saveDataTimer = null;
   var saveDataPending = false;
   var saveDataVersion = 0;
+  var saveRetryTimer = null;
+  var saveRetryCount = 0;
+  var saveDataInFlight = null;
+  var SAVE_RETRY_DELAYS = [1000, 3000, 10000];
+
+  function scheduleSaveRetry(){
+    if(!saveDataPending || saveRetryTimer || saveRetryCount >= SAVE_RETRY_DELAYS.length) return;
+    var delay = SAVE_RETRY_DELAYS[saveRetryCount];
+    saveRetryCount += 1;
+    if(saveStatusText){
+      saveStatusText.textContent = '⚠ บันทึกไม่สำเร็จ กำลังลองใหม่...';
+      saveStatusText.classList.add('saving');
+    }
+    saveRetryTimer = setTimeout(function(){
+      saveRetryTimer = null;
+      flushSaveData();
+    }, delay);
+  }
 
   async function flushSaveData(){
-    clearTimeout(saveDataTimer);
-    saveDataTimer = null;
-    if(!saveDataPending) return true;
+    if(saveDataInFlight) return saveDataInFlight;
+    saveDataInFlight = (async function(){
+      clearTimeout(saveDataTimer);
+      saveDataTimer = null;
+      if(!saveDataPending) return true;
 
-    var flushVersion = saveDataVersion;
-    saveDataPending = false;
-    var ok = await saveDataImmediate();
+      var flushVersion = saveDataVersion;
+      saveDataPending = false;
+      var ok = await saveDataImmediate();
 
-    // Preserve a newer pending change or a failed save for a subsequent flush.
-    if(!ok || saveDataVersion !== flushVersion){
-      saveDataPending = true;
+      // Preserve a newer pending change or a failed save for a subsequent flush.
+      if(!ok || saveDataVersion !== flushVersion){
+        saveDataPending = true;
+        if(!ok){
+          scheduleSaveRetry();
+        }else if(!saveDataTimer){
+          saveDataTimer = setTimeout(flushSaveData, 400);
+        }
+      }else{
+        saveRetryCount = 0;
+        clearTimeout(saveRetryTimer);
+        saveRetryTimer = null;
+      }
+      return ok && saveDataVersion === flushVersion;
+    })();
+    try{
+      return await saveDataInFlight;
+    }finally{
+      saveDataInFlight = null;
     }
-    return ok && saveDataVersion === flushVersion;
   }
 
   function saveData(){
+    if(!storageReady) return false;
     saveDataPending = true;
     saveDataVersion += 1;
+    saveRetryCount = 0;
+    clearTimeout(saveRetryTimer);
+    saveRetryTimer = null;
     clearTimeout(saveDataTimer);
     saveDataTimer = setTimeout(flushSaveData, 400);
     return true;
@@ -4051,6 +4102,16 @@
   });
 
   var errorBox = document.getElementById('errorBox');
+
+  // Defense-in-depth boundary for unexpected browser/runtime failures.
+  window.addEventListener('unhandledrejection', function(event){
+    var reason = event && event.reason;
+    if(reason && reason.name === 'AbortError') return;
+    console.error('Unhandled Promise rejection:', reason);
+  });
+  window.addEventListener('error', function(event){
+    console.error('Unhandled runtime error:', event && (event.error || event.message));
+  });
   var processBtn = document.getElementById('processBtn');
   var copyBtn = document.getElementById('copyBtn');
   var downloadBtn = document.getElementById('downloadBtn');
@@ -4329,6 +4390,15 @@
           await showAlertDialog('ไฟล์สำรองไม่ถูกต้อง', msg);
         }
       }
+    };
+    reader.onerror = function(){
+      console.error('Backup file read failed:', reader.error || file.name);
+      showAlertDialog('อ่านไฟล์สำรองไม่สำเร็จ', 'ไม่สามารถอ่านไฟล์ Backup ที่เลือกได้ กรุณาลองไฟล์อื่นอีกครั้ง').catch(function(dialogErr){
+        console.error('Backup file read error dialog failed:', dialogErr);
+      });
+    };
+    reader.onabort = function(){
+      console.warn('Backup file read aborted:', file.name);
     };
     reader.readAsText(file, 'UTF-8');
     e.target.value = '';
@@ -5317,6 +5387,8 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     setTimeout(function(){ URL.revokeObjectURL(objectUrl); }, 0);
   });
 
+  var SCRIPT_LOAD_PROMISES = Object.create(null);
+
   var SRI_MAP = {
     'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js': 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==',
     'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js': 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==',
@@ -5328,23 +5400,54 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
   };
 
   function loadScript(src, integrity){
-    return new Promise(function(resolve, reject){
-      if(document.querySelector('script[src="' + src + '"]')) return resolve();
-      var s = document.createElement('script');
-      s.src = src;
+    if(SCRIPT_LOAD_PROMISES[src]) return SCRIPT_LOAD_PROMISES[src];
+    var existing = document.querySelector('script[src="' + src + '"]');
+    if(existing && existing.dataset.prungLoaded === 'true') return Promise.resolve();
+
+    var promise = new Promise(function(resolve, reject){
+      var s = existing || document.createElement('script');
+      var timer = null;
+      var settled = false;
       var hash = integrity || (typeof SRI_MAP !== 'undefined' ? SRI_MAP[src] : null);
-      if(hash){
-        s.integrity = hash;
-        s.crossOrigin = 'anonymous';
-        s.referrerPolicy = 'no-referrer';
+
+      function cleanup(){
+        if(timer) clearTimeout(timer);
+        s.removeEventListener('load', onLoad);
+        s.removeEventListener('error', onError);
       }
-      s.onload = resolve;
-      s.onerror = function(){
-        if(s.parentNode) s.parentNode.removeChild(s);
+      function onLoad(){
+        if(settled) return;
+        settled = true;
+        cleanup();
+        s.dataset.prungLoaded = 'true';
+        resolve();
+      }
+      function onError(){
+        if(settled) return;
+        settled = true;
+        cleanup();
+        if(!existing && s.parentNode) s.parentNode.removeChild(s);
+        delete SCRIPT_LOAD_PROMISES[src];
         reject(new Error('โหลดไฟล์ ' + src + ' ไม่สำเร็จ'));
-      };
-      document.head.appendChild(s);
+      }
+
+      s.addEventListener('load', onLoad, { once: true });
+      s.addEventListener('error', onError, { once: true });
+      timer = setTimeout(onError, 15000);
+
+      if(!existing){
+        s.src = src;
+        if(hash){
+          s.integrity = hash;
+          s.crossOrigin = 'anonymous';
+          s.referrerPolicy = 'no-referrer';
+        }
+        document.head.appendChild(s);
+      }
     });
+
+    SCRIPT_LOAD_PROMISES[src] = promise;
+    return promise;
   }
 
   document.getElementById('exportDocxBtn').addEventListener('click', async function(){
@@ -6335,21 +6438,29 @@ function setReaderFontSize(size, persist) {
   window.addEventListener('message', function(e) {
     var ingestMessage = validatePrungIngestMessage(e);
     if (ingestMessage) {
-      importExternalChapter(ingestMessage.title, ingestMessage.content, ingestMessage.autoStart);
+      importExternalChapter(ingestMessage.title, ingestMessage.content, ingestMessage.autoStart)
+        .catch(function(err){
+          console.error('External chapter import failed:', err);
+        });
     }
   });
 
   /* เริ่มต้นระบบแบบ Asynchronous */
   (async function initApp(){
-    await loadData();
-            loadTranslationRecoveryUIState();
+    var loaded = await loadData();
+    if(!loaded) throw new Error('IndexedDB initialization failed.');
+    loadTranslationRecoveryUIState();
     applySettingsToUI();
     renderProjects();
     renderBottomHistory();
     updateActiveBanner();
     loadProjectDraft(getCurrentProject());
     await scanTranslationJobs();
-  })();
+  })().catch(function(err){
+    storageReady = false;
+    console.error('Application initialization failed:', err);
+    showError('ไม่สามารถเปิดฐานข้อมูลของแอปได้อย่างปลอดภัย กรุณารีโหลดหน้าเว็บและลองอีกครั้ง');
+  });
 
 })();
 </script>
