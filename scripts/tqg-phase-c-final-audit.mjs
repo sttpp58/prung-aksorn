@@ -37,8 +37,8 @@ function git(args) {
   return (result.stdout || '').trim();
 }
 
-const report = read('TQG_PHASE_C_FINAL_AUDIT.md');
-const scope = read('TQG_SCOPE.md');
+const report = read('docs/tqg/TQG_PHASE_C_FINAL_AUDIT.md');
+const scope = read('docs/tqg/TQG_SCOPE.md');
 const regressionGate = read('scripts/regression-gate.mjs');
 const tqgRegression = read('scripts/tqg-regression.mjs');
 const detector = read('tqg.js');

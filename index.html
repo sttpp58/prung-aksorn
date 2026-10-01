@@ -2341,25 +2341,44 @@
 
   var saveDataTimer = null;
   var saveDataPending = false;
+  var saveDataVersion = 0;
 
   async function flushSaveData(){
     clearTimeout(saveDataTimer);
     saveDataTimer = null;
     if(!saveDataPending) return true;
+
+    var flushVersion = saveDataVersion;
     saveDataPending = false;
-    return await saveDataImmediate();
+    var ok = await saveDataImmediate();
+
+    // Preserve a newer pending change or a failed save for a subsequent flush.
+    if(!ok || saveDataVersion !== flushVersion){
+      saveDataPending = true;
+    }
+    return ok && saveDataVersion === flushVersion;
   }
 
   function saveData(){
     saveDataPending = true;
+    saveDataVersion += 1;
     clearTimeout(saveDataTimer);
     saveDataTimer = setTimeout(flushSaveData, 400);
     return true;
   }
 
-  window.addEventListener('beforeunload', function(){
+  function flushPendingSaveOnLifecycle(){
     if(saveDataPending) flushSaveData();
+  }
+
+  window.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'hidden') flushPendingSaveOnLifecycle();
   });
+
+  window.addEventListener('pagehide', flushPendingSaveOnLifecycle);
+
+  // Keep beforeunload as a last-attempt fallback; lifecycle handlers above are preferred.
+  window.addEventListener('beforeunload', flushPendingSaveOnLifecycle);
 
   function commitChange(){
     saveData();

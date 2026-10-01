@@ -245,6 +245,19 @@ function main() {
     /<script\b[^>]*\bsrc=["'](?:\.\/)?storage-v2\.js["'][^>]*>/i.test(indexHtml),
     'index.html loads storage-v2.js'
   );
+  assert(
+    /function\s+flushPendingSaveOnLifecycle\s*\(/.test(indexHtml) &&
+      /addEventListener\(['"]visibilitychange['"]/.test(indexHtml) &&
+      /document\.visibilityState\s*===\s*['"]hidden['"]/.test(indexHtml) &&
+      /addEventListener\(['"]pagehide['"]/.test(indexHtml),
+    'application flushes pending saves on page lifecycle transitions'
+  );
+  assert(
+    /var\s+saveDataVersion\s*=\s*0/.test(indexHtml) &&
+      /saveDataVersion\s*\+=\s*1/.test(indexHtml) &&
+      /!ok\s*\|\|\s*saveDataVersion\s*!==\s*flushVersion/.test(indexHtml),
+    'application preserves failed or newer pending saves'
+  );
 
   assert(
     /var\s+STORES\s*=\s*\[[^\]]*['"]translationJobs['"]/s.test(storage),
