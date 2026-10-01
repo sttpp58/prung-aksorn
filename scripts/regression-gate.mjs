@@ -266,8 +266,13 @@ function main() {
   );
 
   assert(
-    /function\s+flushPendingDraftSave\s*\([\s\S]*?draftSaveContext\s*=\s*null[\s\S]*?draftSaveGeneration\s*\+=\s*1[\s\S]*?proj\.draft\s*=\s*context\.draft[\s\S]*?proj\.chapterTitle\s*=\s*context\.chapterTitle/.test(indexHtml),
-    'pending draft is transferred to its captured project before context switches'
+    /function\s+loadProjectDraft\s*\([\s\S]*?var activeBook = getActiveBook\(proj\)[\s\S]*?if\(!activeBook\) return;[\s\S]*?chapterTitle\.value = activeBook\.chapterTitle[\s\S]*?inputText\.value = activeBook\.draft/.test(indexHtml),
+    'editor draft loads strictly from active Book'
+  );
+
+  assert(
+    /function\s+flushPendingDraftSave\s*\([\s\S]*?if\(!proj \|\| !context\.bookId\) return;[\s\S]*?var book = \(proj\.books \|\| \[\]\)\.find[\s\S]*?book\.draft = context\.draft[\s\S]*?book\.chapterTitle = context\.chapterTitle/.test(indexHtml),
+    'pending draft flush writes strictly to captured Book'
   );
 
   const draftSaveStart = indexHtml.indexOf('function saveDraftSoon(){');
@@ -275,23 +280,38 @@ function main() {
   assert(draftSaveStart >= 0 && draftSaveEnd > draftSaveStart, 'saveDraftSoon function can be audited');
   const draftSaveBody = indexHtml.slice(draftSaveStart, draftSaveEnd);
   assert(
-    draftSaveBody.includes('projectId: proj.id') &&
-      draftSaveBody.includes('bookId: proj.currentBookId || null') &&
-      draftSaveBody.includes('draft: inputText.value') &&
-      draftSaveBody.includes('chapterTitle: chapterTitle.value.trim()'),
-    'saveDraftSoon captures editor values with project/book context'
+    draftSaveBody.includes('var activeBook = getActiveBook(proj);') &&
+      draftSaveBody.includes('bookId: activeBook.id'),
+    'saveDraftSoon captures active Book identity'
   );
   const draftTimerStart = draftSaveBody.indexOf('draftSaveTimer = setTimeout(function(){');
-  assert(draftTimerStart >= 0, 'saveDraftSoon has a debounced timer');
+  assert(draftTimerStart >= 0, 'saveDraftSoon retains debounce timer');
   const draftTimerBody = draftSaveBody.slice(draftTimerStart);
   assert(
     draftTimerBody.includes('draftSaveContext.generation !== context.generation') &&
+      draftTimerBody.includes('context.bookId') &&
       draftTimerBody.includes('context.draft') &&
       draftTimerBody.includes('context.chapterTitle') &&
-      draftTimerBody.includes('targetProj') &&
       !draftTimerBody.includes('inputText.value') &&
       !draftTimerBody.includes('chapterTitle.value'),
-    'debounced draft callback writes only its captured snapshot'
+    'debounced callback writes only captured Book snapshot'
+  );
+
+  assert(
+    /function\s+loadData\s*\([\s\S]*?legacyDraft[\s\S]*?legacyChapterTitle[\s\S]*?activeBookHadDraft[\s\S]*?activeBookHadChapterTitle[\s\S]*?delete p\.draft[\s\S]*?delete p\.chapterTitle/.test(indexHtml),
+    'loadData migrates legacy Project draft metadata into active Book'
+  );
+
+  assert(
+    /defaultBook\s*=\s*\{[^\n]*draft:\s*['"]['"][^\n]*chapterTitle:\s*['"]['"]/.test(indexHtml) &&
+      /var newBook = \{[^\n]*draft:\s*['"]['"][^\n]*chapterTitle:\s*['"]['"]/.test(indexHtml),
+    'new Project and Book initialize Book-scoped draft'
+  );
+
+  assert(
+    /if\(!activeBookBeforeNormalize && p\.books\.length > 0\)/.test(indexHtml) &&
+      /if\(!activeBook && p\.books\.length > 0\)/.test(indexHtml),
+    'invalid currentBookId falls back to a real Book'
   );
 
   const projectSwitchStart = indexHtml.indexOf("row.addEventListener('click', function(){");
@@ -301,7 +321,7 @@ function main() {
       projectSwitch.includes('flushPendingDraftSave();') &&
       projectSwitch.includes('saveData();') &&
       projectSwitch.includes('loadProjectDraft(proj);'),
-    'project switch flushes pending draft and reloads editor context'
+    'project switch flushes pending draft before context mutation'
   );
 
   const bookSwitchStart = indexHtml.indexOf("btitle.addEventListener('click', function(e){");
@@ -311,7 +331,34 @@ function main() {
       bookSwitch.includes('flushPendingDraftSave();') &&
       bookSwitch.includes('commitChange();') &&
       bookSwitch.includes('loadProjectDraft(proj);'),
-    'book switch flushes pending draft and reloads editor context'
+    'book switch flushes pending draft before loading Book'
+  );
+
+  const newBookStart = indexHtml.indexOf("var newBook = { id: makeId('b')");
+  const newBookHandler = indexHtml.slice(Math.max(0, newBookStart - 220), newBookStart + 600);
+  assert(
+    newBookStart >= 0 &&
+      newBookHandler.includes('flushPendingDraftSave();') &&
+      newBookHandler.includes('proj.currentBookId = newBook.id;') &&
+      newBookHandler.includes('loadProjectDraft(proj);'),
+    'new Book creation switches to isolated empty editor state'
+  );
+
+  const bookDeleteStart = indexHtml.indexOf("bdel.addEventListener('click', async function(e){");
+  const bookDeleteHandler = indexHtml.slice(bookDeleteStart, bookDeleteStart + 1000);
+  assert(
+    bookDeleteStart >= 0 &&
+      bookDeleteHandler.includes('var wasActiveBook = proj.currentBookId === book.id;') &&
+      bookDeleteHandler.includes('flushPendingDraftSave();') &&
+      bookDeleteHandler.includes('proj.books = proj.books.filter') &&
+      bookDeleteHandler.includes('if(wasActiveBook) loadProjectDraft(proj);'),
+    'Book deletion reloads editor only when the deleted Book was active'
+  );
+
+  assert(
+    /function\s+normalize\s*\([\s\S]*?var book=without\(b,\['history'\]\)/.test(storage) &&
+      /function\s+hydrate\s*\([\s\S]*?ps\[b\.projectId\]\.books\.push\(bs\[b\.id\]\)/.test(storage),
+    'IndexedDB V2 preserves Book fields without adding a schema'
   );
 
   assert(

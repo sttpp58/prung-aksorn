@@ -2255,20 +2255,62 @@
     }
     if(!appData || typeof appData !== 'object') appData = { projects: [], currentProjectId: null };
     if(!Array.isArray(appData.projects)) appData.projects = [];
+    var migratedBookDrafts = false;
     appData.projects = appData.projects.filter(function(p){ return p && typeof p === 'object' && p.id && p.name; }).map(function(p){
+      var legacyDraft = typeof p.draft === 'string' ? p.draft : '';
+      var legacyChapterTitle = typeof p.chapterTitle === 'string' ? p.chapterTitle : '';
+      var hadLegacyDraftFields = Object.prototype.hasOwnProperty.call(p, 'draft') || Object.prototype.hasOwnProperty.call(p, 'chapterTitle');
+
       if(!Array.isArray(p.books) || p.books.length === 0){
-        p.books = [{ id: makeId('b'), title: 'เล่ม 1', history: Array.isArray(p.history) ? p.history : [] }];
+        p.books = [{ id: makeId('b'), title: 'เล่ม 1', history: Array.isArray(p.history) ? p.history : [], draft: legacyDraft, chapterTitle: legacyChapterTitle }];
         p.currentBookId = p.books[0].id;
+        if(hadLegacyDraftFields) migratedBookDrafts = true;
       } else {
-        p.books.forEach(function(b){ b.history = Array.isArray(b.history) ? b.history : []; });
+        if(!p.currentBookId && p.books.length > 0) p.currentBookId = p.books[0].id;
+        var activeBookBeforeNormalize = p.books.find(function(b){ return b.id === p.currentBookId; }) || null;
+        if(!activeBookBeforeNormalize && p.books.length > 0){
+          p.currentBookId = p.books[0].id;
+          activeBookBeforeNormalize = p.books[0];
+        }
+        var activeBookHadDraft = !!(activeBookBeforeNormalize && typeof activeBookBeforeNormalize.draft === 'string');
+        var activeBookHadChapterTitle = !!(activeBookBeforeNormalize && typeof activeBookBeforeNormalize.chapterTitle === 'string');
+
+        p.books.forEach(function(b){
+          b.history = Array.isArray(b.history) ? b.history : [];
+          b.draft = typeof b.draft === 'string' ? b.draft : '';
+          b.chapterTitle = typeof b.chapterTitle === 'string' ? b.chapterTitle : '';
+        });
+
+        var activeBook = p.books.find(function(b){ return b.id === p.currentBookId; }) || null;
+        if(activeBook){
+          if(!activeBookHadDraft && legacyDraft){
+            activeBook.draft = legacyDraft;
+            migratedBookDrafts = true;
+          }
+          if(!activeBookHadChapterTitle && legacyChapterTitle){
+            activeBook.chapterTitle = legacyChapterTitle;
+            migratedBookDrafts = true;
+          }
+        }
       }
+
       if(!p.currentBookId && p.books.length > 0) p.currentBookId = p.books[0].id;
+      var activeBook = p.books.find(function(b){ return b.id === p.currentBookId; }) || null;
+      if(!activeBook && p.books.length > 0){
+        p.currentBookId = p.books[0].id;
+        activeBook = p.books[0];
+      }
+      if(activeBook){
+        if(hadLegacyDraftFields) migratedBookDrafts = true;
+        delete p.draft;
+        delete p.chapterTitle;
+      }
+
       p.glossary = typeof p.glossary === 'string' ? p.glossary : '';
       p.context = typeof p.context === 'string' ? p.context : '';
-      p.draft = typeof p.draft === 'string' ? p.draft : '';
-      p.chapterTitle = typeof p.chapterTitle === 'string' ? p.chapterTitle : '';
       return p;
     });
+    if(migratedBookDrafts) saveData();
     appData.settings = Object.assign({}, defaultSettings, appData.settings || {});
     if(!appData.settings.apiStats) appData.settings.apiStats = { tokens: 0, cost: 0 };
   }
@@ -3035,9 +3077,12 @@
             if(proj.books.length <= 1){ await showAlertDialog('ทำไม่ได้', 'ต้องมีอย่างน้อย 1 เล่มในเรื่องนี้'); return; }
             var ok = await showConfirmDialog('ลบเล่ม', 'ต้องการลบเล่ม "' + book.title + '" พร้อมประวัติในเล่มหรือไม่? การลบไม่สามารถย้อนกลับได้', true);
             if(ok){
+              var wasActiveBook = proj.currentBookId === book.id;
+              flushPendingDraftSave();
               proj.books = proj.books.filter(function(b){ return b.id !== book.id; });
-              proj.currentBookId = proj.books[0].id;
+              if(wasActiveBook) proj.currentBookId = proj.books[0].id;
               commitChange();
+              if(wasActiveBook) loadProjectDraft(proj);
             }
           });
           brow.appendChild(bdel);
@@ -3140,10 +3185,12 @@
           e.stopPropagation();
           var bname = await showPromptDialog('ตั้งชื่อเล่ม/โฟลเดอร์ใหม่', 'เล่มที่ ' + (proj.books.length + 1));
           if(bname && bname.trim()){
-            var newBook = { id: makeId('b'), title: bname.trim(), history: [] };
+            var newBook = { id: makeId('b'), title: bname.trim(), history: [], draft: '', chapterTitle: '' };
+            flushPendingDraftSave();
             proj.books.push(newBook);
             proj.currentBookId = newBook.id;
             commitChange();
+            loadProjectDraft(proj);
           }
         });
         bookContainer.appendChild(addBookBtn);
@@ -3169,8 +3216,8 @@
   document.getElementById('addProjBtn').addEventListener('click', async function(){
     var name = await showPromptDialog('ตั้งชื่อเรื่องนิยาย', '');
     if(!name || !name.trim()) return;
-    var proj = { id: makeId('p'), name: name.trim(), glossary: '', context: '', draft: '', chapterTitle: '', books: [] };
-    var defaultBook = { id: makeId('b'), title: 'เล่ม 1', history: [] };
+    var proj = { id: makeId('p'), name: name.trim(), glossary: '', context: '', books: [] };
+    var defaultBook = { id: makeId('b'), title: 'เล่ม 1', history: [], draft: '', chapterTitle: '' };
     proj.books.push(defaultBook);
     proj.currentBookId = defaultBook.id;
     appData.projects.push(proj);
@@ -3664,14 +3711,16 @@
   
   function loadProjectDraft(proj){
     if(!proj) return;
+    var activeBook = getActiveBook(proj);
+    if(!activeBook) return;
     viewingHistoryId = null;
     pendingResume = null;
     if(resumeBtn) resumeBtn.classList.remove('show');
     document.body.classList.remove('history-mode');
     historyViewBanner.classList.remove('show');
     historyViewBannerBottom.classList.remove('show');
-    chapterTitle.value = proj.chapterTitle || '';
-    inputText.value = proj.draft || '';
+    chapterTitle.value = activeBook.chapterTitle || '';
+    inputText.value = activeBook.draft || '';
     inCount.textContent = countWords(inputText.value) + ' คำ';
     updateChunkInfo();
     highlightSuspicious(inputText.value);
@@ -3694,14 +3743,18 @@
     if(!context) return;
 
     var proj = appData.projects.find(function(p){ return p.id === context.projectId; }) || null;
-    if(!proj) return;
-    proj.draft = context.draft;
-    proj.chapterTitle = context.chapterTitle;
+    if(!proj || !context.bookId) return;
+    var book = (proj.books || []).find(function(b){ return b.id === context.bookId; }) || null;
+    if(!book) return;
+    book.draft = context.draft;
+    book.chapterTitle = context.chapterTitle;
   }
 
   function saveDraftSoon(){
     var proj = getCurrentProject();
     if(!proj) return;
+    var activeBook = getActiveBook(proj);
+    if(!activeBook) return;
     if(saveStatusText){
       saveStatusText.textContent = '⋯ กำลังบันทึก';
       saveStatusText.classList.add('saving');
@@ -3711,7 +3764,7 @@
     var context = {
       generation: draftSaveGeneration + 1,
       projectId: proj.id,
-      bookId: proj.currentBookId || null,
+      bookId: activeBook.id,
       draft: inputText.value,
       chapterTitle: chapterTitle.value.trim()
     };
