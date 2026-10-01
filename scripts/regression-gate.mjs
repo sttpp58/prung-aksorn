@@ -292,6 +292,11 @@ function main() {
       draftTimerBody.includes('context.bookId') &&
       draftTimerBody.includes('context.draft') &&
       draftTimerBody.includes('context.chapterTitle') &&
+      draftTimerBody.includes('targetBook') &&
+      draftTimerBody.includes('targetBook.draft = context.draft') &&
+      draftTimerBody.includes('targetBook.chapterTitle = context.chapterTitle') &&
+      !draftTimerBody.includes('targetProj.draft') &&
+      !draftTimerBody.includes('targetProj.chapterTitle') &&
       !draftTimerBody.includes('inputText.value') &&
       !draftTimerBody.includes('chapterTitle.value'),
     'debounced callback writes only captured Book snapshot'

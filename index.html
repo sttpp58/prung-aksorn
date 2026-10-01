@@ -3777,9 +3777,11 @@
       draftSaveContext = null;
 
       var targetProj = appData.projects.find(function(p){ return p.id === context.projectId; }) || null;
-      if(!targetProj) return;
-      targetProj.draft = context.draft;
-      targetProj.chapterTitle = context.chapterTitle;
+      if(!targetProj || !context.bookId) return;
+      var targetBook = (targetProj.books || []).find(function(b){ return b.id === context.bookId; }) || null;
+      if(!targetBook) return;
+      targetBook.draft = context.draft;
+      targetBook.chapterTitle = context.chapterTitle;
       saveData();
     }, 450);
   }
