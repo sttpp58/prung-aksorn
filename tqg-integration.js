@@ -12,6 +12,40 @@
 
   const OBSERVABILITY_SCHEMA_VERSION = 'TQG-OBS-01';
   const OBSERVABILITY_PHASE = 'D';
+  const MAX_OBSERVATION_EVENT_CHARS = 4096;
+  const MAX_AI_CALLS_PER_EVENT = 1;
+  const MAX_TRANSPORT_CALLS_PER_EVENT = 1;
+  const MAX_FINDINGS_PER_EVENT = 64;
+  const FORBIDDEN_OBSERVABILITY_KEYS = Object.freeze(new Set([
+    'sourcetext',
+    'targettext',
+    'translationtext',
+    'translation',
+    'suspicioustext',
+    'fullfindingtext',
+    'fullprompt',
+    'systemprompt',
+    'userprompt',
+    'rawairesponse',
+    'replacementtext',
+    'glossarytext',
+    'glossarycontents',
+    'booktitle',
+    'chaptertitle',
+    'chaptertext',
+    'sourcechapter',
+    'userid',
+    'email',
+    'credentials',
+    'apikey',
+    'apikeys',
+    'authorizationheaders',
+    'cookies',
+    'sessiontokens',
+    'backuppayloads',
+    'recoverypayloads'
+  ]));
+
   const OBSERVABILITY_EVENTS = Object.freeze([
     'tqg.output.completed',
     'tqg.detection.completed',
@@ -181,8 +215,29 @@
     );
   }
 
+  function normalizeTelemetryKey(key) {
+    return text(key).toLowerCase().replace(/[\s_-]+/g, '');
+  }
+
+  function containsForbiddenTelemetryKey(value, seen = new Set()) {
+    if (!value || typeof value !== 'object') return false;
+    if (seen.has(value)) return false;
+    seen.add(value);
+    for (const key of Object.keys(value)) {
+      if (FORBIDDEN_OBSERVABILITY_KEYS.has(normalizeTelemetryKey(key))) {
+        return true;
+      }
+      const nested = value[key];
+      if (nested && typeof nested === 'object' && containsForbiddenTelemetryKey(nested, seen)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function buildObservationEvent(eventName, fields = {}) {
     if (!OBSERVABILITY_EVENTS.includes(eventName)) return null;
+    if (containsForbiddenTelemetryKey(fields)) return null;
     const allowed = OBSERVABILITY_ALLOWED_FIELDS[eventName];
     const event = {
       schemaVersion: OBSERVABILITY_SCHEMA_VERSION,
@@ -205,6 +260,7 @@
 
   function validateObservationEvent(event) {
     if (!event || typeof event !== 'object') return false;
+    if (containsForbiddenTelemetryKey(event)) return false;
     if (!OBSERVABILITY_EVENTS.includes(event.event)) return false;
     if (event.schemaVersion !== OBSERVABILITY_SCHEMA_VERSION) return false;
     if (event.phase !== OBSERVABILITY_PHASE) return false;
@@ -224,6 +280,7 @@
     }
     if (event.findingCodes !== undefined) {
       if (!Array.isArray(event.findingCodes)) return false;
+      if (event.findingCodes.length > MAX_FINDINGS_PER_EVENT) return false;
       if (!event.findingCodes.every((code) => OBSERVABILITY_FINDING_CODES.includes(code))) return false;
     }
     if (event.findingCount !== undefined && !Number.isInteger(event.findingCount)) return false;
@@ -237,6 +294,9 @@
     for (const key of ['aiCalls', 'transportCalls', 'findingCount']) {
       if (event[key] !== undefined && !Number.isInteger(event[key])) return false;
     }
+    if (event.aiCalls !== undefined && event.aiCalls > MAX_AI_CALLS_PER_EVENT) return false;
+    if (event.transportCalls !== undefined && event.transportCalls > MAX_TRANSPORT_CALLS_PER_EVENT) return false;
+    if (event.findingCount !== undefined && event.findingCount > MAX_FINDINGS_PER_EVENT) return false;
     if (event.accepted !== undefined && typeof event.accepted !== 'boolean') return false;
     if (event.revalidated !== undefined && typeof event.revalidated !== 'boolean') return false;
     if (event.errorClass !== undefined && !OBSERVABILITY_ERROR_CLASSES.includes(event.errorClass)) return false;
@@ -254,6 +314,15 @@
     }
     if (event.event === 'tqg.revalidation.completed' && event.status === 'COMPLETED' &&
         typeof event.revalidated !== 'boolean') {
+      return false;
+    }
+    let serialized;
+    try {
+      serialized = JSON.stringify(event);
+    } catch (_error) {
+      return false;
+    }
+    if (typeof serialized !== 'string' || serialized.length > MAX_OBSERVATION_EVENT_CHARS) {
       return false;
     }
     return true;
@@ -680,6 +749,10 @@
     version: 'TQG-08-2026-09-30',
     STATUSES,
     OBSERVABILITY_SCHEMA_VERSION,
+    MAX_OBSERVATION_EVENT_CHARS,
+    MAX_AI_CALLS_PER_EVENT,
+    MAX_TRANSPORT_CALLS_PER_EVENT,
+    MAX_FINDINGS_PER_EVENT,
     OBSERVABILITY_EVENTS,
     OBSERVABILITY_CONTEXTS,
     OBSERVABILITY_STATUSES,
