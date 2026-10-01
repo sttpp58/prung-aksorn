@@ -523,9 +523,13 @@ function main() {
     assert(start >= 0, name + ' remains present for async-isolation audit');
   }
 
-  const singleTranslationBody = runTranslationBody;
+  const singleTranslationStart = indexHtml.indexOf('async function runTranslation(');
+  const singleTranslationEnd = indexHtml.indexOf('\\n  var batchInProgress', singleTranslationStart);
+  const singleTranslationBody = indexHtml.slice(singleTranslationStart, singleTranslationEnd);
   assert(
-    singleTranslationBody.includes('if(isAppContextCurrent(translationContext)){') &&
+    singleTranslationStart >= 0 &&
+      singleTranslationEnd > singleTranslationStart &&
+      singleTranslationBody.includes('if(isAppContextCurrent(translationContext)){') &&
       singleTranslationBody.includes("if(err.name !== 'AbortError' && isAppContextCurrent(translationContext))") &&
       singleTranslationBody.includes('if(translationContextCurrent) clearTranslationRecoveryUI();'),
     'single translation gates stale success/error/recovery UI'
