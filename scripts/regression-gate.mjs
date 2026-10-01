@@ -802,6 +802,71 @@ function main() {
     'B12 result download revokes its object URL after triggering the download'
   );
 
+  assert(indexHtml.includes('var storageReady = false;') && indexHtml.includes('storageReady = true;') && indexHtml.includes('return false;'), 'Production hardening keeps storage readiness fail-safe');
+
+  const hardeningSaveStart = indexHtml.indexOf('async function saveDataImmediate(){');
+  const hardeningSaveEnd = indexHtml.indexOf('  function commitChange(){', hardeningSaveStart);
+  const hardeningSaveBody = indexHtml.slice(hardeningSaveStart, hardeningSaveEnd);
+  assert(
+    hardeningSaveStart >= 0 &&
+      hardeningSaveBody.includes('if(!storageReady)') &&
+      hardeningSaveBody.includes('var saveRetryTimer = null;') &&
+      hardeningSaveBody.includes('var saveDataInFlight = null;') &&
+      hardeningSaveBody.includes('var SAVE_RETRY_DELAYS = [1000, 3000, 10000];') &&
+      hardeningSaveBody.includes('function scheduleSaveRetry(){') &&
+      hardeningSaveBody.includes('if(saveDataInFlight) return saveDataInFlight;') &&
+      hardeningSaveBody.includes('if(!ok){') &&
+      hardeningSaveBody.includes('scheduleSaveRetry();') &&
+      hardeningSaveBody.includes('else if(!saveDataTimer){') &&
+      hardeningSaveBody.includes('saveDataTimer = setTimeout(flushSaveData, 400);'),
+    'Production hardening serializes autosave and retries bounded failures'
+  );
+
+  const scriptLoaderStart = indexHtml.indexOf('function loadScript(src, integrity){');
+  const scriptLoaderEnd = indexHtml.indexOf("  document.getElementById('exportDocxBtn')", scriptLoaderStart);
+  const scriptLoaderBody = indexHtml.slice(scriptLoaderStart, scriptLoaderEnd);
+  assert(
+    scriptLoaderStart >= 0 &&
+      scriptLoaderBody.includes('SCRIPT_LOAD_PROMISES[src]') &&
+      scriptLoaderBody.includes("s.addEventListener('load', onLoad") &&
+      scriptLoaderBody.includes("s.addEventListener('error', onError") &&
+      scriptLoaderBody.includes('timer = setTimeout(onError, 15000);'),
+    'Production hardening makes dynamic CDN loading concurrency-safe with timeout'
+  );
+
+  const backupReaderStart = indexHtml.indexOf("document.getElementById('backupFile').addEventListener('change'");
+  const backupReaderEnd = indexHtml.indexOf("reader.readAsText(file, 'UTF-8');", backupReaderStart);
+  const backupReaderBody = indexHtml.slice(backupReaderStart, backupReaderEnd);
+  assert(
+    backupReaderStart >= 0 &&
+      backupReaderBody.includes('reader.onerror = function(){') &&
+      backupReaderBody.includes('reader.onabort = function(){'),
+    'Production hardening handles backup file read failure and abort'
+  );
+
+  const ingestListenerForHardening = indexHtml.slice(indexHtml.indexOf("window.addEventListener('message', function(e)"));
+  assert(
+    ingestListenerForHardening.includes('importExternalChapter(ingestMessage.title, ingestMessage.content, ingestMessage.autoStart)') &&
+      ingestListenerForHardening.includes('.catch(function(err){') &&
+      ingestListenerForHardening.includes("console.error('External chapter import failed:'"),
+    'Production hardening closes the external ingestion Promise rejection boundary'
+  );
+
+  const initHardeningStart = indexHtml.indexOf('(async function initApp(){');
+  const initHardeningBody = indexHtml.slice(initHardeningStart);
+  assert(
+    initHardeningBody.includes('var loaded = await loadData();') &&
+      initHardeningBody.includes("if(!loaded) throw new Error('IndexedDB initialization failed.');") &&
+      initHardeningBody.includes('})().catch(function(err){'),
+    'Production hardening fail-closes application initialization errors'
+  );
+
+  assert(
+    indexHtml.includes("window.addEventListener('unhandledrejection', function(event){") &&
+      indexHtml.includes("window.addEventListener('error', function(event){"),
+    'Production hardening installs runtime error observability boundaries'
+  );
+
   const staleTimerPattern = /setTimeout\(function\(\)\s*\{\s*if\s*\(readerCurrentBook\)\s*\{/;
   assert(!staleTimerPattern.test(indexHtml), 'Reader stale mutable-book timer pattern is absent');
 
