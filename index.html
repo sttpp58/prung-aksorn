@@ -5301,15 +5301,20 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     navigator.clipboard.writeText(output.textContent).then(function(){
       copyBtn.textContent = 'คัดลอกแล้ว';
       setTimeout(function(){ copyBtn.textContent = 'คัดลอก'; }, 1500);
+    }).catch(function(err){
+      console.error('Clipboard copy failed:', err);
+      showError('ไม่สามารถคัดลอกข้อความไปยังคลิปบอร์ดได้');
     });
   });
 
   downloadBtn.addEventListener('click', function(){
     var blob = new Blob([output.textContent], { type: 'text/plain;charset=utf-8' });
     var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    var objectUrl = URL.createObjectURL(blob);
+    a.href = objectUrl;
     a.download = safeFilename(getCurrentProject() ? getCurrentProject().name : '') + '-ผลลัพธ์.txt';
     a.click();
+    setTimeout(function(){ URL.revokeObjectURL(objectUrl); }, 0);
   });
 
   var SRI_MAP = {
@@ -5748,7 +5753,9 @@ function setReaderFontSize(size, persist) {
     readerTtsBar.classList.add('show');
     if(ttsState === 'paused' && ttsIndex >= 0){
       ttsState = 'playing';
-      speakIndex(ttsIndex);
+      window.speechSynthesis.resume();
+      ttsStatusText.textContent = 'กำลังอ่าน ' + (ttsIndex + 1) + '/' + ttsQueue.length;
+      updatePlayPauseIcon();
     } else {
       var startEl = findStartElementFromScroll();
       var startIdx = buildTtsQueue(startEl);
@@ -5764,7 +5771,7 @@ function setReaderFontSize(size, persist) {
   function pauseTts(){
     if(!ttsSupported) return;
     ttsState = 'paused';
-    window.speechSynthesis.cancel();
+    window.speechSynthesis.pause();
     ttsStatusText.textContent = 'หยุดชั่วคราว';
     updatePlayPauseIcon();
   }
@@ -5811,8 +5818,9 @@ function setReaderFontSize(size, persist) {
 
   ttsNextBtn.addEventListener('click', function(){
     if(!ttsQueue.length){ playTts(); return; }
+    if(ttsIndex >= ttsQueue.length - 1) return;
     var wasPlaying = (ttsState === 'playing');
-    var newIdx = Math.min(ttsQueue.length - 1, ttsIndex + 1);
+    var newIdx = ttsIndex + 1;
     if(wasPlaying){ speakIndex(newIdx); }
     else {
       ttsIndex = newIdx; clearTtsHighlight();
