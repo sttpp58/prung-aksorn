@@ -912,6 +912,48 @@ function main() {
     'Translation Job Recovery Stress CI action references remain pinned'
   );
 
+  const semanticGoldRunnerPath = path.join(ROOT, 'scripts', 'tqg-semantic-gold-target-validation.mjs');
+  const semanticGoldWorkflowPath = path.join(ROOT, '.github', 'workflows', 'tqg-semantic-gold-target-validation.yml');
+  const semanticGoldDocPath = path.join(ROOT, 'docs', 'tqg', 'TQG_SEMANTIC_GOLD_TARGET_VALIDATION.md');
+  assert(fs.existsSync(semanticGoldRunnerPath), 'TQG semantic gold-target runner is present');
+  assert(fs.existsSync(semanticGoldWorkflowPath), 'TQG semantic gold-target CI workflow is present');
+  assert(fs.existsSync(semanticGoldDocPath), 'TQG semantic gold-target scope document is present');
+  const semanticGoldRunner = fs.readFileSync(semanticGoldRunnerPath, 'utf8');
+  const semanticGoldWorkflow = fs.readFileSync(semanticGoldWorkflowPath, 'utf8');
+  const semanticGoldDoc = fs.readFileSync(semanticGoldDocPath, 'utf8');
+  for (const caseId of [
+    'TQG-REPAIR-001',
+    'TQG-REPAIR-002',
+    'TQG-REPAIR-004',
+    'TQG-REPAIR-005',
+    'TQG-REPAIR-006'
+  ]) {
+    assert(
+      semanticGoldRunner.includes(caseId),
+      'semantic gold-target runner retains synthetic fixture: ' + caseId
+    );
+  }
+  assert(
+    semanticGoldRunner.includes('TQG_SEMANTIC_GOLD_DATASET') &&
+      semanticGoldRunner.includes('GOLD_REVIEWED') &&
+      semanticGoldRunner.includes('independentReviewers'),
+    'semantic gold-target runner requires an independently reviewed private dataset'
+  );
+  assert(
+    semanticGoldRunner.includes('acceptableGoldMatchRate === 1'),
+    'semantic gold-target runner enforces a 100% acceptable-gold match gate'
+  );
+  assert(
+    semanticGoldWorkflow.includes('actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1') &&
+      semanticGoldWorkflow.includes('actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'),
+    'semantic gold-target CI action references remain pinned'
+  );
+  assert(
+    semanticGoldDoc.includes('Real-world semantic repair accuracy') &&
+      semanticGoldDoc.includes('NOT CLAIMED / DEFERRED'),
+    'semantic gold-target document preserves the real-world evidence boundary'
+  );
+
   const staleTimerPattern = /setTimeout\(function\(\)\s*\{\s*if\s*\(readerCurrentBook\)\s*\{/;
   assert(!staleTimerPattern.test(indexHtml), 'Reader stale mutable-book timer pattern is absent');
 
