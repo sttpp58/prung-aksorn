@@ -58,7 +58,8 @@ Every case must retain:
     sourceText
     brokenTargetText
     glossaryText
-    tqgSnapshot
+    tqgBaselineSnapshot
+    tqgCurrentSnapshot
     repairSpan
     candidateTargetText
     goldTargetText
@@ -117,8 +118,10 @@ The default deterministic review set is:
 Selection is deterministic and round-robin by the existing C2 sampling
 buckets and case ID.
 
-The runner replays the current deterministic TQG analyzer and requires the
-current status and finding-code set to match the locked C2 snapshot.
+The runner replays the current deterministic TQG analyzer and captures both
+the original C2 baseline snapshot and the current detector snapshot. A later
+controlled Work 2 detector hardening may therefore change the current
+snapshot without invalidating the provenance of the original C2 case.
 
 The runner does not produce:
 
@@ -195,7 +198,8 @@ tests/tqg/tqg-work1-semantic-gold-regression.mjs verifies:
     validator self-test -> PASS
     local C2 preparation -> deterministic 32/16 review template
     prepared cases cannot self-identify as GOLD_REVIEWED
-    semantic target hashes are not fabricated
+  baseline/current detector snapshots are explicit
+  semantic target hashes are not fabricated
 
 The regression is intended to run without private data in public CI.
 

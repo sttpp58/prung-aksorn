@@ -80,8 +80,11 @@ check(parsed.cases
   .every(item => item.repairSpan &&
     item.repairSpan.end - item.repairSpan.start <= 2000),
   'prepared repair spans stay within the locked 2000-character boundary');
-check(parsed.cases.every(item => item.review.status === 'PENDING' &&
+check(parsed.cases.every(item =>
+  item.review.status === 'PENDING' &&
   item.review.independentReviewers === 0 &&
+  item.tqgBaselineSnapshot &&
+  item.tqgCurrentSnapshot &&
   item.candidateTargetText === null &&
   item.goldTargetText === null),
   'prepared cases cannot be mistaken for adjudicated gold');

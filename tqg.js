@@ -108,7 +108,7 @@
   function wordTokens(value) {
     const source = text(value);
     const tokens = [];
-    const pattern = /[\p{L}\p{N}]+(?:[’'\-][\p{L}\p{N}]+)*/gu;
+    const pattern = /[\p{L}\p{M}\p{N}]+(?:[’'\-][\p{L}\p{M}\p{N}]+)*/gu;
     let match;
     while ((match = pattern.exec(source)) !== null) {
       tokens.push({
@@ -518,7 +518,42 @@
   function findRepeatedText(targetText) {
     const tokens = wordTokens(targetText);
     const tokenCount = tokens.length;
-    if (tokenCount < 2) return null;
+    let best = null;
+
+    const consider = (candidate) => {
+      if (!candidate || candidate.text.length < CONFIG.minRepeatChars) return;
+      if (!best ||
+        candidate.text.length > best.text.length ||
+        (candidate.text.length === best.text.length && candidate.start < best.start)
+      ) {
+        best = candidate;
+      }
+    };
+
+    // Unicode-safe guard for exact duplicated Thai lexical units inside a
+    // larger token. The minimum length, valid Thai-letter start, and diversity
+    // requirements keep short reduplication/sound effects out of this detector.
+    for (const token of tokens) {
+      if (!/[\u0E00-\u0E7F]/u.test(token.text)) continue;
+      const pattern = /([\u0E00-\u0E7F]{6,})\1/gu;
+      let match;
+      while ((match = pattern.exec(token.text)) !== null) {
+        const repeatedUnit = match[1];
+        if (!/[ก-ฮ]/u.test(repeatedUnit[0])) continue;
+        const uniqueThaiLetters = new Set(
+          [...repeatedUnit].filter(character => /[ก-ฮ]/u.test(character))
+        );
+        if (uniqueThaiLetters.size < 3) continue;
+        consider({
+          start: token.start + match.index,
+          end: token.start + match.index + match[0].length,
+          text: match[0],
+          repeats: 2
+        });
+      }
+    }
+
+    if (tokenCount < 2) return best;
 
     // Preserve the exact "largest repeated adjacent token sequence" semantics
     // while avoiding the previous slice/join work inside a cubic nested loop.
@@ -526,8 +561,6 @@
     // pair of token positions in O(n^2) time and O(n) memory.
     let nextRow = new Uint32Array(tokenCount + 1);
     let currentRow = new Uint32Array(tokenCount + 1);
-
-    let best = null;
 
     for (let start = tokenCount - 1; start >= 0; start -= 1) {
       const maxLength = Math.floor((tokenCount - start) / 2);

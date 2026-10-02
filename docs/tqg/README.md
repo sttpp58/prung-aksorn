@@ -14,6 +14,10 @@
 
 - [WORK 1 Contract](TQG_WORK1_INDEPENDENT_SEMANTIC_GOLD.md)
 
+## WORK 2 — Evidence-Based Effectiveness Hardening
+
+- [WORK 2 Hardening](TQG_WORK2_EFFECTIVENESS_HARDENING.md)
+
 ## Phase D — Observability / Operations
 
 - [Observability Contract](TQG_PHASE_D_OBSERVABILITY_CONTRACT.md)

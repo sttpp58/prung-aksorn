@@ -84,8 +84,12 @@ function validateCommonCase(item) {
     item.caseId + ': sourceText is required');
   check(typeof item.brokenTargetText === 'string' && item.brokenTargetText.length > 0,
     item.caseId + ': brokenTargetText is required');
-  check(item.tqgSnapshot && Array.isArray(item.tqgSnapshot.codes),
-    item.caseId + ': tqgSnapshot is required');
+  check(item.tqgBaselineSnapshot &&
+    Array.isArray(item.tqgBaselineSnapshot.codes),
+    item.caseId + ': tqgBaselineSnapshot is required');
+  check(item.tqgCurrentSnapshot &&
+    Array.isArray(item.tqgCurrentSnapshot.codes),
+    item.caseId + ': tqgCurrentSnapshot is required');
   check(item.contentHashes && typeof item.contentHashes === 'object',
     item.caseId + ': contentHashes are required');
   check(item.contentHashes.source === sha256(item.sourceText),
@@ -112,8 +116,9 @@ function validateRepairCase(item) {
   check(item.expectedAction === REPAIR_ACTION, item.caseId + ': repair case action mismatch');
   check(REPAIR_LABELS.has(item.goldLabel),
     item.caseId + ': REPAIR action requires an anomaly gold label');
-  check(item.tqgSnapshot && item.tqgSnapshot.detectorVersion === TQG.version,
-    item.caseId + ': detector version drifted from the captured snapshot');
+  check(item.tqgCurrentSnapshot &&
+    item.tqgCurrentSnapshot.detectorVersion === TQG.version,
+    item.caseId + ': detector version drifted from the captured current snapshot');
   check(item.repairSpan && REQUIRED_REPAIR_CODES.has(item.repairSpan.code),
     item.caseId + ': eligible bounded repair span is required');
   check(item.brokenTargetText.slice(item.repairSpan.start, item.repairSpan.end) === item.repairSpan.text,
@@ -148,12 +153,12 @@ function validateRepairCase(item) {
     targetText: item.brokenTargetText,
     glossaryText: item.glossaryText || ''
   });
-  check(brokenAnalysis.status === item.tqgSnapshot.status,
-    item.caseId + ': broken-target status drifted from captured TQG snapshot');
+  check(brokenAnalysis.status === item.tqgCurrentSnapshot.status,
+    item.caseId + ': broken-target status drifted from captured current TQG snapshot');
   check(
     JSON.stringify([...new Set(brokenAnalysis.findings.map(f => f.code))].sort()) ===
-      JSON.stringify([...new Set(item.tqgSnapshot.codes || [])].sort()),
-    item.caseId + ': broken-target finding-code set drifted from captured TQG snapshot'
+      JSON.stringify([...new Set(item.tqgCurrentSnapshot.codes || [])].sort()),
+    item.caseId + ': broken-target finding-code set drifted from captured current TQG snapshot'
   );
   const capturedFinding = brokenAnalysis.findings.find(f =>
     f.code === item.repairSpan.code &&
@@ -218,7 +223,16 @@ function runSelfTest() {
     sourceText: 'She walked home.',
     brokenTargetText: 'นาง walked home',
     glossaryText: '',
-    tqgSnapshot: {
+    tqgBaselineSnapshot: {
+      status: 'HIGH_SUSPICION',
+      codes: [
+        'FOREIGN_SCRIPT_SPAN',
+        'MIXED_LANGUAGE_SPAN',
+        'SOURCE_LANGUAGE_RESIDUE',
+        'SOURCE_TEXT_OVERLAP'
+      ]
+    },
+    tqgCurrentSnapshot: {
       status: 'HIGH_SUSPICION',
       codes: [
         'FOREIGN_SCRIPT_SPAN',
