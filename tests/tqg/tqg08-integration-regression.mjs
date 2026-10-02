@@ -148,6 +148,11 @@ for (const functionName of ['runTranslation', 'runSingleTranslationForBatch', 'r
   const completion = body.lastIndexOf('completeTranslationJob(');
   const integrationCall = body.lastIndexOf('analyzeTQGCompletedOutput(');
   check(completion >= 0 && integrationCall > completion, functionName + ' runs TQG only after completion');
+  if (functionName === 'runTranslation') {
+    const finalOutputRender = body.lastIndexOf('setOutput(translationOutput);');
+    check(finalOutputRender >= 0 && integrationCall > finalOutputRender,
+      'runTranslation runs TQG only after the final translation output render');
+  }
 }
 
 const checkpointPos = indexSource.indexOf('checkpointTranslationJob(');

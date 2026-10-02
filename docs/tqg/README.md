@@ -18,6 +18,10 @@
 
 - [WORK 2 Hardening](TQG_WORK2_EFFECTIVENESS_HARDENING.md)
 
+## WORK 3 — Production Assurance
+
+- [WORK 3 Production Assurance](TQG_WORK3_PRODUCTION_ASSURANCE.md)
+
 ## Phase D — Observability / Operations
 
 - [Observability Contract](TQG_PHASE_D_OBSERVABILITY_CONTRACT.md)
