@@ -840,9 +840,10 @@ if (work1Regression.status !== 0) {
   fail('WORK 1 semantic-gold regression failed' +
     (work1Regression.stderr ? ': ' + work1Regression.stderr.trim() : ''));
 }
+const work1Result = /TQG WORK 1 Regression: (PASS|DEFERRED)/.exec(work1Regression.stdout);
 check(
-  /TQG WORK 1 Regression: PASS/.test(work1Regression.stdout),
-  'WORK 1 semantic-gold regression passes'
+  Boolean(work1Result),
+  'WORK 1 semantic-gold regression passes or explicitly defers without private data'
 );
 
 const work2RegressionPath = path.join(ROOT, 'tests', 'tqg', 'tqg-work2-effectiveness-regression.mjs');

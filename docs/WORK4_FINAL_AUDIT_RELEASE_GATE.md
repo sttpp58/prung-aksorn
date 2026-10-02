@@ -106,7 +106,7 @@ WORK 4 does not authorize changes to:
 - TQG Inspector semantics;
 - TQG Repair semantics.
 
-The release gate compares protected file Git blobs to the resolved release base. For pull requests, the base is the first parent of GitHub’s synthetic merge checkout, which remains available with shallow checkout; locally it uses `main` and falls back to `origin/main` or `HEAD`. The only exception is `tqg-integration.js`, where the gate permits exactly one approved transformation: forwarding `input.exceptions` into the deterministic analyzer. Any other byte drift fails the gate.
+The release gate compares protected file Git blobs to the resolved release base. For pull requests, the gate reads the exact `pull_request.base.sha` from `GITHUB_EVENT_PATH`, fetches that commit shallowly from `origin`, and uses `FETCH_HEAD` as the immutable release base. Protected-file comparisons use the two commit trees directly so the gate does not require a merge base in a shallow checkout. Locally it uses `main` and falls back to `origin/main` or `HEAD`. The only exception is `tqg-integration.js`, where the gate permits exactly one approved transformation: forwarding `input.exceptions` into the deterministic analyzer. Any other byte drift fails the gate.
 
     storage-v2.js
     sw.js

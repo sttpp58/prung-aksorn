@@ -36,7 +36,13 @@ function git(args) {
 
 function resolveReleaseBase() {
   if (process.env.GITHUB_EVENT_NAME === 'pull_request') {
-    return git(['rev-parse', 'HEAD^1']);
+    const eventPath = process.env.GITHUB_EVENT_PATH;
+    assert.ok(eventPath && fs.existsSync(eventPath), 'GitHub pull_request event payload is available');
+    const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+    const baseSha = event && event.pull_request && event.pull_request.base && event.pull_request.base.sha;
+    assert.match(String(baseSha || ''), /^[0-9a-fA-F]{40}$/, 'GitHub pull_request base SHA is valid');
+    git(['fetch', '--no-tags', '--depth=1', 'origin', baseSha]);
+    return git(['rev-parse', 'FETCH_HEAD']);
   }
   try {
     return git(['rev-parse', 'main']);
@@ -197,7 +203,7 @@ const PROTECTED_FILES = [
 ];
 
 function isApprovedTQGIntegrationFix() {
-  const diff = git(['diff', '--unified=0', RELEASE_BASE + '...HEAD', '--', 'tqg-integration.js']);
+  const diff = git(['diff', '--unified=0', RELEASE_BASE, 'HEAD', '--', 'tqg-integration.js']);
   const changedLines = diff
     .split(/\r?\n/)
     .filter((line) => /^[+-](?![+-])/.test(line))
