@@ -10,6 +10,18 @@
 
 - [Phase C Final Audit](TQG_PHASE_C_FINAL_AUDIT.md)
 
+## WORK 1 — Independent Semantic Gold / Repair Accuracy
+
+- [WORK 1 Contract](TQG_WORK1_INDEPENDENT_SEMANTIC_GOLD.md)
+
+## WORK 2 — Evidence-Based Effectiveness Hardening
+
+- [WORK 2 Hardening](TQG_WORK2_EFFECTIVENESS_HARDENING.md)
+
+## WORK 3 — Production Assurance
+
+- [WORK 3 Production Assurance](TQG_WORK3_PRODUCTION_ASSURANCE.md)
+
 ## Phase D — Observability / Operations
 
 - [Observability Contract](TQG_PHASE_D_OBSERVABILITY_CONTRACT.md)

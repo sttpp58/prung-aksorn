@@ -912,6 +912,34 @@ function main() {
     'Translation Job Recovery Stress CI action references remain pinned'
   );
 
+  const tqgProductionAssurancePath = path.join(ROOT, 'tests', 'e2e', 'tqg-production-assurance.mjs');
+  const tqgProductionAssuranceWorkflowPath = path.join(ROOT, '.github', 'workflows', 'tqg-production-assurance.yml');
+  const tqgProductionAssuranceDocPath = path.join(ROOT, 'docs', 'tqg', 'TQG_WORK3_PRODUCTION_ASSURANCE.md');
+  assert(fs.existsSync(tqgProductionAssurancePath), 'TQG Production Assurance browser runner is present');
+  assert(fs.existsSync(tqgProductionAssuranceWorkflowPath), 'TQG Production Assurance CI workflow is present');
+  assert(fs.existsSync(tqgProductionAssuranceDocPath), 'TQG Production Assurance scope document is present');
+  const tqgProductionAssurance = fs.readFileSync(tqgProductionAssurancePath, 'utf8');
+  const tqgProductionAssuranceWorkflow = fs.readFileSync(tqgProductionAssuranceWorkflowPath, 'utf8');
+  const tqgProductionAssuranceDoc = fs.readFileSync(tqgProductionAssuranceDocPath, 'utf8');
+  assert(
+    tqgProductionAssurance.includes('TQG Production Assurance: PASS') &&
+      tqgProductionAssurance.includes('window.TQG') &&
+      tqgProductionAssurance.includes('SOURCE_LANGUAGE_RESIDUE') &&
+      tqgProductionAssurance.includes('no unexpected external calls'),
+    'TQG Production Assurance covers runtime, suspicious-output, and network isolation gates'
+  );
+  assert(
+    tqgProductionAssuranceWorkflow.includes('actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1') &&
+      tqgProductionAssuranceWorkflow.includes('actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'),
+    'TQG Production Assurance CI action references remain pinned'
+  );
+  assert(
+    tqgProductionAssuranceDoc.includes('Production defect found') &&
+      tqgProductionAssuranceDoc.includes('Completion-boundary rule') &&
+      tqgProductionAssuranceDoc.includes('WORK 1'),
+    'TQG Production Assurance document preserves the scope and evidence boundary'
+  );
+
   const semanticGoldRunnerPath = path.join(ROOT, 'scripts', 'tqg-semantic-gold-target-validation.mjs');
   const semanticGoldWorkflowPath = path.join(ROOT, '.github', 'workflows', 'tqg-semantic-gold-target-validation.yml');
   const semanticGoldDocPath = path.join(ROOT, 'docs', 'tqg', 'TQG_SEMANTIC_GOLD_TARGET_VALIDATION.md');

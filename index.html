@@ -5061,9 +5061,6 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
       await PrungAksornStorageV2.completeTranslationJob(translationJobId, translationJobRevision);
       var translationOutput = results.join('\n\n');
       var translationContextCurrent = isAppContextCurrent(translationContext);
-      if(translationContextCurrent){
-        analyzeTQGCompletedOutput(sourceSnapshotText || normalizeOCR(originalText || ''), translationOutput, proj);
-      }
       activeTranslationJobRevision = null;
       pendingResume = null;
       activeTranslationJobId = null;
@@ -5077,6 +5074,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
 
       if(translationContextCurrent){
         setOutput(translationOutput);
+        analyzeTQGCompletedOutput(sourceSnapshotText || normalizeOCR(originalText || ''), translationOutput, proj);
         viewingHistoryId = newEntry.id;
         stamp.classList.add('show');
         setResultFocus(true);

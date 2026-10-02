@@ -829,5 +829,37 @@ check(
   'production TQG actions remain translate-only'
 );
 
+const work1RegressionPath = path.join(ROOT, 'tests', 'tqg', 'tqg-work1-semantic-gold-regression.mjs');
+check(fs.existsSync(work1RegressionPath), 'WORK 1 semantic-gold regression is present');
+const work1Regression = spawnSync(process.execPath, [work1RegressionPath], {
+  cwd: ROOT,
+  encoding: 'utf8',
+  maxBuffer: 8 * 1024 * 1024
+});
+if (work1Regression.status !== 0) {
+  fail('WORK 1 semantic-gold regression failed' +
+    (work1Regression.stderr ? ': ' + work1Regression.stderr.trim() : ''));
+}
+check(
+  /TQG WORK 1 Regression: PASS/.test(work1Regression.stdout),
+  'WORK 1 semantic-gold regression passes'
+);
+
+const work2RegressionPath = path.join(ROOT, 'tests', 'tqg', 'tqg-work2-effectiveness-regression.mjs');
+check(fs.existsSync(work2RegressionPath), 'WORK 2 effectiveness regression is present');
+const work2Regression = spawnSync(process.execPath, [work2RegressionPath], {
+  cwd: ROOT,
+  encoding: 'utf8',
+  maxBuffer: 8 * 1024 * 1024
+});
+if (work2Regression.status !== 0) {
+  fail('WORK 2 effectiveness regression failed' +
+    (work2Regression.stderr ? ': ' + work2Regression.stderr.trim() : ''));
+}
+check(
+  /TQG WORK 2 Regression: PASS/.test(work2Regression.stdout),
+  'WORK 2 effectiveness regression passes'
+);
+
 console.log('');
 console.log('TQG-09 Regression: PASS');
