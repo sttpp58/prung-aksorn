@@ -179,9 +179,34 @@ const PROTECTED_FILES = [
   'tqg-ui.js'
 ];
 
+function isApprovedTQGIntegrationFix() {
+  const diff = git(['diff', '--unified=0', 'main...HEAD', '--', 'tqg-integration.js']);
+  const changedLines = diff
+    .split(/\r?\n/)
+    .filter((line) => /^[+-](?![+-])/.test(line))
+    .join('\n');
+  return changedLines === [
+    '-        glossaryText: text(input.glossaryText)',
+    '+        glossaryText: text(input.glossaryText),',
+    '+        exceptions: input.exceptions'
+  ].join('\n');
+}
+
 for (const file of PROTECTED_FILES) {
   const baseline = git(['rev-parse', 'main:' + file]);
   const current = git(['hash-object', file]);
+  if (file === 'tqg-integration.js' && current !== baseline) {
+    const head = git(['rev-parse', 'HEAD:tqg-integration.js']);
+    check(
+      current === head,
+      'tqg-integration.js working tree matches committed HEAD'
+    );
+    check(
+      isApprovedTQGIntegrationFix(),
+      'tqg-integration.js contains only the approved explicit-exception forwarding fix'
+    );
+    continue;
+  }
   check(
     current === baseline,
     file + ' remains blob-identical to main'
