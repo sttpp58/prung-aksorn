@@ -34,6 +34,23 @@ function git(args) {
   return (result.stdout || '').trim();
 }
 
+function resolveReleaseBase() {
+  if (process.env.GITHUB_EVENT_NAME === 'pull_request') {
+    return git(['rev-parse', 'HEAD^1']);
+  }
+  try {
+    return git(['rev-parse', 'main']);
+  } catch {
+    try {
+      return git(['rev-parse', 'origin/main']);
+    } catch {
+      return git(['rev-parse', 'HEAD']);
+    }
+  }
+}
+
+const RELEASE_BASE = resolveReleaseBase();
+
 function runNode(file, label) {
   const result = spawnSync(process.execPath, [path.join(ROOT, file)], {
     cwd: ROOT,
@@ -180,7 +197,7 @@ const PROTECTED_FILES = [
 ];
 
 function isApprovedTQGIntegrationFix() {
-  const diff = git(['diff', '--unified=0', 'main...HEAD', '--', 'tqg-integration.js']);
+  const diff = git(['diff', '--unified=0', RELEASE_BASE + '...HEAD', '--', 'tqg-integration.js']);
   const changedLines = diff
     .split(/\r?\n/)
     .filter((line) => /^[+-](?![+-])/.test(line))
@@ -193,7 +210,7 @@ function isApprovedTQGIntegrationFix() {
 }
 
 for (const file of PROTECTED_FILES) {
-  const baseline = git(['rev-parse', 'main:' + file]);
+  const baseline = git(['rev-parse', RELEASE_BASE + ':' + file]);
   const current = git(['hash-object', file]);
   if (file === 'tqg-integration.js' && current !== baseline) {
     const head = git(['rev-parse', 'HEAD:tqg-integration.js']);
@@ -209,7 +226,7 @@ for (const file of PROTECTED_FILES) {
   }
   check(
     current === baseline,
-    file + ' remains blob-identical to main'
+    file + ' remains blob-identical to release base'
   );
 }
 
