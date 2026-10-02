@@ -54,6 +54,37 @@ check(analyzeCalls === 1, 'completed output calls deterministic analyzer exactly
 check(completed.analysis.status === 'REVIEW', 'analysis result is preserved');
 check(completed.meta.aiCalls === 0, 'deterministic analysis makes zero AI calls');
 
+const explicitExceptionInput = {
+  completed: true,
+  sourceText: 'The dragon clan arrived.',
+  targetText: 'กองทัพ dragon clan',
+  glossaryText: '',
+  exceptions: [{
+    type: 'known_term',
+    text: 'dragon clan',
+    findingCodes: ['FOREIGN_SCRIPT_SPAN'],
+    reason: 'integration exception forwarding regression'
+  }]
+};
+const directExceptionAnalysis = requireFromRoot(path.join(ROOT, 'tqg.js')).analyze(explicitExceptionInput);
+const integratedException = integration.analyzeCompletedOutput(explicitExceptionInput);
+check(
+  integratedException.analysis.suppressedFindings.some(
+    (finding) => finding.code === 'FOREIGN_SCRIPT_SPAN'
+  ),
+  'integration forwards explicit TQG exceptions'
+);
+check(
+  !integratedException.analysis.findings.some(
+    (finding) => finding.code === 'FOREIGN_SCRIPT_SPAN'
+  ),
+  'integration preserves the explicit exception suppression result'
+);
+check(
+  JSON.stringify(integratedException.analysis) === JSON.stringify(directExceptionAnalysis),
+  'integration exception analysis matches direct TQG analysis'
+);
+
 let inspectorCalls = 0;
 const inspector = {
   inspect: async (input) => {

@@ -34,6 +34,29 @@ function git(args) {
   return (result.stdout || '').trim();
 }
 
+function resolveReleaseBase() {
+  if (process.env.GITHUB_EVENT_NAME === 'pull_request') {
+    const eventPath = process.env.GITHUB_EVENT_PATH;
+    assert.ok(eventPath && fs.existsSync(eventPath), 'GitHub pull_request event payload is available');
+    const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+    const baseSha = event && event.pull_request && event.pull_request.base && event.pull_request.base.sha;
+    assert.match(String(baseSha || ''), /^[0-9a-fA-F]{40}$/, 'GitHub pull_request base SHA is valid');
+    git(['fetch', '--no-tags', '--depth=1', 'origin', baseSha]);
+    return git(['rev-parse', 'FETCH_HEAD']);
+  }
+  try {
+    return git(['rev-parse', 'main']);
+  } catch {
+    try {
+      return git(['rev-parse', 'origin/main']);
+    } catch {
+      return git(['rev-parse', 'HEAD']);
+    }
+  }
+}
+
+const RELEASE_BASE = resolveReleaseBase();
+
 function runNode(file, label) {
   const result = spawnSync(process.execPath, [path.join(ROOT, file)], {
     cwd: ROOT,
@@ -179,12 +202,37 @@ const PROTECTED_FILES = [
   'tqg-ui.js'
 ];
 
+function isApprovedTQGIntegrationFix() {
+  const diff = git(['diff', '--unified=0', RELEASE_BASE, 'HEAD', '--', 'tqg-integration.js']);
+  const changedLines = diff
+    .split(/\r?\n/)
+    .filter((line) => /^[+-](?![+-])/.test(line))
+    .join('\n');
+  return changedLines === [
+    '-        glossaryText: text(input.glossaryText)',
+    '+        glossaryText: text(input.glossaryText),',
+    '+        exceptions: input.exceptions'
+  ].join('\n');
+}
+
 for (const file of PROTECTED_FILES) {
-  const baseline = git(['rev-parse', 'main:' + file]);
+  const baseline = git(['rev-parse', RELEASE_BASE + ':' + file]);
   const current = git(['hash-object', file]);
+  if (file === 'tqg-integration.js' && current !== baseline) {
+    const head = git(['rev-parse', 'HEAD:tqg-integration.js']);
+    check(
+      current === head,
+      'tqg-integration.js working tree matches committed HEAD'
+    );
+    check(
+      isApprovedTQGIntegrationFix(),
+      'tqg-integration.js contains only the approved explicit-exception forwarding fix'
+    );
+    continue;
+  }
   check(
     current === baseline,
-    file + ' remains blob-identical to main'
+    file + ' remains blob-identical to release base'
   );
 }
 

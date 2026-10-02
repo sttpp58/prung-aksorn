@@ -54,6 +54,7 @@ const privateC2 = process.env.TQG_C2_GOLD_DATASET ||
   path.join(ROOT, 'tests', 'tqg', 'c2-private', 'gold-dataset.json');
 if (!fs.existsSync(privateC2)) {
   console.log('INFO  private C2 dataset unavailable locally; preparation replay remains deferred');
+  console.log('TQG WORK 1 Regression: DEFERRED');
   process.exit(0);
 }
 

@@ -87,7 +87,7 @@ The gate verifies:
 | Privacy | no tracked private C2 or user backup JSON |
 | Security | secret-pattern scan |
 | CI | immutable action SHA checks |
-| Protected core | byte-identical protected files |
+| Protected core | byte-identical protected files, except the explicitly allowlisted TQG integration bugfix |
 | Syntax | Node syntax validation |
 | Hygiene | diff --check |
 
@@ -106,7 +106,7 @@ WORK 4 does not authorize changes to:
 - TQG Inspector semantics;
 - TQG Repair semantics.
 
-The release gate directly compares the protected file Git blobs to main:
+The release gate compares protected file Git blobs to the resolved release base. For pull requests, the gate reads the exact `pull_request.base.sha` from `GITHUB_EVENT_PATH`, fetches that commit shallowly from `origin`, and uses `FETCH_HEAD` as the immutable release base. Protected-file comparisons use the two commit trees directly so the gate does not require a merge base in a shallow checkout. Locally it uses `main` and falls back to `origin/main` or `HEAD`. The only exception is `tqg-integration.js`, where the gate permits exactly one approved transformation: forwarding `input.exceptions` into the deterministic analyzer. Any other byte drift fails the gate.
 
     storage-v2.js
     sw.js
@@ -115,7 +115,7 @@ The release gate directly compares the protected file Git blobs to main:
     tqg-integration.js
     tqg-ui.js
 
-No protected blob drift is accepted.
+No protected blob drift is accepted outside that exact allowlisted bugfix.
 
 ## 6. Required CI policy
 
@@ -177,7 +177,7 @@ The final release gate fails on:
 - tracked backup/user JSON;
 - tracked private C2 corpus;
 - secret-pattern hit;
-- protected-core byte drift;
+- protected-core byte drift outside the exact allowlisted TQG integration bugfix;
 - syntax failure;
 - whitespace error;
 - regression failure;
