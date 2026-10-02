@@ -494,7 +494,8 @@
       const analysis = analyzer({
         sourceText: text(input.sourceText),
         targetText: text(input.targetText),
-        glossaryText: text(input.glossaryText)
+        glossaryText: text(input.glossaryText),
+        exceptions: input.exceptions
       });
       const findingCodes = findingCodesFrom(analysis && analysis.findings);
       emitObservation(observer, 'tqg.detection.completed', {
