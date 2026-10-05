@@ -25,6 +25,7 @@ function check(condition, message) {
 const uiSource = read('tqg-ui.js');
 const indexSource = read('index.html');
 const swSource = read('sw.js');
+const appSource = read('app.js');
 
 new vm.Script(uiSource, { filename: 'tqg-ui.js' });
 check(/TQG-07-2026-09-30/.test(uiSource), 'UI module version is TQG-07');
@@ -105,7 +106,13 @@ for (const token of uiForbidden) {
 
 check(/tqg-ui\.js/.test(indexSource), 'index.html loads tqg-ui.js');
 check(/\.\/tqg-ui\.js/.test(swSource), 'Service Worker app shell includes tqg-ui.js');
+check(/\.\/app\.js/.test(swSource), 'Service Worker app shell includes app.js');
+check(/\.\/styles\.css/.test(swSource), 'Service Worker app shell includes styles.css');
 check(/APP_RELEASE_VERSION\s*=\s*['"]v\d+['"]/.test(swSource), 'Service Worker declares a versioned release marker for TQG runtime assets');
+check(/navigator\.serviceWorker\.register\(['"]sw\.js['"]\)/.test(appSource), 'application entrypoint retains Service Worker registration');
+check((indexSource.match(/<script\b[^>]*\bsrc=["'](?:\.\/)?app\.js["'][^>]*><\/script>/gi) || []).length === 1, 'index.html loads app.js exactly once');
+check(!/<script\b(?![^>]*\bsrc=)[^>]*>/i.test(indexSource), 'index.html has no inline script tags');
+check(!/<style\b/i.test(indexSource), 'index.html has no inline style blocks');
 
 console.log('');
 console.log('TQG-07 Quality UI Regression: PASS');

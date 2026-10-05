@@ -1,0 +1,5101 @@
+
+(function(){
+  var STORAGE_KEY = 'prungAksornData';
+  var DB_NAME = 'PrungAksornDB';
+  var STORE_NAME = 'app_store';
+
+  /* ---------------- IndexedDB V2 Storage Adapter ---------------- */
+  var storageV2 = window.PrungAksornStorageV2;
+  if(!storageV2) throw new Error('IndexedDB V2 storage layer failed to load.');
+
+  var state = { source: 'translate', level: 'edit', genre: 'ทั่วไป', style: 'สำนวนปัจจุบัน' };
+  var appData = { projects: [], currentProjectId: null };
+  var storageReady = false;
+  var expandedProjects = {};
+  var viewingHistoryId = null;
+  var activeController = null;
+  var draftSaveTimer = null;
+  var draftSaveContext = null;
+  var draftSaveGeneration = 0;
+  var outputFontSize = 15.5;
+
+  var defaultSettings = { provider:'openai', model:'gpt-4o-mini', chunkLen:'3000', source:'translate', level:'edit', genre:'ทั่วไป', style:'สำนวนปัจจุบัน', outputFontSize:15.5, darkMode: false, ttsRate:'1', ttsVoiceURI:'' };
+
+  // API Pricing (USD per 1,000,000 tokens)
+  var API_RATES = {
+    'gpt-4o-mini': { in: 0.15, out: 0.60 },
+    'gpt-4o':      { in: 2.50, out: 10.00 },
+    'gpt-5-mini':  { in: 0.25, out: 2.00 },
+    'gpt-5':       { in: 1.25, out: 10.00 },
+    'gpt-5.5':     { in: 5.00, out: 30.00 },
+    'gemini-2.5-flash': { in: 0.30, out: 2.50 },
+    'gemini-2.5-flash-lite': { in: 0.10, out: 0.40 },
+    'gemini-2.5-pro':   { in: 1.25, out: 10.00 },
+    'gemini-3.1-pro':   { in: 2.00, out: 12.00 },
+    'gemini-3.1-flash-lite': { in: 0.25, out: 1.50 },
+    'gemini-3.5-flash': { in: 1.50, out: 9.00 },
+    'gemini-3.5-flash-lite': { in: 0.30, out: 2.50 },
+    'gemini-3.6-flash': { in: 1.50, out: 7.50 },
+    'gemma-4-26b-a4b-it': { in: 0.00, out: 0.00 },
+    'gemma-4-31b-it': { in: 0.00, out: 0.00 },
+    'gemini-flash-latest': { in: 1.50, out: 7.50 },
+    'gemini-pro-latest':   { in: 2.00, out: 12.00 },
+    'default': { in: 0.25, out: 2.00 }
+  };
+  var currentActionCost = 0;
+  var currentActionTokens = 0;
+
+  var tabSourceBtn = document.getElementById('tabSourceBtn');
+  var tabOutputBtn = document.getElementById('tabOutputBtn');
+  var mobileTabToggleBtn = document.getElementById('mobileTabToggleBtn');
+  var spread = document.getElementById('spread');
+
+  function switchMobileTab(tab){
+    if(tab === 'source'){
+      spread.classList.add('show-source');
+      spread.classList.remove('show-output');
+      tabSourceBtn.classList.add('active');
+      tabOutputBtn.classList.remove('active');
+      if(mobileTabToggleBtn) mobileTabToggleBtn.textContent = '≡ ดูผลลัพธ์';
+    }else{
+      spread.classList.remove('show-source');
+      spread.classList.add('show-output');
+      tabSourceBtn.classList.remove('active');
+      tabOutputBtn.classList.add('active');
+      if(mobileTabToggleBtn) mobileTabToggleBtn.textContent = '■ ดูต้นฉบับ';
+    }
+  }
+  tabSourceBtn.addEventListener('click', function(){ switchMobileTab('source'); });
+  tabOutputBtn.addEventListener('click', function(){ switchMobileTab('output'); });
+  if(mobileTabToggleBtn){
+    mobileTabToggleBtn.addEventListener('click', function(){
+      if(spread.classList.contains('show-source')) switchMobileTab('output');
+      else switchMobileTab('source');
+    });
+  }
+
+  var touchStartX = 0;
+  spread.addEventListener('touchstart', function(e){ touchStartX = e.changedTouches[0].screenX; }, {passive:true});
+  spread.addEventListener('touchend', function(e){
+    if(window.innerWidth <= 900){
+      var touchEndX = e.changedTouches[0].screenX;
+      if(touchStartX - touchEndX > 70) switchMobileTab('output');
+      else if(touchEndX - touchStartX > 70) switchMobileTab('source');
+    }
+  }, {passive:true});
+
+  var zenToggleBtn = document.getElementById('zenToggleBtn');
+  var exitZenBtn = document.getElementById('exitZenBtn');
+
+  function toggleZenMode(enable){
+    var isZen = (typeof enable === 'boolean') ? enable : !document.body.classList.contains('zen-mode');
+    document.body.classList.toggle('zen-mode', isZen);
+    zenToggleBtn.textContent = isZen ? '✖ ออกจากโหมดสมาธิ' : '⛶ โหมดสมาธิ';
+  }
+  zenToggleBtn.addEventListener('click', function(){ toggleZenMode(); });
+  exitZenBtn.addEventListener('click', function(){ toggleZenMode(false); });
+
+  var themeToggleBtn = document.getElementById('themeToggleBtn');
+  var readerThemeToggleBtn = document.getElementById('readerThemeToggleBtn');
+  var readerThemeIconWrapper = document.getElementById('readerThemeIconWrapper');
+
+  function updateThemeButtons(isDark) {
+    themeToggleBtn.textContent = isDark ? '☼ โหมดสว่าง' : '☾ โหมดมืด';
+    if (readerThemeToggleBtn) {
+      readerThemeIconWrapper.textContent = isDark ? '☼' : '☾';
+      readerThemeToggleBtn.querySelector('.text-label').textContent = isDark ? 'โหมดสว่าง' : 'โหมดมืด';
+    }
+  }
+
+  function handleThemeToggle() {
+    var isDark = document.documentElement.classList.toggle('dark-mode');
+    updateThemeButtons(isDark);
+    appData.settings.darkMode = isDark;
+    saveData();
+  }
+
+  themeToggleBtn.addEventListener('click', handleThemeToggle);
+  if(readerThemeToggleBtn) {
+    readerThemeToggleBtn.addEventListener('click', handleThemeToggle);
+  }
+
+  function updateKeyStatusBadge(){
+    var key = document.getElementById('apiKey').value.trim();
+    var dot = document.getElementById('keyStatusDot');
+    if(dot){
+      if(key) dot.classList.add('ready');
+      else dot.classList.remove('ready');
+    }
+  }
+  document.getElementById('apiKey').addEventListener('input', updateKeyStatusBadge);
+
+  var mainInput = document.getElementById('inputText');
+  var outputBox = document.getElementById('output');
+  var isSyncingScroll = false;
+
+  function syncScroll(source, target){
+    if(window.innerWidth > 900 && source.scrollHeight > source.clientHeight){
+      if(isSyncingScroll) return;
+      isSyncingScroll = true;
+      var percentage = source.scrollTop / (source.scrollHeight - source.clientHeight || 1);
+      target.scrollTop = percentage * (target.scrollHeight - target.clientHeight);
+      setTimeout(function(){ isSyncingScroll = false; }, 40);
+    }
+  }
+  mainInput.addEventListener('scroll', function(){ syncScroll(mainInput, outputBox); });
+  outputBox.addEventListener('scroll', function(){ syncScroll(outputBox, mainInput); });
+
+  var mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+  var sidebar = document.getElementById('sidebar');
+  var sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
+  mobileSidebarToggle.addEventListener('click', function(){
+    var isOpen = sidebar.classList.toggle('open');
+    sidebarToggleIcon.textContent = isOpen ? '▲' : '▼';
+  });
+
+  var toggleBottomHistoryBtn = document.getElementById('toggleBottomHistoryBtn');
+  var bottomHistoryList = document.getElementById('bottomHistoryList');
+  toggleBottomHistoryBtn.addEventListener('click', function(){
+    bottomHistoryList.classList.toggle('collapsed');
+  });
+
+  function scrollToTopTarget(){
+    setTimeout(function(){
+      var target = document.getElementById('mobileTabs') || document.getElementById('spread');
+      if (target && window.innerWidth <= 900) {
+        var topPos = target.getBoundingClientRect().top + window.pageYOffset - 12;
+        window.scrollTo({ top: Math.max(0, topPos), behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 60);
+  }
+
+  function getActiveBook(proj){
+    if(!proj) return null;
+    if(!proj.currentBookId && proj.books && proj.books.length > 0){
+      proj.currentBookId = proj.books[0].id;
+    }
+    return (proj.books || []).find(function(b){ return b.id === proj.currentBookId; }) || null;
+  }
+
+  var appContextGeneration = 0;
+
+  function captureAppContext(proj, book){
+    return {
+      generation: appContextGeneration,
+      projectId: proj ? proj.id : null,
+      bookId: book ? book.id : null
+    };
+  }
+
+  function isAppContextCurrent(context){
+    if(!context) return false;
+    var proj = getCurrentProject();
+    var book = proj ? getActiveBook(proj) : null;
+    return context.generation === appContextGeneration &&
+      context.projectId === (proj ? proj.id : null) &&
+      context.bookId === (book ? book.id : null);
+  }
+
+  function advanceAppContextGeneration(){
+    appContextGeneration += 1;
+    return appContextGeneration;
+  }
+
+  function captureTranslationSettingsSnapshot(provider, model, chunkLen){
+    return {
+      source: state.source,
+      level: state.level,
+      genre: state.genre,
+      style: state.style,
+      provider: String(provider || ''),
+      model: String(model || ''),
+      chunkLen: Number(chunkLen) || 3000
+    };
+  }
+
+  function normalizeTranslationSettingsSnapshot(snapshot, fallbackProvider, fallbackModel, fallbackChunkLen){
+    var base = snapshot && typeof snapshot === 'object' ? snapshot : {};
+    return {
+      source: typeof base.source === 'string' ? base.source : state.source,
+      level: typeof base.level === 'string' ? base.level : state.level,
+      genre: typeof base.genre === 'string' ? base.genre : state.genre,
+      style: typeof base.style === 'string' ? base.style : state.style,
+      provider: typeof base.provider === 'string' && base.provider ? base.provider : String(fallbackProvider || ''),
+      model: typeof base.model === 'string' && base.model ? base.model : String(fallbackModel || ''),
+      chunkLen: Number(base.chunkLen) || Number(fallbackChunkLen) || 3000
+    };
+  }
+
+  function buildTranslatePromptWithSettings(proj, previousTail, currentChunk, settingsSnapshot){
+    var previous = {
+      source: state.source,
+      level: state.level,
+      genre: state.genre,
+      style: state.style
+    };
+    if(settingsSnapshot){
+      state.source = settingsSnapshot.source;
+      state.level = settingsSnapshot.level;
+      state.genre = settingsSnapshot.genre;
+      state.style = settingsSnapshot.style;
+    }
+    try{
+      return buildTranslatePrompt(proj, previousTail, currentChunk);
+    }finally{
+      state.source = previous.source;
+      state.level = previous.level;
+      state.genre = previous.genre;
+      state.style = previous.style;
+    }
+  }
+
+  function getActiveHistoryList(proj){
+    var book = getActiveBook(proj);
+    return book ? (book.history || []) : (proj.history || []);
+  }
+
+  function renderBottomHistory(){
+    var container = document.getElementById('bottomHistoryList');
+    var box = document.getElementById('projectHistoryBottom');
+    var titleEl = document.getElementById('bottomHistoryProjectTitle');
+    if(!container || !box) return;
+
+    var proj = getCurrentProject();
+    if(!proj){
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = 'block';
+
+    var activeBook = getActiveBook(proj);
+    var bookSuffix = activeBook ? (' [' + activeBook.title + ']') : '';
+    titleEl.textContent = 'ประวัติเรื่อง "' + proj.name + '"' + bookSuffix;
+    container.innerHTML = '';
+
+    var historyList = getActiveHistoryList(proj);
+
+    if(!historyList || historyList.length === 0){
+      var empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = 'ยังไม่มีประวัติการแปลสำหรับเล่มนี้';
+      container.appendChild(empty);
+      return;
+    }
+
+    historyList.forEach(function(entry, idx){
+      var item = document.createElement('div');
+      item.className = 'bottom-history-item' + (viewingHistoryId === entry.id ? ' active' : '');
+
+      var title = document.createElement('div');
+      title.className = 'bottom-history-title';
+      title.textContent = (entry.label || ('แปล' + (idx + 1))) + ' · ' + fmtTime(entry.ts);
+      title.addEventListener('click', function(){
+        viewHistoryEntry(proj, entry, idx);
+      });
+      item.appendChild(title);
+
+      var actions = document.createElement('div');
+      actions.className = 'bottom-history-actions';
+
+      var renameBtn = document.createElement('button');
+      renameBtn.className = 'icon-btn';
+      renameBtn.title = 'เปลี่ยนชื่อ';
+      renameBtn.textContent = '✎';
+      renameBtn.addEventListener('click', async function(e){
+        e.stopPropagation();
+        var currentLabel = entry.label || ('แปล' + (idx + 1));
+        var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
+        if(newLabel && newLabel.trim()){
+          entry.label = newLabel.trim();
+          commitChange();
+          if(viewingHistoryId === entry.id){
+            historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+            historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
+          }
+        }
+      });
+      actions.appendChild(renameBtn);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'icon-btn';
+      delBtn.title = 'ลบประวัติ';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', async function(e){
+        e.stopPropagation();
+        var itemLabel = entry.label || ('แปล' + (idx + 1));
+        var ok = await showConfirmDialog('ลบประวัติการแปล', 'ต้องการลบ "' + itemLabel + '" หรือไม่? การลบไม่สามารถย้อนกลับได้', true);
+        if(ok){
+          var currentHistory = getActiveHistoryList(proj);
+          var filtered = currentHistory.filter(function(h){ return h.id !== entry.id; });
+          if(activeBook) activeBook.history = filtered;
+          else proj.history = filtered;
+
+          if(viewingHistoryId === entry.id){
+            viewingHistoryId = null;
+            historyViewBanner.classList.remove('show');
+            historyViewBannerBottom.classList.remove('show');
+            loadProjectDraft(proj);
+          }
+          commitChange();
+        }
+      });
+      actions.appendChild(delBtn);
+
+      if(entry.parentId){
+        var diffBtnEl = document.createElement('button');
+        diffBtnEl.className = 'icon-btn diff-btn';
+        diffBtnEl.title = 'เทียบความต่างกับต้นฉบับที่แก้มาจาก';
+        diffBtnEl.textContent = 'Δ';
+        diffBtnEl.addEventListener('click', async function(e){
+          e.stopPropagation();
+          var parentEntry = findEntryById(proj, entry.parentId);
+          if(!parentEntry){ await showAlertDialog('ไม่พบต้นทาง', 'ไม่พบฉบับต้นทางที่ใช้เทียบ (อาจถูกลบไปแล้ว)'); return; }
+          openDiff(parentEntry.output, entry.output, 'เทียบ "' + (parentEntry.label || 'ต้นทาง') + '" กับ "' + (entry.label || 'ฉบับแก้ไข') + '"');
+        });
+        actions.appendChild(diffBtnEl);
+      }
+
+      item.appendChild(actions);
+      container.appendChild(item);
+    });
+
+    applyBottomHistorySearchFilter();
+  }
+
+  var bottomHistorySearchInput = document.getElementById('bottomHistorySearchInput');
+  function applyBottomHistorySearchFilter(){
+    var term = (bottomHistorySearchInput.value || '').trim().toLowerCase();
+    document.querySelectorAll('#bottomHistoryList .bottom-history-item').forEach(function(item){
+      var txt = item.textContent.toLowerCase();
+      item.style.display = (!term || txt.indexOf(term) !== -1) ? '' : 'none';
+    });
+  }
+  bottomHistorySearchInput.addEventListener('input', applyBottomHistorySearchFilter);
+
+
+  /* ---------------- STEP 4.3 Translation Job Recovery ---------------- */
+  function clearTranslationRecoveryUI(){
+    var box = document.getElementById('translationRecoveryBox');
+    if(box) box.remove();
+  }
+
+  function renderTranslationRecovery(jobs){
+    clearTranslationRecoveryUI();
+    if(!jobs || !jobs.length) return;
+    var box=document.createElement('div');
+    box.id='translationRecoveryBox';
+    box.style.margin='12px 0';
+    box.style.padding='12px';
+    box.style.border='1px solid var(--border-color, #d9d9d9)';
+    box.style.borderRadius='10px';
+    box.style.background='var(--panel-bg, transparent)';
+    var title=document.createElement('div');
+    title.textContent='พบงานแปลที่ต้องตรวจสอบ';
+    title.style.fontWeight='600';
+    title.style.marginBottom='8px';
+    box.appendChild(title);
+    jobs.forEach(function(job){
+      var row=document.createElement('div');
+      row.style.display='flex';
+      row.style.alignItems='center';
+      row.style.justifyContent='space-between';
+      row.style.gap='8px';
+      row.style.marginTop='6px';
+
+      var label=document.createElement('span');
+      label.style.flex='1';
+      label.style.minWidth='0';
+      label.style.overflow='hidden';
+      label.style.textOverflow='ellipsis';
+      label.style.whiteSpace='nowrap';
+      label.textContent=(job.label||('Job '+job.jobId))+' — '+job.completedChunks+'/'+job.totalChunks+' ('+job.status+')'+(job.reason?' — '+job.reason:'');
+      row.appendChild(label);
+
+      var actions=document.createElement('div');
+      actions.style.display='flex';
+      actions.style.alignItems='center';
+      actions.style.gap='6px';
+      actions.style.flexShrink='0';
+
+      if(job.recoverable){
+        var btn=document.createElement('button');
+        btn.type='button';
+        btn.className='secondary-btn';
+        if(job.jobType==='batch' && job.status==='failed'){
+          btn.textContent='Retry';
+          btn.addEventListener('click',function(){retryBatchTranslationJob(job.jobId);});
+        }else if(job.jobType==='batch'){
+          btn.textContent='กู้คืน';
+          btn.addEventListener('click',function(){prepareBatchTranslationRecovery(job.jobId);});
+        }else{
+          btn.textContent='กู้คืน';
+          btn.addEventListener('click',function(){prepareTranslationRecovery(job.jobId);});
+        }
+        actions.appendChild(btn);
+      }
+
+      var dismissBtn=document.createElement('button');
+      dismissBtn.type='button';
+      dismissBtn.className='secondary-btn';
+      dismissBtn.textContent='ซ่อน';
+      dismissBtn.title='ซ่อนรายการนี้จากหน้าจอ โดยไม่ลบ Translation Job';
+      dismissBtn.addEventListener('click',function(){dismissTranslationRecoveryJob(job);});
+      actions.appendChild(dismissBtn);
+
+      row.appendChild(actions);
+      box.appendChild(row);
+    });
+
+    var note=document.createElement('div');
+    note.textContent='ระบบจะไม่เริ่ม API อัตโนมัติ ต้องกดกู้คืนและเริ่มงานด้วยตนเอง • รายการที่ซ่อนจะกลับมาเมื่อสถานะ Job เปลี่ยน';
+    note.style.marginTop='8px';
+    note.style.fontSize='0.9em';
+    note.style.opacity='0.75';
+    box.appendChild(note);
+
+    var anchor=resumeBtn&&resumeBtn.parentNode?resumeBtn.parentNode:null;
+    if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(box,anchor);
+  }
+
+  async function scanTranslationJobs(){
+    try{
+      var jobs=await PrungAksornStorageV2.listTranslationJobs();
+      var candidates=[];
+      jobs.forEach(function(job){
+        if(!job||['pending','running','paused','failed'].indexOf(job.status)<0)return;
+        var base={
+          jobId:job.jobId,
+          projectId:job.projectId||null,
+          bookId:job.bookId||null,
+          chapterId:job.chapterId||null,
+          jobType:job.jobType||'single',
+          batchId:job.batchId||null,
+          batchIndex:Number.isInteger(job.batchIndex)?job.batchIndex:null,
+          status:job.status,
+          completedChunks:Number(job.completedChunks||0),
+          totalChunks:Number(job.totalChunks||0),
+          revision:Number.isInteger(job.revision)?job.revision:0,
+          updatedAt:Number(job.updatedAt||0),
+          label:job.sourceSnapshot&&job.sourceSnapshot.title||('งานแปล '+job.jobId),
+          recoverable:false,
+          reason:''
+        };
+        try{
+          PrungAksornStorageV2.validateTranslationJob(job);
+          var proj=appData.projects.find(function(p){return p.id===job.projectId;});
+          var book=proj&&(proj.books||[]).find(function(b){return b.id===job.bookId;});
+          if(!proj){base.reason='ไม่พบ Project ต้นทาง';candidates.push(base);return;}
+          if(!book){base.reason='ไม่พบ Book ต้นทาง';candidates.push(base);return;}
+          if(hasCompletedTranslationHistory(job)) return;
+          if(job.jobType==='batch'){
+            if(typeof job.batchId!=='string'||!job.batchId){base.reason='Batch Job ไม่มี batchId';candidates.push(base);return;}
+            if(!Number.isInteger(job.batchIndex)||job.batchIndex<0){base.reason='Batch Job มี batchIndex ไม่ถูกต้อง';candidates.push(base);return;}
+          }
+          if(!job.sourceSnapshot||typeof job.sourceSnapshot.text!=='string'||!job.sourceSnapshot.text||job.sourceSnapshot.normalized!==true){base.reason='ไม่มี Recovery Source Snapshot ที่สมบูรณ์';candidates.push(base);return;}
+          if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0){base.reason='Job มี chunkSize ไม่ถูกต้อง';candidates.push(base);return;}
+          if(!Number.isInteger(job.totalChunks)||job.totalChunks<0){base.reason='Job มี totalChunks ไม่ถูกต้อง';candidates.push(base);return;}
+          base.recoverable=true;
+          candidates.push(base);
+        }catch(e){
+          base.reason='Job validation ไม่ผ่าน';
+          candidates.push(base);
+          console.warn('Translation recovery candidate rejected:',job.jobId,e);
+        }
+      });
+      var activeCandidates=candidates.filter(function(job){ return !isTranslationRecoveryDismissed(job); });
+      var dedupedCandidates=dedupeTranslationRecoveryCandidates(activeCandidates);
+      translationRecoveryJobs=dedupedCandidates;
+      pruneTranslationRecoveryUIState();
+      renderTranslationRecovery(dedupedCandidates);
+    }catch(e){
+      console.warn('Translation recovery scan failed:',e);
+    }
+  }
+
+  function refreshTranslationRecoveryUI(){
+    scanTranslationJobs().catch(function(e){
+      console.warn('Translation recovery UI refresh failed:',e);
+    });
+  }
+
+  async function prepareBatchTranslationRecovery(jobId){
+    if(warnIfAiBusy())return;
+    hideError();
+    try{
+      var job=await PrungAksornStorageV2.getTranslationJob(jobId);
+      if(!job)throw new Error('ไม่พบ Translation Job นี้แล้ว');
+      PrungAksornStorageV2.validateTranslationJob(job);
+      if(job.jobType!=='batch')throw new Error('Job นี้ไม่ใช่ Batch Job');
+      if(['pending','running','paused'].indexOf(job.status)<0){
+        if(job.status==='failed')throw new Error('Job นี้อยู่ในสถานะ failed ให้ใช้ “Retry” แทนการกู้คืน');
+        throw new Error('Job นี้ไม่สามารถกู้คืนจากสถานะ '+job.status+' ได้');
+      }
+      if(typeof job.batchId!=='string'||!job.batchId)throw new Error('Batch Job ไม่มี batchId');
+      if(!Number.isInteger(job.batchIndex)||job.batchIndex<0)throw new Error('Batch Job มี batchIndex ไม่ถูกต้อง');
+
+      var proj=appData.projects.find(function(p){return p.id===job.projectId;});
+      if(!proj)throw new Error('ไม่พบ Project ต้นทางของ Job');
+      var book=(proj.books||[]).find(function(b){return b.id===job.bookId;});
+      if(!book)throw new Error('ไม่พบ Book ต้นทางของ Job');
+
+      var snapshot=job.sourceSnapshot;
+      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true)throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
+      if(typeof snapshot.originalText!=='string')throw new Error('Original Source Snapshot ไม่ถูกต้อง');
+      if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0)throw new Error('Job มี chunkSize ไม่ถูกต้อง');
+      if(!Number.isInteger(job.totalChunks)||job.totalChunks<0)throw new Error('Job มี totalChunks ไม่ถูกต้อง');
+      if(!Number.isInteger(job.completedChunks)||job.completedChunks<0||job.completedChunks>job.totalChunks)throw new Error('Checkpoint ของ Job ไม่ถูกต้อง');
+      if(!Array.isArray(job.partialResults)||job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
+      if(job.partialResults.some(function(x,idx){return !x||x.chunkIndex!==idx||typeof x.text!=='string';}))throw new Error('partialResults ของ Job ไม่ถูกต้อง');
+      if(job.completedChunks>0){
+        var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
+        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
+      }else if(String(job.previousTail||'')){
+        throw new Error('previousTail ต้องว่างเมื่อยังไม่มี Chunk ที่ checkpoint');
+      }
+
+      if(providerSel.value!==job.provider)throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อนกู้คืน');
+      if(modelInput.value!==job.model)throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อนกู้คืน');
+      if(!document.getElementById('apiKey').value.trim())throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
+
+      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+
+      advanceAppContextGeneration();
+      appData.currentProjectId=proj.id;
+      proj.currentBookId=book.id;
+      chapterTitle.value=snapshot.title||chapterTitle.value||'';
+      inputText.value=snapshot.originalText;
+      inCount.textContent=countWords(inputText.value)+' คำ';
+      updateChunkInfo();
+      setOutput(job.partialResults.map(function(x){return x.text;}).join('\n\n'));
+
+      pendingResume=null;
+      pendingBatchResume={
+        jobId:job.jobId,
+        batchId:job.batchId,
+        batchIndex:job.batchIndex,
+        projectId:job.projectId,
+        bookId:job.bookId,
+        chapterId:job.chapterId,
+        model:job.model,
+        provider:job.provider,
+        retryCount:Number(job.retryCount||0),
+        completedChunks:job.completedChunks,
+        totalChunks:job.totalChunks,
+        sourceSnapshotText:snapshot.text,
+        originalText:snapshot.originalText,
+        title:snapshot.title||'',
+        proj:proj,
+        book:book,
+        chunks:chunks,
+        results:job.partialResults.map(function(x){return x.text;}),
+        previousTail:String(job.previousTail||'')
+      };
+      activeTranslationJobId=null;
+      if(resumeBtn){
+        resumeBtn.textContent='ดำเนินการต่อจากจุดกู้คืน';
+        resumeBtn.classList.add('show');
+      }
+      renderProjects();
+      renderBottomHistory();
+      clearTranslationRecoveryUI();
+      showError('เตรียมกู้คืน Batch Item '+(job.batchIndex+1)+' แล้ว กด “ดำเนินการต่อจากจุดกู้คืน” เพื่อเริ่ม API');
+    }catch(e){
+      showError('ไม่สามารถเตรียม Batch Recovery Job ได้: '+(e.message||e));
+    }
+  }
+
+  async function runBatchTranslationRecovery(state){
+    if(!state||!state.jobId)return;
+    if(warnIfAiBusy())return;
+    var job=null;
+    var recoveryStarted=false;
+    var recoveryCompleted=false;
+    var recoveryContext=null;
+    var activeRetryCount=Number(state.retryCount||0);
+    try{
+      job=await PrungAksornStorageV2.getTranslationJob(state.jobId);
+      if(!job)throw new Error('ไม่พบ Translation Job นี้แล้ว');
+      PrungAksornStorageV2.validateTranslationJob(job);
+      if(job.jobType!=='batch')throw new Error('Job นี้ไม่ใช่ Batch Job');
+      if(['pending','running','paused'].indexOf(job.status)<0)throw new Error('Job นี้ไม่สามารถกู้คืนจากสถานะ '+job.status+' ได้');
+      if(job.batchId!==state.batchId||job.batchIndex!==state.batchIndex)throw new Error('Batch identity ของ Job เปลี่ยนแปลงไป');
+      if(job.projectId!==state.projectId||job.bookId!==state.bookId||job.chapterId!==state.chapterId)throw new Error('Source reference ของ Job เปลี่ยนแปลงไป');
+      if(providerSel.value!==job.provider)throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อนกู้คืน');
+      if(modelInput.value!==job.model)throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อนกู้คืน');
+      var key=document.getElementById('apiKey').value.trim();
+      if(!key)throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
+
+      recoveryContext=captureAppContext(state.proj,state.book);
+      var snapshot=job.sourceSnapshot;
+      if(!snapshot||snapshot.text!==state.sourceSnapshotText||snapshot.normalized!==true)throw new Error('Recovery Source Snapshot ของ Job เปลี่ยนแปลงไป');
+      if(typeof snapshot.originalText!=='string')throw new Error('Original Source Snapshot ไม่ถูกต้อง');
+      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+      if(job.completedChunks!==state.completedChunks)throw new Error('Checkpoint ของ Job เปลี่ยนแปลงไป กรุณาเตรียม Recovery ใหม่');
+      if(job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
+      if(job.completedChunks>0){
+        var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
+        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
+      }
+      activeRetryCount=Number(job.retryCount||0);
+      var recoverySettingsSnapshot=normalizeTranslationSettingsSnapshot(job.settingsSnapshot,job.provider,job.model,job.chunkSize);
+
+      var results=job.partialResults.map(function(x){return x.text;});
+      var previousTail=String(job.previousTail||'');
+
+      if(job.completedChunks===job.totalChunks){
+        recoveryStarted=true;
+        await PrungAksornStorageV2.completeTranslationJob(job.jobId,job.revision);
+        activeTranslationJobRevision=null;
+        recoveryCompleted=true;
+      }else{
+        job=await PrungAksornStorageV2.updateTranslationJob({jobId:job.jobId,status:'running',retryCount:activeRetryCount,error:null,settingsSnapshot:recoverySettingsSnapshot,expectedRevision:job.revision});
+        activeTranslationJobRevision=job.revision;
+        recoveryStarted=true;
+        activeController=new AbortController();
+        activeTranslationJobId=job.jobId;
+        batchCancelled=false;
+        setAiBusy(true);
+        setTranslationSettingsLocked(true);
+        resetActionStats();
+        cancelBtn.classList.add('show');
+        if(isAppContextCurrent(recoveryContext)){
+          progressText.textContent='กำลังกู้คืน Batch Item '+(job.batchIndex+1)+' จากจุด '+job.completedChunks+'/'+job.totalChunks;
+          setOutput(results.join('\n\n'));
+        }
+
+        for(var i=job.completedChunks;i<chunks.length;i++){
+          if(batchCancelled){
+            var cancelError=new Error('Batch recovery cancelled');
+            cancelError.name='AbortError';
+            throw cancelError;
+          }
+          if(isAppContextCurrent(recoveryContext)) progressText.textContent='กำลังกู้คืน Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
+          var sys=buildTranslatePromptWithSettings(state.proj,previousTail,chunks[i],recoverySettingsSnapshot);
+          var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
+          var partTrim=part.trim();
+          previousTail=getTail(partTrim,300);
+          job=await PrungAksornStorageV2.checkpointTranslationJob({jobId:job.jobId,retryCount:activeRetryCount,expectedRevision:job.revision},i,partTrim,previousTail);
+          activeTranslationJobRevision=job.revision;
+          results.push(partTrim);
+          if(isAppContextCurrent(recoveryContext)) setOutput(results.join('\n\n'));
+        }
+
+        await PrungAksornStorageV2.completeTranslationJob(job.jobId,job.revision);
+        recoveryCompleted=true;
+      }
+
+      if(isAppContextCurrent(recoveryContext)){
+        analyzeTQGCompletedOutput(snapshot.text, results.join('\n\n'), state.proj);
+      }
+      activeTranslationJobId=null;
+      var existingEntry=findEntryById(state.proj,job.chapterId);
+      if(!existingEntry){
+        var newEntry={
+          id:job.chapterId,
+          ts:Date.now(),
+          label:snapshot.title||('Batch Item '+(job.batchIndex+1)),
+          input:snapshot.originalText,
+          output:results.join('\n\n')
+        };
+        if(state.book)state.book.history.push(newEntry);
+        else(state.proj.history=state.proj.history||[]).push(newEntry);
+      }
+      await restoreBatchHistoryOrder(state.proj,state.book,job.batchId);
+      commitChange();
+      pendingBatchResume=null;
+      if(isAppContextCurrent(recoveryContext)){
+        refreshTranslationRecoveryUI();
+        if(resumeBtn){
+          resumeBtn.classList.remove('show');
+          resumeBtn.textContent='ดำเนินการต่อ';
+        }
+      }
+      if(isAppContextCurrent(recoveryContext)){
+        progressText.textContent='Batch Recovery สำเร็จ';
+        setTimeout(function(){
+          if(progressText.textContent==='Batch Recovery สำเร็จ')progressText.textContent='';
+        },4000);
+      }
+    }catch(err){
+      if(recoveryStarted&&!recoveryCompleted){
+        try{
+          if(err.name==='AbortError'){
+            await PrungAksornStorageV2.cancelTranslationJob(job.jobId,job.revision);
+          }else{
+            await PrungAksornStorageV2.failTranslationJob(job.jobId,{
+              code:'BATCH_RECOVERY_FAILED',
+              message:String(err.message||'เกิดข้อผิดพลาด'),
+              chunkIndex:typeof i==='number'?i:null,
+              retryCount:activeRetryCount,
+              timestamp:Date.now()
+            },job.revision);
+          }
+        }catch(jobErr){
+          console.warn('Batch recovery job state checkpoint failed:',jobErr);
+        }
+      }
+      activeTranslationJobId=null;
+      pendingBatchResume=null;
+      if(err.name!=='AbortError' && (!recoveryContext || isAppContextCurrent(recoveryContext))){
+        showError('Batch Recovery ไม่สำเร็จ: '+(err.message||err));
+      }
+    }finally{
+      setTranslationSettingsLocked(false);
+      setAiBusy(false);
+      if(!recoveryContext || isAppContextCurrent(recoveryContext)){
+        cancelBtn.classList.remove('show');
+        if(progressText.textContent!=='Batch Recovery สำเร็จ')progressText.textContent='';
+      }
+    }
+  }
+
+  async function retryBatchTranslationJob(jobId){
+    if(warnIfAiBusy()) return;
+    hideError();
+    var job=null;
+    var retryStarted=false;
+    var retryCompleted=false;
+    var retryContext=null;
+    var retryCount=0;
+    try{
+      job=await PrungAksornStorageV2.getTranslationJob(jobId);
+      if(!job) throw new Error('ไม่พบ Translation Job นี้แล้ว');
+      PrungAksornStorageV2.validateTranslationJob(job);
+      if(job.jobType!=='batch') throw new Error('Job นี้ไม่ใช่ Batch Job');
+      if(job.status!=='failed') throw new Error('Retry ได้เฉพาะ Job ที่อยู่ในสถานะ failed');
+      if(typeof job.batchId!=='string'||!job.batchId) throw new Error('Batch Job ไม่มี batchId');
+      if(!Number.isInteger(job.batchIndex)||job.batchIndex<0) throw new Error('Batch Job มี batchIndex ไม่ถูกต้อง');
+      var proj=appData.projects.find(function(p){return p.id===job.projectId;});
+      if(!proj) throw new Error('ไม่พบ Project ต้นทางของ Job');
+      var book=(proj.books||[]).find(function(b){return b.id===job.bookId;});
+      if(!book) throw new Error('ไม่พบ Book ต้นทางของ Job');
+      retryContext=captureAppContext(proj,book);
+      var snapshot=job.sourceSnapshot;
+      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true) throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
+      if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0) throw new Error('Job มี chunkSize ไม่ถูกต้อง');
+      if(!Number.isInteger(job.totalChunks)||job.totalChunks<0) throw new Error('Job มี totalChunks ไม่ถูกต้อง');
+      if(!Number.isInteger(job.completedChunks)||job.completedChunks<0||job.completedChunks>job.totalChunks) throw new Error('Checkpoint ของ Job ไม่ถูกต้อง');
+      if(!Array.isArray(job.partialResults)||job.partialResults.length!==job.completedChunks) throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
+      if(job.partialResults.some(function(x,idx){return !x||x.chunkIndex!==idx||typeof x.text!=='string';})) throw new Error('partialResults ของ Job ไม่ถูกต้อง');
+      if(job.completedChunks>0){
+        var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
+        if(expectedTail!==String(job.previousTail||'')) throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
+      }else if(String(job.previousTail||'')) {
+        throw new Error('previousTail ต้องว่างเมื่อยังไม่มี Chunk ที่ checkpoint');
+      }
+      if(providerSel.value!==job.provider) throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อน Retry');
+      if(modelInput.value!==job.model) throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อน Retry');
+      var key=document.getElementById('apiKey').value.trim();
+      if(!key) throw new Error('กรุณาใส่ API Key ก่อน Retry');
+
+      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      if(chunks.length!==job.totalChunks) throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+
+      retryCount=Number(job.retryCount||0)+1;
+      var retrySettingsSnapshot=normalizeTranslationSettingsSnapshot(job.settingsSnapshot,job.provider,job.model,job.chunkSize);
+      job=await PrungAksornStorageV2.updateTranslationJob({jobId:job.jobId,status:'running',retryCount:retryCount,error:null,settingsSnapshot:retrySettingsSnapshot,expectedRevision:job.revision});
+      retryStarted=true;
+      activeController=new AbortController();
+      activeTranslationJobId=job.jobId;
+      activeTranslationJobRevision=job.revision;
+      batchCancelled=false;
+      setAiBusy(true);
+      setTranslationSettingsLocked(true);
+      resetActionStats();
+      cancelBtn.classList.add('show');
+      if(isAppContextCurrent(retryContext)) progressText.textContent='กำลัง Retry Batch Item '+(job.batchIndex+1)+' จากจุด '+job.completedChunks+'/'+job.totalChunks;
+
+      var results=job.partialResults.map(function(x){return x.text;});
+      var previousTail=String(job.previousTail||'');
+      if(isAppContextCurrent(retryContext)) setOutput(results.join('\n\n'));
+
+      for(var i=job.completedChunks;i<chunks.length;i++){
+        if(batchCancelled){
+          var cancelError=new Error('Batch retry cancelled');
+          cancelError.name='AbortError';
+          throw cancelError;
+        }
+        if(isAppContextCurrent(retryContext)) progressText.textContent='กำลัง Retry Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
+        var sys=buildTranslatePromptWithSettings(proj,previousTail,chunks[i],retrySettingsSnapshot);
+        var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
+        var partTrim=part.trim();
+        previousTail=getTail(partTrim,300);
+        job=await PrungAksornStorageV2.checkpointTranslationJob({jobId:job.jobId,retryCount:retryCount,expectedRevision:job.revision},i,partTrim,previousTail);
+        activeTranslationJobRevision=job.revision;
+        results.push(partTrim);
+        if(isAppContextCurrent(retryContext)) setOutput(results.join('\n\n'));
+      }
+
+      await PrungAksornStorageV2.completeTranslationJob(job.jobId,job.revision);
+      if(isAppContextCurrent(retryContext)){
+        analyzeTQGCompletedOutput(snapshot.text, results.join('\n\n'), proj);
+      }
+      activeTranslationJobRevision=null;
+      retryCompleted=true;
+      activeTranslationJobId=null;
+
+      var existingEntry=findEntryById(proj,job.chapterId);
+      if(!existingEntry){
+        var newEntry={
+          id:job.chapterId,
+          ts:Date.now(),
+          label:snapshot.title||('Batch Item '+(job.batchIndex+1)),
+          input:snapshot.originalText,
+          output:results.join('\n\n')
+        };
+        if(book) book.history.push(newEntry);
+        else (proj.history=proj.history||[]).push(newEntry);
+      }
+      await restoreBatchHistoryOrder(proj,book,job.batchId);
+      commitChange();
+      if(isAppContextCurrent(retryContext)) refreshTranslationRecoveryUI();
+      if(isAppContextCurrent(retryContext)){
+        progressText.textContent='Retry Batch Item สำเร็จ';
+        setTimeout(function(){
+          if(progressText.textContent==='Retry Batch Item สำเร็จ') progressText.textContent='';
+        },4000);
+      }
+    }catch(err){
+      if(retryStarted&&!retryCompleted){
+        try{
+          if(err.name==='AbortError'){
+            await PrungAksornStorageV2.cancelTranslationJob(job.jobId,job.revision);
+          }else{
+            await PrungAksornStorageV2.failTranslationJob(job.jobId,{
+              code:'BATCH_RETRY_FAILED',
+              message:String(err.message||'เกิดข้อผิดพลาด'),
+              chunkIndex:typeof i==='number'?i:null,
+              retryCount:retryCount,
+              timestamp:Date.now()
+            },job.revision);
+          }
+        }catch(jobErr){
+          console.warn('Batch retry job state checkpoint failed:',jobErr);
+        }
+      }
+      activeTranslationJobId=null;
+      if(err.name!=='AbortError' && (!retryContext || isAppContextCurrent(retryContext))) showError('Retry ไม่สำเร็จ: '+(err.message||err));
+    }finally{
+      setTranslationSettingsLocked(false);
+      setAiBusy(false);
+      if(!retryContext || isAppContextCurrent(retryContext)){
+        cancelBtn.classList.remove('show');
+        if(progressText.textContent!=='Retry Batch Item สำเร็จ') progressText.textContent='';
+      }
+    }
+  }
+
+  async function prepareTranslationRecovery(jobId){
+    if(warnIfAiBusy())return;
+    hideError();
+    try{
+      var job=await PrungAksornStorageV2.getTranslationJob(jobId);
+      if(!job)throw new Error('ไม่พบ Translation Job นี้แล้ว');
+      PrungAksornStorageV2.validateTranslationJob(job);
+      if(job.jobType==='batch')throw new Error('Batch Job ต้องใช้ Batch Recovery โดยเฉพาะ');
+      pendingBatchResume=null;
+      if(['pending','running','paused','failed'].indexOf(job.status)<0)throw new Error('Job นี้ไม่สามารถกู้คืนจากสถานะ '+job.status+' ได้');
+      var proj=appData.projects.find(function(p){return p.id===job.projectId;});
+      if(!proj)throw new Error('ไม่พบ Project ต้นทางของ Job');
+      var book=(proj.books||[]).find(function(b){return b.id===job.bookId;});
+      if(!book)throw new Error('ไม่พบ Book ต้นทางของ Job');
+      var snapshot=job.sourceSnapshot;
+      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true)throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
+      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+      if(job.completedChunks>chunks.length)throw new Error('Checkpoint ของ Job เกินจำนวน Chunk ที่กู้คืนได้');
+      if(job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
+      if(job.completedChunks>0){
+        var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
+        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
+      }
+      if(providerSel.value!==job.provider)throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อนกู้คืน');
+      if(modelInput.value!==job.model)throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อนกู้คืน');
+      if(!document.getElementById('apiKey').value.trim())throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
+      advanceAppContextGeneration();
+      appData.currentProjectId=proj.id;
+      proj.currentBookId=book.id;
+      chapterTitle.value=snapshot.title||chapterTitle.value||'';
+      inputText.value=snapshot.originalText;
+      inCount.textContent=countWords(inputText.value)+' คำ';
+      updateChunkInfo();
+      setOutput(job.partialResults.map(function(x){return x.text;}).join('\n\n'));
+      pendingResume={
+        chunks:chunks,
+        proj:proj,
+        key:null,
+        model:job.model,
+        startIndex:job.completedChunks,
+        results:job.partialResults.map(function(x){return x.text;}),
+        originalText:snapshot.originalText,
+        chapterId:job.chapterId,
+        jobId:job.jobId,
+        provider:job.provider,
+        sourceSnapshotText:snapshot.text,
+        revision:job.revision,
+        settingsSnapshot: normalizeTranslationSettingsSnapshot(job.settingsSnapshot, job.provider, job.model, job.chunkSize)
+      };
+      activeTranslationJobId=null;
+      if(resumeBtn){
+        resumeBtn.textContent='ดำเนินการต่อจากจุดกู้คืน';
+        resumeBtn.classList.add('show');
+      }
+      renderProjects();
+      renderBottomHistory();
+      clearTranslationRecoveryUI();
+      showError('เตรียมกู้คืน Job '+job.jobId+' แล้ว กด “ดำเนินการต่อจากจุดกู้คืน” เพื่อเริ่ม API');
+    }catch(e){
+      showError('ไม่สามารถเตรียม Recovery Job ได้: '+(e.message||e));
+    }
+  }
+
+  /* โหลดข้อมูลจาก IndexedDB V2 และทำ migration V1 -> V2 เมื่อจำเป็น */
+  async function loadData(){
+    try{
+      var data = await storageV2.load();
+      if(data && typeof data === 'object') appData = data;
+    }catch(e){
+      storageReady = false;
+      console.error('Error loading data from IndexedDB V2:', e);
+      return false;
+    }
+    if(!appData || typeof appData !== 'object') appData = { projects: [], currentProjectId: null };
+    if(!Array.isArray(appData.projects)) appData.projects = [];
+    var migratedBookDrafts = false;
+    appData.projects = appData.projects.filter(function(p){ return p && typeof p === 'object' && p.id && p.name; }).map(function(p){
+      var legacyDraft = typeof p.draft === 'string' ? p.draft : '';
+      var legacyChapterTitle = typeof p.chapterTitle === 'string' ? p.chapterTitle : '';
+      var hadLegacyDraftFields = Object.prototype.hasOwnProperty.call(p, 'draft') || Object.prototype.hasOwnProperty.call(p, 'chapterTitle');
+
+      if(!Array.isArray(p.books) || p.books.length === 0){
+        p.books = [{ id: makeId('b'), title: 'เล่ม 1', history: Array.isArray(p.history) ? p.history : [], draft: legacyDraft, chapterTitle: legacyChapterTitle }];
+        p.currentBookId = p.books[0].id;
+        if(hadLegacyDraftFields) migratedBookDrafts = true;
+      } else {
+        if(!p.currentBookId && p.books.length > 0) p.currentBookId = p.books[0].id;
+        var activeBookBeforeNormalize = p.books.find(function(b){ return b.id === p.currentBookId; }) || null;
+        if(!activeBookBeforeNormalize && p.books.length > 0){
+          p.currentBookId = p.books[0].id;
+          activeBookBeforeNormalize = p.books[0];
+        }
+        var activeBookHadDraft = !!(activeBookBeforeNormalize && typeof activeBookBeforeNormalize.draft === 'string');
+        var activeBookHadChapterTitle = !!(activeBookBeforeNormalize && typeof activeBookBeforeNormalize.chapterTitle === 'string');
+
+        p.books.forEach(function(b){
+          b.history = Array.isArray(b.history) ? b.history : [];
+          b.draft = typeof b.draft === 'string' ? b.draft : '';
+          b.chapterTitle = typeof b.chapterTitle === 'string' ? b.chapterTitle : '';
+        });
+
+        var activeBook = p.books.find(function(b){ return b.id === p.currentBookId; }) || null;
+        if(activeBook){
+          if(!activeBookHadDraft && legacyDraft){
+            activeBook.draft = legacyDraft;
+            migratedBookDrafts = true;
+          }
+          if(!activeBookHadChapterTitle && legacyChapterTitle){
+            activeBook.chapterTitle = legacyChapterTitle;
+            migratedBookDrafts = true;
+          }
+        }
+      }
+
+      if(!p.currentBookId && p.books.length > 0) p.currentBookId = p.books[0].id;
+      var activeBook = p.books.find(function(b){ return b.id === p.currentBookId; }) || null;
+      if(!activeBook && p.books.length > 0){
+        p.currentBookId = p.books[0].id;
+        activeBook = p.books[0];
+      }
+      if(activeBook){
+        if(hadLegacyDraftFields) migratedBookDrafts = true;
+        delete p.draft;
+        delete p.chapterTitle;
+      }
+
+      p.glossary = typeof p.glossary === 'string' ? p.glossary : '';
+      p.context = typeof p.context === 'string' ? p.context : '';
+      return p;
+    });
+    storageReady = true;
+    if(migratedBookDrafts) saveData();
+    appData.settings = Object.assign({}, defaultSettings, appData.settings || {});
+    if(!appData.settings.apiStats) appData.settings.apiStats = { tokens: 0, cost: 0 };
+    return true;
+  }
+
+  function saveSettings(){
+    var prevSettings = appData.settings || {};
+    appData.settings = {
+      provider: providerSel.value,
+      model: modelInput.value,
+      chunkLen: document.getElementById('chunkLen').value,
+      source: state.source, level: state.level, genre: state.genre, style: state.style,
+      outputFontSize: outputFontSize,
+      readerFontSize: prevSettings.readerFontSize || defaultSettings.readerFontSize,
+      darkMode: document.documentElement.classList.contains('dark-mode'),
+      ttsRate: prevSettings.ttsRate || defaultSettings.ttsRate,
+      ttsVoiceURI: prevSettings.ttsVoiceURI || defaultSettings.ttsVoiceURI,
+      apiStats: prevSettings.apiStats || { tokens: 0, cost: 0 }
+    };
+    saveData();
+  }
+
+  function applySettingsToUI(){
+    var s = appData.settings;
+    providerSel.value = s.provider;
+    modelInput.value = s.model;
+    document.getElementById('chunkLen').value = s.chunkLen;
+    state.source = s.source; state.level = s.level; state.genre = s.genre; state.style = s.style;
+    outputFontSize = Number(s.outputFontSize) || defaultSettings.outputFontSize;
+
+    if(s.darkMode){
+      document.documentElement.classList.add('dark-mode');
+    }else{
+      document.documentElement.classList.remove('dark-mode');
+    }
+    updateThemeButtons(s.darkMode);
+    renderCostMeter();
+
+    function setSegActive(id, val){
+      var seg = document.getElementById(id);
+      seg.querySelectorAll('button').forEach(function(b){
+        b.classList.toggle('active', b.dataset.val === val);
+      });
+    }
+    setSegActive('sourceSeg', s.source);
+    setSegActive('levelSeg', s.level);
+    setSegActive('styleSeg', s.style);
+    document.getElementById('genreChips').querySelectorAll('.chip').forEach(function(c){
+      c.classList.toggle('active', c.dataset.val === s.genre);
+    });
+    setOutputFontSize(outputFontSize, false);
+    updateTranslationSummary();
+    updateKeyStatusBadge();
+  }
+
+  async function saveDataImmediate(){
+    if(!storageReady){
+      if(saveStatusText){
+        saveStatusText.textContent = '⚠ ฐานข้อมูลยังไม่พร้อม';
+        saveStatusText.classList.remove('saving');
+      }
+      return false;
+    }
+    try{
+      await storageV2.save(appData);
+      if(saveStatusText){
+        saveStatusText.textContent = '⚬ บันทึกแล้ว';
+        saveStatusText.classList.remove('saving');
+      }
+      return true;
+    }catch(e){
+      console.error('IndexedDB V2 save failed:', e);
+      if(saveStatusText){
+        saveStatusText.textContent = '⚠ บันทึกไม่สำเร็จ';
+        saveStatusText.classList.remove('saving');
+      }
+      return false;
+    }
+  }
+
+  var saveDataTimer = null;
+  var saveDataPending = false;
+  var saveDataVersion = 0;
+  var saveRetryTimer = null;
+  var saveRetryCount = 0;
+  var saveDataInFlight = null;
+  var SAVE_RETRY_DELAYS = [1000, 3000, 10000];
+
+  function scheduleSaveRetry(){
+    if(!saveDataPending || saveRetryTimer || saveRetryCount >= SAVE_RETRY_DELAYS.length) return;
+    var delay = SAVE_RETRY_DELAYS[saveRetryCount];
+    saveRetryCount += 1;
+    if(saveStatusText){
+      saveStatusText.textContent = '⚠ บันทึกไม่สำเร็จ กำลังลองใหม่...';
+      saveStatusText.classList.add('saving');
+    }
+    saveRetryTimer = setTimeout(function(){
+      saveRetryTimer = null;
+      flushSaveData();
+    }, delay);
+  }
+
+  async function flushSaveData(){
+    if(saveDataInFlight) return saveDataInFlight;
+    saveDataInFlight = (async function(){
+      clearTimeout(saveDataTimer);
+      saveDataTimer = null;
+      if(!saveDataPending) return true;
+
+      var flushVersion = saveDataVersion;
+      saveDataPending = false;
+      var ok = await saveDataImmediate();
+
+      // Preserve a newer pending change or a failed save for a subsequent flush.
+      if(!ok || saveDataVersion !== flushVersion){
+        saveDataPending = true;
+        if(!ok){
+          scheduleSaveRetry();
+        }else if(!saveDataTimer){
+          saveDataTimer = setTimeout(flushSaveData, 400);
+        }
+      }else{
+        saveRetryCount = 0;
+        clearTimeout(saveRetryTimer);
+        saveRetryTimer = null;
+      }
+      return ok && saveDataVersion === flushVersion;
+    })();
+    try{
+      return await saveDataInFlight;
+    }finally{
+      saveDataInFlight = null;
+    }
+  }
+
+  function saveData(){
+    if(!storageReady) return false;
+    saveDataPending = true;
+    saveDataVersion += 1;
+    saveRetryCount = 0;
+    clearTimeout(saveRetryTimer);
+    saveRetryTimer = null;
+    clearTimeout(saveDataTimer);
+    saveDataTimer = setTimeout(flushSaveData, 400);
+    return true;
+  }
+
+  function flushPendingSaveOnLifecycle(){
+    if(saveDataPending) flushSaveData();
+  }
+
+  window.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'hidden') flushPendingSaveOnLifecycle();
+  });
+
+  window.addEventListener('pagehide', flushPendingSaveOnLifecycle);
+
+  // Keep beforeunload as a last-attempt fallback; lifecycle handlers above are preferred.
+  window.addEventListener('beforeunload', flushPendingSaveOnLifecycle);
+
+  function commitChange(){
+    saveData();
+    renderProjects();
+    renderBottomHistory();
+  }
+
+  function getCurrentProject(){
+    return appData.projects.find(function(p){ return p.id === appData.currentProjectId; }) || null;
+  }
+
+  function makeId(prefix){
+    return prefix + '_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random().toString(16).slice(2));
+  }
+
+  function safeFilename(name){
+    return (name || 'prung-aksorn').replace(/[\\/:*?"<>|]/g, '_').trim().slice(0, 80) || 'prung-aksorn';
+  }
+
+  function escapeHtml(str){
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function fmtTime(ts){
+    var d = new Date(ts);
+    return d.toLocaleDateString('th-TH', {day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit'});
+  }
+
+  function levelDesc(l){
+    if(l === 'proof') return 'พิสูจน์อักษรเบาๆ แก้เฉพาะจุดที่สะดุดหรือผิดหลักภาษา คงสำนวนและคำเดิมไว้ให้มากที่สุด';
+    if(l === 'rewrite') return 'ขัดเกลาใหม่อย่างเต็มที่ ปรับจังหวะประโยคและสำนวนให้อ่านลื่นไหลสนุกที่สุดเท่าที่จะทำได้ โดยยังคงเนื้อเรื่องและความหมายเดิม';
+    return 'เรียบเรียงระดับกลาง ปรับประโยคให้ลื่นไหลขึ้นอย่างเป็นธรรมชาติ แต่ยังคงลีลาและน้ำเสียงของผู้เขียนไว้';
+  }
+  function styleDesc(s){
+    if(s === 'สำนวนย้อนยุค') return 'ใช้สำนวนภาษาไทยแบบย้อนยุค มีกลิ่นอายคำโบราณหรือคำที่ใช้ในนิยายพื้นบ้าน/กำลังภายใน/ยุคเก่า เพิ่มความขลังและบรรยากาศแบบดั้งเดิม';
+    if(s === 'สำนวนร่วมสมัย') return 'ใช้สำนวนภาษาไทยร่วมสมัย อ่านลื่นเหมือนนิยายที่ตีพิมพ์ในปัจจุบัน จังหวะกระชับทันสมัย';
+    if(s === 'สำนวนทางการ') return 'ใช้สำนวนภาษาไทยที่เป็นทางการ สุภาพ เรียบร้อย เหมาะกับงานเขียนเชิงวรรณกรรมหรือทางการ';
+    return 'ใช้สำนวนภาษาไทยแบบปัจจุบันทั่วไปที่ผู้อ่านคุ้นเคย เป็นธรรมชาติในชีวิตประจำวัน';
+  }
+/* ---------------- Smart Relevant Glossary Filter ---------------- */
+  function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+/* ---------------- ฟังก์ชันตรวจจับคำในบทความแบบยืดหยุ่น (Case-Insensitive + Suffix Support) ---------------- */
+  function isTermInText(term, text) {
+    if (!term || !text) return false;
+    term = term.trim();
+    if (!term) return false;
+
+    // 1. ล้างอักขระล่องหนและแปลง Smart Quotes ในคำค้นหาให้เป็นมาตรฐานเดียวกับบทความ
+    var cleanTerm = term
+      .replace(/[\u00AD\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+
+    // 2. ถ้าเป็นภาษาอังกฤษ/ละติน: รองรับตัวพิมพ์เล็ก-ใหญ่ (Case-Insensitive) และการเติม s, es, 's, ed, ing
+    if (/^[A-Za-z0-9\s'-]+$/.test(cleanTerm)) {
+      try {
+        // ดักจับคำ ไม่ว่าจะเป็นรูปเอกพจน์, พหูพจน์ (s/es), แสดงความเป็นเจ้าของ ('s), หรือกริยา (ed/ing)
+        var pattern = '\\b' + escapeRegex(cleanTerm) + "(?:'s|’s|s|es|d|ed|ing)?\\b";
+        var reg = new RegExp(pattern, 'i');
+        if (reg.test(text)) return true;
+      } catch(e) {}
+    }
+
+    // 3. Fallback: ค้นหาแบบ Substring ไม่สนตัวพิมพ์เล็ก-ใหญ่ (สำหรับภาษาไทย, จีน หรือคำที่มีสัญลักษณ์)
+    return text.toLowerCase().indexOf(cleanTerm.toLowerCase()) !== -1;
+  }
+
+/* ---------------- ระบบคัดกรองคลังคำแบบคำยาวมาก่อน (Longest-Match-First) ---------------- */
+  function filterRelevantGlossary(glossaryText, chunkText) {
+    if (!glossaryText || !glossaryText.trim() || !chunkText) return { text: '', count: 0 };
+
+    var lines = glossaryText.split('\n');
+    var validTerms = [];
+    var seen = Object.create(null);
+
+    // 1. แยกบรรทัดและคัดกรองคู่คำศัพท์ที่ถูกต้อง
+    lines.forEach(function(line) {
+      var cleanLine = line.trim().replace(/^[-*•\d.]+\s*/, '').trim();
+      if (!cleanLine || cleanLine.startsWith('[') || cleanLine.startsWith('#')) return;
+      if (!cleanLine.includes('=')) return;
+
+      var parts = cleanLine.split('=');
+      var src = parts[0].trim();
+      var trans = parts.slice(1).join('=').trim();
+      if (!src || !trans) return;
+
+      var keyLower = src.toLowerCase();
+      if (seen[keyLower]) return;
+      seen[keyLower] = true;
+
+      validTerms.push({ src: src, trans: trans });
+    });
+
+    // 2. ⚡ จัดเรียงลำดับจากคำที่ยาวที่สุดไปหาสั้นที่สุด (Longest-Match-First)
+    validTerms.sort(function(a, b) {
+      return b.src.length - a.src.length || a.src.localeCompare(b.src);
+    });
+
+    // 3. ตรวจจับคำที่ปรากฏใน Chunk ตามลำดับความยาว
+    var matchedTerms = [];
+    validTerms.forEach(function(term) {
+      if (isTermInText(term.src, chunkText) || isTermInText(term.trans, chunkText)) {
+        matchedTerms.push(term.src + ' = ' + term.trans);
+      }
+    });
+
+    return {
+      text: matchedTerms.join('; '),
+      count: matchedTerms.length
+    };
+  }
+
+  function buildTranslatePrompt(proj, previousTail, currentChunk){
+    // ถ้าส่ง currentChunk มาจะกรองคำเฉพาะส่วนนั้น ถ้าไม่ส่งจะใช้คลังคำทั้งหมดตามเดิม
+    var filterResult = currentChunk
+      ? filterRelevantGlossary(proj.glossary, currentChunk)
+      : { text: (proj.glossary ? proj.glossary.replace(/\n+/g, '; ') : ''), count: 0 };
+
+    var glossaryPart = filterResult.text
+      ? (' ใช้คำศัพท์เฉพาะที่พบในส่วนนี้อย่างสม่ำเสมอ (เรียงลำดับตามความเจาะจง หากมีคำซ้อนทับกันให้ยึดคำที่ยาวที่สุดเป็นหลัก): ' + filterResult.text + '.')
+      : '';
+    var contextPart = proj.context ? (' บริบทของเรื่อง: ' + proj.context) : '';
+    var tailPart = previousTail ? (' นี่คือข้อความท้ายส่วนก่อนหน้าที่ทำเสร็จไปแล้ว (แค่ให้ดูเพื่อต่อเนื้อความให้ลื่นไหลเป็นธรรมชาติ ห้ามทำซ้ำข้อความนี้อีกในคำตอบ): "' + previousTail + '"') : '';
+
+    var base = state.source === 'translate'
+      ? ('คุณเป็นนักแปลนิยายมืออาชีพ ผู้เชี่ยวชาญงานแปลแนว' + state.genre + 'เป็นภาษาไทย หน้าที่ของคุณคือแปลข้อความที่ได้รับเป็นภาษาไทยที่อ่านลื่นไหล เป็นธรรมชาติ เหมาะกับนิยาย รักษาโทนอารมณ์ น้ำเสียง และความหมายดั้งเดิมของต้นฉบับให้ครบถ้วน')
+      : ('คุณเป็นบรรณาธิการต้นฉบับนิยายมืออาชีพ ผู้เชี่ยวชาญงานแนว' + state.genre + ' หน้าที่ของคุณคือปรับสำนวนภาษาไทยของข้อความต่อไปนี้ให้ลื่นไหลและเป็นธรรมชาติมากขึ้น โดยไม่เปลี่ยนเนื้อเรื่องหรือความหมายเดิม');
+
+    return base +
+      ' ระดับการปรับสำนวน: ' + levelDesc(state.level) +
+      ' สำนวนภาษาที่ต้องการ: ' + styleDesc(state.style) + '.' +
+      glossaryPart + contextPart + tailPart +
+      ' หมายเหตุ: ข้อความที่ได้รับอาจเป็นเพียงส่วนหนึ่งของเรื่องยาว ให้ทำงานต่อเนื่องเสมือนเป็นส่วนหนึ่งของทั้งเรื่อง' +
+      ' ตอบกลับเฉพาะข้อความภาษาไทยที่ทำเสร็จแล้วเท่านั้น ห้ามใส่คำอธิบาย คำนำ หมายเหตุ หรือกระบวนการคิด(Chain-of-thought) ใดๆ ทั้งสิ้น ตอบมาแค่ผลลัพธ์เพียวๆ เท่านั้น';
+  }
+  function getTail(text, maxLen){
+    text = (text || '').trim();
+    if(text.length <= maxLen) return text;
+    return text.slice(-maxLen);
+  }
+
+  function diffTokens(oldArr, newArr){
+    var n = oldArr.length, m = newArr.length;
+    var dp = new Array(n + 1);
+    for(var i = 0; i <= n; i++) dp[i] = new Int32Array(m + 1);
+    for(var i = n - 1; i >= 0; i--){
+      for(var j = m - 1; j >= 0; j--){
+        dp[i][j] = oldArr[i] === newArr[j] ? dp[i+1][j+1] + 1 : Math.max(dp[i+1][j], dp[i][j+1]);
+      }
+    }
+    var result = [];
+    var i = 0, j = 0;
+    while(i < n && j < m){
+      if(oldArr[i] === newArr[j]){ result.push({type:'same', text:oldArr[i]}); i++; j++; }
+      else if(dp[i+1][j] >= dp[i][j+1]){ result.push({type:'removed', text:oldArr[i]}); i++; }
+      else { result.push({type:'added', text:newArr[j]}); j++; }
+    }
+    while(i < n){ result.push({type:'removed', text:oldArr[i]}); i++; }
+    while(j < m){ result.push({type:'added', text:newArr[j]}); j++; }
+    return result;
+  }
+
+  function diffTexts(oldText, newText){
+    var oldWords = (oldText || '').split(/(\s+)/).filter(function(s){ return s.length; });
+    var newWords = (newText || '').split(/(\s+)/).filter(function(s){ return s.length; });
+    if(oldWords.length * newWords.length > 3000000){
+      oldWords = (oldText || '').split(/\n+/);
+      newWords = (newText || '').split(/\n+/);
+      if(oldWords.length * newWords.length > 3000000) return null;
+    }
+    return diffTokens(oldWords, newWords);
+  }
+
+  function renderDiffHtml(diffResult){
+    var frag = document.createDocumentFragment();
+    diffResult.forEach(function(part){
+      if(part.type === 'same'){
+        frag.appendChild(document.createTextNode(part.text));
+      } else {
+        var span = document.createElement('span');
+        span.className = part.type === 'added' ? 'diff-added' : 'diff-removed';
+        span.textContent = part.text;
+        frag.appendChild(span);
+      }
+    });
+    return frag;
+  }
+
+  var appDialogOverlay = document.getElementById('appDialogOverlay');
+  var appDialogTitle = document.getElementById('appDialogTitle');
+  var appDialogMessage = document.getElementById('appDialogMessage');
+  var appDialogInput = document.getElementById('appDialogInput');
+  var appDialogCancelBtn = document.getElementById('appDialogCancelBtn');
+  var appDialogConfirmBtn = document.getElementById('appDialogConfirmBtn');
+  var appDialogResolver = null;
+  var appDialogMode = null;
+
+  function closeAppDialog(result){
+    appDialogOverlay.classList.remove('show');
+    if(appDialogResolver){
+      var r = appDialogResolver;
+      appDialogResolver = null;
+      r(result);
+    }
+  }
+  appDialogCancelBtn.addEventListener('click', function(){
+    closeAppDialog(appDialogMode === 'prompt' ? null : false);
+  });
+  appDialogConfirmBtn.addEventListener('click', function(){
+    if(appDialogMode === 'prompt') closeAppDialog(appDialogInput.value);
+    else closeAppDialog(true);
+  });
+  appDialogOverlay.addEventListener('click', function(e){
+    if(e.target !== appDialogOverlay) return;
+    closeAppDialog(appDialogMode === 'prompt' ? null : false);
+  });
+  appDialogInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); appDialogConfirmBtn.click(); }
+    else if(e.key === 'Escape'){ appDialogCancelBtn.click(); }
+  });
+  appDialogOverlay.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && appDialogOverlay.classList.contains('show')){
+      appDialogCancelBtn.click();
+    }
+  });
+
+  function showPromptDialog(title, defaultValue){
+    return new Promise(function(resolve){
+      appDialogMode = 'prompt';
+      appDialogResolver = resolve;
+      appDialogTitle.textContent = title;
+      appDialogMessage.style.display = 'none';
+      appDialogInput.style.display = 'block';
+      appDialogInput.value = defaultValue || '';
+      appDialogConfirmBtn.textContent = 'ตกลง';
+      appDialogConfirmBtn.classList.remove('danger');
+      appDialogCancelBtn.style.display = 'inline-block';
+      appDialogOverlay.classList.add('show');
+      setTimeout(function(){ appDialogInput.focus(); appDialogInput.select(); }, 50);
+    });
+  }
+
+  function showConfirmDialog(title, message, danger, confirmLabel){
+    return new Promise(function(resolve){
+      appDialogMode = 'confirm';
+      appDialogResolver = resolve;
+      appDialogTitle.textContent = title;
+      appDialogMessage.textContent = message;
+      appDialogMessage.style.display = 'block';
+      appDialogInput.style.display = 'none';
+      appDialogConfirmBtn.textContent = confirmLabel || (danger ? 'ลบ' : 'ตกลง');
+      appDialogConfirmBtn.classList.toggle('danger', !!danger);
+      appDialogCancelBtn.style.display = 'inline-block';
+      appDialogOverlay.classList.add('show');
+      setTimeout(function(){ appDialogConfirmBtn.focus(); }, 50);
+    });
+  }
+
+  function showAlertDialog(title, message){
+    return new Promise(function(resolve){
+      appDialogMode = 'alert';
+      appDialogResolver = resolve;
+      appDialogTitle.textContent = title;
+      appDialogMessage.textContent = message;
+      appDialogMessage.style.display = 'block';
+      appDialogInput.style.display = 'none';
+      appDialogConfirmBtn.textContent = 'ตกลง';
+      appDialogConfirmBtn.classList.remove('danger');
+      appDialogCancelBtn.style.display = 'none';
+      appDialogOverlay.classList.add('show');
+      setTimeout(function(){ appDialogConfirmBtn.focus(); }, 50);
+    });
+  }
+
+  var diffOverlay = document.getElementById('diffOverlay');
+  var diffBody = document.getElementById('diffBody');
+  var diffTitleEl = document.getElementById('diffTitle');
+  function openDiff(oldText, newText, titleText){
+    diffTitleEl.textContent = titleText || 'เทียบความต่าง';
+    diffBody.innerHTML = '';
+    var result = diffTexts(oldText, newText);
+    if(!result){
+      diffBody.textContent = 'ข้อความยาวเกินไปสำหรับเทียบความต่างแบบละเอียด ลองเทียบทีละส่วนที่สั้นกว่านี้';
+    } else {
+      diffBody.appendChild(renderDiffHtml(result));
+    }
+    diffOverlay.classList.add('show');
+  }
+  document.getElementById('diffCloseBtn').addEventListener('click', function(){
+    diffOverlay.classList.remove('show');
+  });
+  diffOverlay.addEventListener('click', function(e){
+    if(e.target === diffOverlay) diffOverlay.classList.remove('show');
+  });
+
+  function findEntryById(proj, id){
+    if(!proj || !id) return null;
+    var allHist = [];
+    (proj.books || []).forEach(function(b){ allHist = allHist.concat(b.history || []); });
+    if(proj.history) allHist = allHist.concat(proj.history);
+    return allHist.find(function(h){ return h.id === id; }) || null;
+  }
+
+  async function restoreBatchHistoryOrder(proj, book, batchId){
+    if(!proj || !batchId) return;
+    try{
+      var history = book ? (book.history || []) : (proj.history || []);
+      if(history.length < 2) return;
+      var jobs = await PrungAksornStorageV2.listTranslationJobs();
+      var orderByChapter = Object.create(null);
+      jobs.forEach(function(j){
+        if(j && j.jobType === 'batch' && j.batchId === batchId && Number.isInteger(j.batchIndex) && j.chapterId){
+          orderByChapter[j.chapterId] = j.batchIndex;
+        }
+      });
+      var batchEntries = history.map(function(entry, index){
+        return {
+          entry: entry,
+          index: index,
+          order: Object.prototype.hasOwnProperty.call(orderByChapter, entry.id) ? orderByChapter[entry.id] : null
+        };
+      }).filter(function(x){ return x.order !== null; });
+      if(batchEntries.length < 2) return;
+      batchEntries.sort(function(a,b){ return a.order - b.order || a.index - b.index; });
+      var cursor = 0;
+      var reordered = history.map(function(entry){
+        if(Object.prototype.hasOwnProperty.call(orderByChapter, entry.id)) return batchEntries[cursor++].entry;
+        return entry;
+      });
+      if(book) book.history = reordered;
+      else proj.history = reordered;
+    }catch(e){
+      console.warn('Batch history order restoration skipped:', e);
+    }
+  }
+
+  function sleep(ms){
+    return new Promise(function(resolve){ setTimeout(resolve, ms); });
+  }
+
+  function analyzeChunkRatio(sourceText, translatedText, priorRatios){
+    var srcLen = (sourceText || '').trim().length;
+    var outLen = (translatedText || '').trim().length;
+    if(srcLen < 40) return null;
+
+    var ratio = outLen / srcLen;
+    var srcParas = (sourceText.split(/\n\s*\n/).filter(function(p){ return p.trim(); })).length || 1;
+    var outParas = (translatedText.split(/\n\s*\n/).filter(function(p){ return p.trim(); })).length || 1;
+
+    var reasons = [];
+
+    if(priorRatios.length >= 2){
+      var avg = priorRatios.reduce(function(a, b){ return a + b; }, 0) / priorRatios.length;
+      if(ratio < avg * 0.4){
+        reasons.push('สั้นผิดปกติเมื่อเทียบกับส่วนก่อนหน้าในเรื่องเดียวกัน (ปกติ ~' + Math.round(avg * 100) + '% ของต้นฉบับ แต่ส่วนนี้ได้ ' + Math.round(ratio * 100) + '%)');
+      }
+    }
+
+    if(ratio < 0.15){
+      reasons.push('คำแปลสั้นกว่าต้นฉบับมาก (ประมาณ ' + Math.round(ratio * 100) + '% ของความยาวต้นฉบับ)');
+    }
+
+    if(srcParas >= 3 && outParas < srcParas * 0.5){
+      reasons.push('จำนวนย่อหน้าลดลงมาก (ต้นฉบับ ' + srcParas + ' ย่อหน้า เหลือคำแปล ' + outParas + ' ย่อหน้า)');
+    }
+
+    return { ratio: ratio, suspicious: reasons.length > 0, reasons: reasons };
+  }
+
+  function isRetryableError(err){
+    if(!err) return false;
+    if(err.status === 429) return true;
+    if(err.status >= 500 && err.status < 600) return true;
+    if(err.status === 'gemini_blocked' || err.status === 'gemini_empty') return false;
+    if(!err.status) return true;
+    return false;
+  }
+
+  function describeGeminiFinishReason(reason){
+    switch(reason){
+      case 'SAFETY': return 'ถูกบล็อกเพราะเข้าข่ายเนื้อหาที่ละเมิดนโยบายความปลอดภัยของ Gemini';
+      case 'RECITATION': return 'ถูกบล็อกเพราะระบบตรวจพบว่าคล้ายเนื้อหาที่มีลิขสิทธิ์มากเกินไป';
+      case 'PROHIBITED_CONTENT': return 'ถูกบล็อกเพราะเข้าข่ายเนื้อหาต้องห้ามตามนโยบายของ Google';
+      case 'SPII': return 'ถูกบล็อกเพราะระบบตรวจพบข้อมูลส่วนบุคคลที่ละเอียดอ่อน';
+      case 'MAX_TOKENS': return 'คำตอบถูกตัดกลางคันเพราะยาวเกินขีดจำกัดคำตอบของโมเดลนี้';
+      case 'OTHER': return 'ถูกบล็อกโดย Gemini โดยไม่ระบุสาเหตุที่ชัดเจน';
+      default: return 'ไม่ทราบสาเหตุชัดเจน (finishReason: ' + (reason || 'ไม่ระบุ') + ')';
+    }
+  }
+
+  function describeGeminiBlockReason(reason){
+    switch(reason){
+      case 'SAFETY': return 'นโยบายความปลอดภัยของ Google';
+      case 'BLOCKLIST': return 'คำต้องห้ามในระบบ';
+      case 'PROHIBITED_CONTENT': return 'เนื้อหาต้องห้าม';
+      default: return reason || 'ไม่ระบุ';
+    }
+  }
+
+  function resetActionStats() {
+    currentActionCost = 0;
+    currentActionTokens = 0;
+  }
+
+  function renderCostMeter() {
+    var stats = (appData.settings && appData.settings.apiStats) || { cost: 0 };
+    document.getElementById('costMeterValue').textContent = (stats.cost || 0).toFixed(4);
+  }
+
+  document.getElementById('costMeter').addEventListener('click', async function(){
+    var ok = await showConfirmDialog('รีเซ็ตสถิติค่าใช้จ่าย', 'ต้องการรีเซ็ตยอดค่าใช้จ่ายและจำนวน Token สะสมกลับเป็นศูนย์หรือไม่?');
+    if(ok) {
+      if(appData.settings) {
+        appData.settings.apiStats = { tokens: 0, cost: 0 };
+        saveSettings();
+        renderCostMeter();
+      }
+    }
+  });
+
+  function updateApiStats(model, pTokens, cTokens) {
+    if(!pTokens && !cTokens) return;
+
+    var modelKey = model.toLowerCase().trim();
+    var rate = API_RATES[modelKey];
+    if(!rate) {
+      if(modelKey.indexOf('flash') !== -1) rate = API_RATES['gemini-2.5-flash'];
+      else if(modelKey.indexOf('pro') !== -1) rate = API_RATES['gemini-2.5-pro'];
+      else if(modelKey.indexOf('4o-mini') !== -1) rate = API_RATES['gpt-4o-mini'];
+      else if(modelKey.indexOf('4o') !== -1) rate = API_RATES['gpt-4o'];
+      else rate = API_RATES['default'];
+    }
+
+    var costIn = (pTokens / 1000000) * rate.in;
+    var costOut = (cTokens / 1000000) * rate.out;
+    var totalCost = costIn + costOut;
+    var totalTokens = pTokens + cTokens;
+
+    currentActionTokens += totalTokens;
+    currentActionCost += totalCost;
+
+    if(!appData.settings.apiStats) appData.settings.apiStats = { tokens: 0, cost: 0 };
+    appData.settings.apiStats.tokens += totalTokens;
+    appData.settings.apiStats.cost += totalCost;
+
+    saveData();
+    renderCostMeter();
+  }
+
+  async function callAIWithRetry(sys, text, key, model, signal, maxRetries, providerOverride, responseFormat){
+    var requestProvider = providerOverride || providerSel.value;
+    var lastErr;
+    for(var attempt = 0; attempt <= maxRetries; attempt++){
+      try{
+        return await (requestProvider === 'openai'
+          ? callOpenAI(sys, text, key, model, signal, responseFormat)
+          : callGemini(sys, text, key, model, signal, responseFormat));
+      }catch(err){
+        if(err.name === 'AbortError') throw err;
+        lastErr = err;
+        if(!isRetryableError(err) || attempt === maxRetries) throw err;
+        progressText.textContent = 'เจอปัญหาชั่วคราว (' + (err.message || '') + ') กำลังลองใหม่ (' + (attempt + 1) + '/' + maxRetries + ')...';
+        await sleep(1000 * Math.pow(2, attempt));
+      }
+    }
+    throw lastErr;
+  }
+
+  function countWords(text){
+    text = (text || '').trim();
+    if(!text) return 0;
+    try{
+      if(typeof Intl !== 'undefined' && Intl.Segmenter){
+        var seg = new Intl.Segmenter('th', { granularity: 'word' });
+        var count = 0;
+        var iter = seg.segment(text)[Symbol.iterator]();
+        var r = iter.next();
+        while(!r.done){
+          if(r.value.isWordLike) count++;
+          r = iter.next();
+        }
+        return count;
+      }
+    }catch(e){}
+    return text.split(/\s+/).filter(Boolean).length;
+  }
+
+  var projectList = document.getElementById('projectList');
+  var activeProjectBanner = document.getElementById('activeProjectBanner');
+  var activeProjectName = document.getElementById('activeProjectName');
+
+  function renderProjects(){
+    projectList.innerHTML = '';
+    if(appData.projects.length === 0){
+      var empty = document.createElement('p');
+      empty.className = 'sidebar-empty';
+      empty.textContent = 'ยังไม่มีเรื่องนิยาย กด "+ เรื่องใหม่" เพื่อเริ่มต้น';
+      projectList.appendChild(empty);
+    }
+    appData.projects.forEach(function(proj){
+      var item = document.createElement('div');
+      item.className = 'project-item';
+
+      var row = document.createElement('div');
+      row.className = 'project-row' + (proj.id === appData.currentProjectId ? ' active' : '');
+
+      var name = document.createElement('span');
+      name.className = 'project-name';
+      name.textContent = proj.name;
+      row.appendChild(name);
+
+      var renameProjBtn = document.createElement('button');
+      renameProjBtn.className = 'icon-btn';
+      renameProjBtn.title = 'เปลี่ยนชื่อเรื่อง';
+      renameProjBtn.textContent = '✎';
+      renameProjBtn.addEventListener('click', async function(e){
+        e.stopPropagation();
+        var newName = await showPromptDialog('เปลี่ยนชื่อเรื่องนิยาย', proj.name);
+        if(newName && newName.trim()){
+          proj.name = newName.trim();
+          commitChange();
+          updateActiveBanner();
+        }
+      });
+      row.appendChild(renameProjBtn);
+
+      var glossBtn = document.createElement('button');
+      glossBtn.className = 'icon-btn';
+      glossBtn.title = 'คลังคำ & บริบท';
+      glossBtn.textContent = '⚙';
+      glossBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        gp.classList.toggle('open');
+      });
+      row.appendChild(glossBtn);
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'icon-btn';
+      delBtn.title = 'ลบเรื่องนี้';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', async function(e){
+        e.stopPropagation();
+        var ok = await showConfirmDialog('ลบเรื่องนิยาย', 'ลบเรื่อง "' + proj.name + '" พร้อมประวัติทั้งหมด? การลบไม่สามารถย้อนกลับได้', true);
+        if(ok){
+          var wasCurrentProject = appData.currentProjectId === proj.id;
+          if(wasCurrentProject) advanceAppContextGeneration();
+          appData.projects = appData.projects.filter(function(p){ return p !== proj; });
+          if(wasCurrentProject) appData.currentProjectId = null;
+          commitChange();
+          updateActiveBanner();
+        }
+      });
+      row.appendChild(delBtn);
+
+      row.addEventListener('click', function(){
+        flushPendingDraftSave();
+        appData.currentProjectId = proj.id;
+        expandedProjects[proj.id] = !expandedProjects[proj.id];
+        saveData();
+        renderProjects();
+        updateActiveBanner();
+        loadProjectDraft(proj);
+        advanceAppContextGeneration();
+      });
+
+      item.appendChild(row);
+
+      var gp = document.createElement('div');
+      gp.className = 'glossary-panel';
+      var gpTextarea = document.createElement('textarea');
+      gpTextarea.rows = 3;
+      gpTextarea.placeholder = 'ต้นฉบับ = คำแปล';
+      gpTextarea.value = proj.glossary || '';
+      gpTextarea.addEventListener('input', function(){
+        proj.glossary = gpTextarea.value;
+        saveData();
+      });
+      gp.appendChild(gpTextarea);
+
+      var aiGlossBtn = document.createElement('button');
+      aiGlossBtn.className = 'ai-glossary-btn';
+      aiGlossBtn.type = 'button';
+      aiGlossBtn.innerHTML = '<svg class="ic" viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M10 2.2l1.5 5.3L17 9l-5.5 1.5L10 15.8l-1.5-5.3L3 9l5.5-1.5L10 2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> ให้ AI แนะนำคลังคำจากข้อความ';
+      aiGlossBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        runAiGlossaryExtract(proj, gpTextarea);
+      });
+      gp.appendChild(aiGlossBtn);
+
+      var contextTextarea = document.createElement('textarea');
+      contextTextarea.rows = 3;
+      contextTextarea.placeholder = 'บริบทของเรื่อง';
+      contextTextarea.style.marginTop = '8px';
+      contextTextarea.value = proj.context || '';
+      contextTextarea.addEventListener('input', function(){
+        proj.context = contextTextarea.value;
+        saveData();
+      });
+      gp.appendChild(contextTextarea);
+      item.appendChild(gp);
+
+      var bookContainer = document.createElement('div');
+      bookContainer.className = 'book-list' + (expandedProjects[proj.id] ? ' open' : '');
+      if(expandedProjects[proj.id]){
+        (proj.books || []).forEach(function(book){
+          var brow = document.createElement('div');
+          brow.className = 'book-item-row' + (proj.currentBookId === book.id ? ' active' : '');
+
+          var btitle = document.createElement('span');
+          btitle.className = 'book-title-text';
+          btitle.innerHTML = '<svg class="ic" viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M2.5 4.2c2.2-1 5-1 7 .2v11.4c-2-1.2-4.8-1.2-7-.2V4.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M17.5 4.2c-2.2-1-5-1-7 .2v11.4c2-1.2 4.8-1.2 7-.2V4.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg> ' + escapeHtml(book.title);
+          btitle.addEventListener('click', function(e){
+            e.stopPropagation();
+            flushPendingDraftSave();
+            proj.currentBookId = book.id;
+            commitChange();
+            loadProjectDraft(proj);
+            advanceAppContextGeneration();
+          });
+          brow.appendChild(btitle);
+
+          var breadBtn = document.createElement('button');
+          breadBtn.className = 'icon-btn';
+          breadBtn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
+          breadBtn.title = 'อ่านเล่มนี้ต่อเนื่อง (โหมดนักอ่าน)';
+          breadBtn.addEventListener('click', function(e){
+            e.stopPropagation();
+            openReaderMode(proj, book.id);
+          });
+          brow.appendChild(breadBtn);
+
+          var brename = document.createElement('button');
+          brename.className = 'icon-btn';
+          brename.textContent = '✎';
+          brename.title = 'เปลี่ยนชื่อเล่ม';
+          brename.addEventListener('click', async function(e){
+            e.stopPropagation();
+            var newTitle = await showPromptDialog('เปลี่ยนชื่อเล่ม/โฟลเดอร์', book.title);
+            if(newTitle && newTitle.trim()){
+              book.title = newTitle.trim();
+              commitChange();
+            }
+          });
+          brow.appendChild(brename);
+
+          var bdel = document.createElement('button');
+          bdel.className = 'icon-btn';
+          bdel.textContent = '✕';
+          bdel.title = 'ลบเล่มนี้';
+          bdel.addEventListener('click', async function(e){
+            e.stopPropagation();
+            if(proj.books.length <= 1){ await showAlertDialog('ทำไม่ได้', 'ต้องมีอย่างน้อย 1 เล่มในเรื่องนี้'); return; }
+            var ok = await showConfirmDialog('ลบเล่ม', 'ต้องการลบเล่ม "' + book.title + '" พร้อมประวัติในเล่มหรือไม่? การลบไม่สามารถย้อนกลับได้', true);
+            if(ok){
+              var wasActiveBook = proj.currentBookId === book.id;
+              flushPendingDraftSave();
+              if(wasActiveBook) advanceAppContextGeneration();
+              proj.books = proj.books.filter(function(b){ return b.id !== book.id; });
+              if(wasActiveBook) proj.currentBookId = proj.books[0].id;
+              commitChange();
+              if(wasActiveBook) loadProjectDraft(proj);
+            }
+          });
+          brow.appendChild(bdel);
+
+          bookContainer.appendChild(brow);
+
+          if(proj.currentBookId === book.id){
+            var hist = document.createElement('div');
+            hist.className = 'history-list open';
+            var histLabel = document.createElement('div');
+            histLabel.className = 'history-list-label';
+            histLabel.textContent = 'ตอนที่แปลแล้ว';
+            hist.appendChild(histLabel);
+
+            var bookHistory = book.history || [];
+            var SIDEBAR_HISTORY_LIMIT = 8;
+            if(bookHistory.length === 0){
+              var hEmpty = document.createElement('div');
+              hEmpty.className = 'history-empty';
+              hEmpty.textContent = 'ยังไม่มีตอนที่แปลในเล่มนี้';
+              hist.appendChild(hEmpty);
+            } else {
+              var startIdx = Math.max(0, bookHistory.length - SIDEBAR_HISTORY_LIMIT);
+              var visibleHistory = bookHistory.slice(startIdx);
+              visibleHistory.forEach(function(entry, visIdx){
+                var idx = startIdx + visIdx;
+                var erow = document.createElement('div');
+                erow.className = 'history-entry-row';
+
+                var eb = document.createElement('button');
+                eb.className = 'history-entry';
+                eb.textContent = (entry.label || ('แปล' + (idx + 1))) + ' · ' + fmtTime(entry.ts);
+                eb.addEventListener('click', function(ev){
+                  ev.stopPropagation();
+                  viewHistoryEntry(proj, entry, idx);
+                });
+                erow.appendChild(eb);
+
+                var erename = document.createElement('button');
+                erename.className = 'icon-btn';
+                erename.title = 'เปลี่ยนชื่อตอนนี้';
+                erename.textContent = '✎';
+                erename.addEventListener('click', async function(ev){
+                  ev.stopPropagation();
+                  var currentLabel = entry.label || ('แปล' + (idx + 1));
+                  var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
+                  if(newLabel && newLabel.trim()){
+                    entry.label = newLabel.trim();
+                    commitChange();
+                    if(viewingHistoryId === entry.id){
+                      historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+                      historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
+                    }
+                  }
+                });
+                erow.appendChild(erename);
+
+                if(entry.parentId){
+                  var ediff = document.createElement('button');
+                  ediff.className = 'icon-btn diff-btn';
+                  ediff.title = 'เทียบความต่างกับต้นฉบับที่แก้มาจาก';
+                  ediff.textContent = 'Δ';
+                  ediff.addEventListener('click', async function(ev){
+                    ev.stopPropagation();
+                    var parentEntry = findEntryById(proj, entry.parentId);
+                    if(!parentEntry){ await showAlertDialog('ไม่พบต้นทาง', 'ไม่พบฉบับต้นทางที่ใช้เทียบ (อาจถูกลบไปแล้ว)'); return; }
+                    openDiff(parentEntry.output, entry.output, 'เทียบ "' + (parentEntry.label || 'ต้นทาง') + '" กับ "' + (entry.label || 'ฉบับแก้ไข') + '"');
+                  });
+                  erow.appendChild(ediff);
+                }
+
+                hist.appendChild(erow);
+              });
+
+              if(bookHistory.length > SIDEBAR_HISTORY_LIMIT){
+                var viewAllLink = document.createElement('button');
+                viewAllLink.className = 'textbtn history-view-all-link';
+                viewAllLink.style.display = 'block';
+                viewAllLink.style.marginTop = '6px';
+                viewAllLink.type = 'button';
+                viewAllLink.textContent = 'ดูทั้งหมด (' + bookHistory.length + ' ตอน) ที่แผงด้านล่าง ↓';
+                viewAllLink.addEventListener('click', function(ev){
+                  ev.stopPropagation();
+                  var panel = document.getElementById('projectHistoryBottom');
+                  if(panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+                hist.appendChild(viewAllLink);
+              }
+            }
+            bookContainer.appendChild(hist);
+          }
+        });
+
+        var addBookBtn = document.createElement('button');
+        addBookBtn.className = 'utility-btn';
+        addBookBtn.style.marginTop = '4px';
+        addBookBtn.style.fontSize = '11px';
+        addBookBtn.textContent = '+ เพิ่มเล่ม/โฟลเดอร์';
+        addBookBtn.addEventListener('click', async function(e){
+          e.stopPropagation();
+          var bname = await showPromptDialog('ตั้งชื่อเล่ม/โฟลเดอร์ใหม่', 'เล่มที่ ' + (proj.books.length + 1));
+          if(bname && bname.trim()){
+            var newBook = { id: makeId('b'), title: bname.trim(), history: [], draft: '', chapterTitle: '' };
+            flushPendingDraftSave();
+            advanceAppContextGeneration();
+            proj.books.push(newBook);
+            proj.currentBookId = newBook.id;
+            commitChange();
+            loadProjectDraft(proj);
+          }
+        });
+        bookContainer.appendChild(addBookBtn);
+      }
+      item.appendChild(bookContainer);
+
+      projectList.appendChild(item);
+    });
+  }
+
+  function updateActiveBanner(){
+    var proj = getCurrentProject();
+    if(proj){
+      activeProjectBanner.style.display = 'flex';
+      var activeBook = getActiveBook(proj);
+      var bookInfo = activeBook ? (' (' + activeBook.title + ')') : '';
+      activeProjectName.textContent = proj.name + bookInfo;
+    } else {
+      activeProjectBanner.style.display = 'none';
+    }
+  }
+
+  document.getElementById('addProjBtn').addEventListener('click', async function(){
+    var name = await showPromptDialog('ตั้งชื่อเรื่องนิยาย', '');
+    if(!name || !name.trim()) return;
+    var proj = { id: makeId('p'), name: name.trim(), glossary: '', context: '', books: [] };
+    var defaultBook = { id: makeId('b'), title: 'เล่ม 1', history: [], draft: '', chapterTitle: '' };
+    advanceAppContextGeneration();
+    proj.books.push(defaultBook);
+    proj.currentBookId = defaultBook.id;
+    appData.projects.push(proj);
+    appData.currentProjectId = proj.id;
+    expandedProjects[proj.id] = true;
+    commitChange();
+    updateActiveBanner();
+    loadProjectDraft(proj);
+  });
+
+  function dedupeGlossary(existingText, newText){
+    var seen = Object.create(null);
+    var lines = [];
+    function addLine(line){
+      line = line.trim();
+      if(!line) return;
+      var key = line.split('=')[0].trim().toLowerCase();
+      if(!key || seen[key]) return;
+      seen[key] = true;
+      lines.push(line);
+    }
+    (existingText || '').split('\n').forEach(addLine);
+    (newText || '').split('\n').forEach(addLine);
+    return lines.join('\n');
+  }
+
+/* ---------------- Interactive Glossary Review Modal Logic ---------------- */
+  var glossaryModal = document.getElementById('glossaryModal');
+  var glossaryListBody = document.getElementById('glossaryListBody');
+  var glossarySelectedCount = document.getElementById('glossarySelectedCount');
+  var glossaryModalCloseBtn = document.getElementById('glossaryModalCloseBtn');
+  var glossaryModalCancelBtn = document.getElementById('glossaryModalCancelBtn');
+  var glossaryModalSaveBtn = document.getElementById('glossaryModalSaveBtn');
+  var glossarySelectAllBtn = document.getElementById('glossarySelectAllBtn');
+  var glossaryDeselectAllBtn = document.getElementById('glossaryDeselectAllBtn');
+
+  var currentGlossaryReviewItems = [];
+  var glossaryModalResolver = null;
+
+  function updateGlossaryModalCount() {
+    var count = currentGlossaryReviewItems.filter(function(i){ return i.selected; }).length;
+    glossarySelectedCount.textContent = 'เลือกแล้ว ' + count + ' จาก ' + currentGlossaryReviewItems.length + ' คำ';
+    glossaryModalSaveBtn.disabled = (count === 0);
+  }
+
+  function showGlossaryReviewModal(items) {
+    return new Promise(function(resolve) {
+      currentGlossaryReviewItems = items;
+      glossaryModalResolver = resolve;
+      glossaryListBody.innerHTML = '';
+
+      items.forEach(function(item) {
+        var row = document.createElement('div');
+        row.className = 'glossary-row-item' + (item.selected ? '' : ' unchecked');
+
+        var chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.checked = item.selected;
+        chk.addEventListener('change', function() {
+          item.selected = chk.checked;
+          row.classList.toggle('unchecked', !chk.checked);
+          updateGlossaryModalCount();
+        });
+        row.appendChild(chk);
+
+        var srcLabel = document.createElement('span');
+        srcLabel.className = 'glossary-item-src';
+        srcLabel.textContent = item.src;
+        row.appendChild(srcLabel);
+
+        var arrow = document.createElement('span');
+        arrow.className = 'glossary-item-arrow';
+        arrow.textContent = '=';
+        row.appendChild(arrow);
+
+        var transInput = document.createElement('input');
+        transInput.type = 'text';
+        transInput.className = 'glossary-item-trans';
+        transInput.value = item.trans;
+        transInput.addEventListener('input', function() {
+          item.trans = transInput.value.trim();
+        });
+        row.appendChild(transInput);
+
+        glossaryListBody.appendChild(row);
+      });
+
+      updateGlossaryModalCount();
+      glossaryModal.classList.add('show');
+    });
+  }
+
+  function closeGlossaryReviewModal(confirmed) {
+    glossaryModal.classList.remove('show');
+    if (glossaryModalResolver) {
+      var res = glossaryModalResolver;
+      glossaryModalResolver = null;
+      if (confirmed) {
+        var approved = currentGlossaryReviewItems
+          .filter(function(i){ return i.selected && i.src && i.trans; })
+          .map(function(i){ return i.src + ' = ' + i.trans; });
+        res(approved);
+      } else {
+        res(null);
+      }
+    }
+  }
+
+  glossaryModalCloseBtn.addEventListener('click', function(){ closeGlossaryReviewModal(false); });
+  glossaryModalCancelBtn.addEventListener('click', function(){ closeGlossaryReviewModal(false); });
+  glossaryModalSaveBtn.addEventListener('click', function(){ closeGlossaryReviewModal(true); });
+
+  glossarySelectAllBtn.addEventListener('click', function(){
+    currentGlossaryReviewItems.forEach(function(i){ i.selected = true; });
+    glossaryListBody.querySelectorAll('.glossary-row-item').forEach(function(el){
+      el.classList.remove('unchecked');
+      el.querySelector('input[type="checkbox"]').checked = true;
+    });
+    updateGlossaryModalCount();
+  });
+
+  glossaryDeselectAllBtn.addEventListener('click', function(){
+    currentGlossaryReviewItems.forEach(function(i){ i.selected = false; });
+    glossaryListBody.querySelectorAll('.glossary-row-item').forEach(function(el){
+      el.classList.add('unchecked');
+      el.querySelector('input[type="checkbox"]').checked = false;
+    });
+    updateGlossaryModalCount();
+  });
+
+  // -------------------------------------------------------------
+  // ฟังก์ชันสกัดคลังคำพร้อมเปิดหน้าต่าง Pop-up ให้ตรวจก่อนบันทึก
+  // -------------------------------------------------------------
+  async function runAiGlossaryExtract(proj, textareaEl){
+    var text = inputText.value.trim();
+    var key = document.getElementById('apiKey').value.trim();
+    if(!text){ await showAlertDialog('ยังไม่มีข้อความ', 'กรุณาวางข้อความต้นฉบับก่อนให้ AI วิเคราะห์คลังคำ'); return; }
+    if(!key){ await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน'); return; }
+    if(warnIfAiBusy()) return;
+
+    var isThaiSource = (state.source === 'polish');
+    var genre = state.genre || 'ทั่วไป';
+    var sys = "";
+
+    // Prompt กฎเหล็ก: บังคับฝั่งซ้ายต้องเป็นภาษาต้นฉบับ 100% ห้ามเป็นภาษาไทย
+    // -------------------------------------------------------------
+    if (isThaiSource) {
+      // กรณีเลือกโหมด: "ไทยอยู่แล้ว (ขัดสำนวน)"
+      sys = "คุณคือบรรณาธิการภาษาไทย ผู้เชี่ยวชาญนิยายแนว " + genre + "\n" +
+            "หน้าที่ของคุณคือ: สแกนข้อความภาษาไทย แล้วดึงเฉพาะคำทับศัพท์ที่มักสะกดผิด หรือคำที่ควรล็อกมาตรฐานการสะกด\n" +
+            "[ข้อกำหนดสำคัญมาก]\n" +
+            "- ห้ามตอบคำที่ซ้ำกันทั้งสองฝั่งเด็ดขาด (เช่น ห้าม 'เจี้ยนเฉิน = เจี้ยนเฉิน')\n" +
+            "- ตอบเฉพาะคำที่มีการแก้ไขหรือล็อกมาตรฐาน เช่น 'คำที่สะกดผิด/คำที่พบ = คำสะกดมาตรฐานที่ถูกต้อง'\n" +
+            "- บรรทัดละ 1 คำ ห้ามใส่ bullet ห้ามใส่ตัวเลข";
+    } else {
+      // กรณีเลือกโหมด: "ภาษาอื่น (แปล)"
+      sys = "คุณคือนักแปลนิยายมืออาชีพ ผู้เชี่ยวชาญนิยายแนว " + genre + "\n" +
+            "หน้าที่ของคุณคือ: อ่านข้อความต้นฉบับ แล้วสกัดเฉพาะ 'ชื่อเฉพาะและศัพท์เฉพาะ' (ชื่อตัวละคร, สัตว์อสูร, สถานที่, สำนัก, ระดับพลัง, สมุนไพร, โอสถ, อาวุธ) เพื่อทำคลังคำ\n\n" +
+            "[กฎเหล็กเด็ดขาดเรื่องภาษา - STRICT CONSTRAINTS]\n" +
+            "1. รูปแบบต้องเป็น: [คำภาษาต้นฉบับดั้งเดิม] = [คำแปลภาษาไทย]\n" +
+            "2. ฝั่งซ้าย (ก่อนเครื่องหมาย =) ต้องเป็นภาษาต้นทางตามที่ปรากฏในข้อความ 100% (เช่น ภาษาอังกฤษ หรือ ภาษาจีน) ห้ามแปลหรือทับศัพท์เป็นภาษาไทยเด็ดขาด!\n" +
+            "   ✅ ตัวอย่างที่ถูกต้อง:\n" +
+            "   Jian Chen = เจี้ยนเฉิน\n" +
+            "   Empyrean Demon Lord = จอมมารเอ็มไพเรียน\n" +
+            "   Nan Potian = หนานโพเทียน\n" +
+            "   Fairy Hao Yue = เซียนฮ่าวเยว่\n" +
+            "   ❌ ตัวอย่างที่ผิดเด็ดขาด (ห้ามทำ):\n" +
+            "   เอ็มไพเรียนเดมอนลอร์ด = จอมมารเอ็มไพเรียน (ผิด! เพราะฝั่งซ้ายเป็นภาษาไทย)\n" +
+            "   เจี้ยนเฉิน = เจี้ยนเฉิน (ผิด! เพราะฝั่งซ้ายต้องเป็นภาษาอังกฤษ Jian Chen)\n" +
+            "3. ห้ามสกัดคำศัพท์สามัญทั่วไป (เช่น sword, forest, city, water, king)\n" +
+            "4. ตอบเฉพาะรายการคำศัพท์บรรทัดละ 1 คำ ห้ามใส่ bullet (- หรือ *) ห้ามใส่ตัวเลขลำดับ และห้ามมีคำอธิบายใดๆ ทั้งสิ้น";
+    }
+
+    var chunks = splitIntoChunks(text, 4000);
+    var rawResults = '';
+
+    activeController = new AbortController();
+    setAiBusy(true);
+    resetActionStats();
+    cancelBtn.classList.add('show');
+    try {
+      for(var i = 0; i < chunks.length; i++){
+        progressText.textContent = chunks.length > 1
+          ? ('กำลังให้ AI วิเคราะห์คลังคำ ส่วนที่ ' + (i + 1) + '/' + chunks.length + '...')
+          : 'กำลังให้ AI วิเคราะห์คลังคำและชื่อเฉพาะ...';
+        var result = await callAIWithRetry(sys, chunks[i], key, modelInput.value, activeController.signal, 1);
+        if(result && result.trim()){
+          rawResults += '\n' + result.trim();
+        }
+      }
+
+      var parsedItems = [];
+      var seen = Object.create(null);
+      var existingKeys = Object.create(null);
+      (proj.glossary || '').split('\n').forEach(function(line){
+        var k = line.split('=')[0].trim().toLowerCase();
+        if(k) existingKeys[k] = true;
+      });
+
+      rawResults.split('\n').forEach(function(rawLine){
+        var line = rawLine.trim().replace(/^[-*•\d.]+\s*/, '').trim();
+        if(!line.includes('=')) return;
+        var parts = line.split('=');
+        var src = parts[0].trim();
+        var trans = parts.slice(1).join('=').trim();
+        if(!src || !trans) return;
+        if(src.toLowerCase() === trans.toLowerCase()) return; //  ป้องกันกรณีคำฝั่งซ้ายตรงกับฝั่งขวาเป๊ะๆ (เช่น เจี้ยนเฉิน = เจี้ยนเฉิน)
+
+        var keyLower = src.toLowerCase();
+        if(!seen[keyLower]){
+          seen[keyLower] = true;
+          parsedItems.push({
+            src: src,
+            trans: trans,
+            selected: !existingKeys[keyLower] // ถ้ามีในคลังคำเดิมแล้วจะ uncheck ไว้
+          });
+        }
+      });
+
+      if(parsedItems.length === 0){
+        await showAlertDialog('ไม่พบคำศัพท์', 'AI ไม่พบชื่อเฉพาะหรือคำศัพท์ใหม่ในข้อความนี้');
+        return;
+      }
+
+      // เปิดหน้าต่าง Pop-up ให้ผู้ใช้ตรวจสอบ
+      var approvedList = await showGlossaryReviewModal(parsedItems);
+      if(approvedList && approvedList.length > 0){
+        var merged = dedupeGlossary(proj.glossary || '', approvedList.join('\n'));
+        proj.glossary = merged;
+        textareaEl.value = proj.glossary;
+        saveData();
+
+        var statsStr = '';
+        if(currentActionTokens > 0) statsStr = '\n\n(ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ประมาณ $' + currentActionCost.toFixed(4) + ')';
+        await showAlertDialog('สำเร็จ', 'บันทึกคำศัพท์ ' + approvedList.length + ' คำ ลงในคลังคำเรียบร้อยแล้ว' + statsStr);
+      }
+    } catch(err){
+      if(err.name !== 'AbortError'){
+        await showAlertDialog('ทำไม่สำเร็จ', 'ไม่สามารถดึงคลังคำได้: ' + (err.message || ''));
+      }
+    } finally {
+      setAiBusy(false);
+      cancelBtn.classList.remove('show');
+      progressText.textContent = '';
+    }
+  }
+
+  var historyViewBanner = document.getElementById('historyViewBanner');
+  var historyViewBannerBottom = document.getElementById('historyViewBannerBottom');
+  var historyViewLabel = document.getElementById('historyViewLabel');
+  var historyViewLabelBottom = document.getElementById('historyViewLabelBottom');
+  var chapterTitle = document.getElementById('chapterTitle');
+  var inputText = document.getElementById('inputText');
+  var inCount = document.getElementById('inCount');
+  var outCount = document.getElementById('outCount');
+  var output = document.getElementById('output');
+  var stamp = document.getElementById('stamp');
+  var qualityWarningBox = document.getElementById('qualityWarningBox');
+  var tqgQualityToggleBtn = document.getElementById('tqgQualityToggleBtn');
+  var tqgQualityPanel = document.getElementById('tqgQualityPanel');
+  var tqgQualityState = null;
+  var outputFontValue = document.getElementById('outputFontValue');
+  if(window.TQGQualityUI && tqgQualityToggleBtn && tqgQualityPanel){
+    window.TQGQualityUI.bindToggle(tqgQualityToggleBtn, tqgQualityPanel);
+    window.TQGQualityUI.mount(tqgQualityPanel, {});
+  }
+  var saveStatusText = document.getElementById('saveStatusText');
+
+  function hideQualityWarning(){
+    qualityWarningBox.style.display = 'none';
+    qualityWarningBox.textContent = '';
+  }
+  function showQualityWarning(msg){
+    qualityWarningBox.textContent = msg;
+    qualityWarningBox.style.display = 'block';
+  }
+
+  function resetTQGQualityPanel(){
+    tqgQualityState = null;
+    if(window.TQGQualityUI && tqgQualityPanel){
+      window.TQGQualityUI.mount(tqgQualityPanel, {});
+      tqgQualityPanel.hidden = true;
+      if(tqgQualityToggleBtn) tqgQualityToggleBtn.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function renderTQGQualityPanel(){
+    if(!window.TQGQualityUI || !tqgQualityPanel) return;
+    var stateData = tqgQualityState || {};
+    window.TQGQualityUI.mount(tqgQualityPanel, {
+      analysis: stateData.analysis || null,
+      inspection: stateData.inspection || null,
+      repair: stateData.repair || null
+    }, {
+      onInspect: inspectCurrentTQGQuality,
+      onRepair: repairCurrentTQGQuality
+    });
+  }
+
+  function isTQGQualityContextCurrent(){
+    if(!tqgQualityState || state.source !== 'translate') return false;
+    var currentSource = normalizeOCR(inputText.value || '');
+    var currentTarget = output.textContent || '';
+    return isAppContextCurrent(tqgQualityState.context) &&
+      currentSource === tqgQualityState.sourceText &&
+      currentTarget === tqgQualityState.targetText;
+  }
+
+  function createTQGAITransport(){
+    var key = document.getElementById('apiKey').value.trim();
+    if(!key) throw new Error('กรุณาใส่ API Key ก่อนใช้ TQG AI Inspector/Repair');
+    return function(request){
+      return callAIWithRetry(
+        request.systemPrompt,
+        request.userPrompt,
+        key,
+        modelInput.value,
+        activeController.signal,
+        1,
+        providerSel.value,
+        'json'
+      );
+    };
+  }
+
+  function analyzeTQGCompletedOutput(sourceText, targetText, proj){
+    if(state.source !== 'translate'){
+      resetTQGQualityPanel();
+      return;
+    }
+    if(!window.TQGIntegration || !window.TQGQualityUI) return;
+    try{
+      var result = window.TQGIntegration.analyzeCompletedOutput({
+        completed: true,
+        sourceText: String(sourceText || ''),
+        targetText: String(targetText || ''),
+        glossaryText: proj && typeof proj.glossary === 'string' ? proj.glossary : ''
+      });
+      if(result.status !== 'COMPLETED'){
+        console.warn('TQG analysis did not complete:', result.reason || result.status);
+        return;
+      }
+      tqgQualityState = {
+        context: captureAppContext(proj, getActiveBook(proj)),
+        sourceText: String(sourceText || ''),
+        targetText: String(targetText || ''),
+        glossaryText: proj && typeof proj.glossary === 'string' ? proj.glossary : '',
+        analysis: result.analysis,
+        inspection: null,
+        repair: null
+      };
+      renderTQGQualityPanel();
+    }catch(err){
+      console.warn('TQG integration boundary failed safely:', err);
+    }
+  }
+
+  async function inspectCurrentTQGQuality(){
+    if(!tqgQualityState || !tqgQualityState.analysis) return;
+    if(!isTQGQualityContextCurrent()){
+      resetTQGQualityPanel();
+      showQualityWarning('ผลตรวจ TQG เดิมไม่ตรงกับข้อความปัจจุบัน กรุณาแปลให้เสร็จก่อนตรวจซ้ำ');
+      return;
+    }
+    if(warnIfAiBusy()) return;
+    try{
+      activeController = new AbortController();
+      setAiBusy(true);
+      resetActionStats();
+      cancelBtn.classList.add('show');
+      progressText.textContent = 'กำลังตรวจคุณภาพ TQG ด้วย AI Inspector...';
+      var inspectionContext = captureAppContext(getCurrentProject(), getActiveBook(getCurrentProject()));
+      var inspectionSourceText = tqgQualityState.sourceText;
+      var inspectionTargetText = tqgQualityState.targetText;
+      var result = await window.TQGIntegration.inspectCompletedOutput({
+        completed: true,
+        analysis: tqgQualityState.analysis,
+        sourceText: tqgQualityState.sourceText,
+        targetText: tqgQualityState.targetText,
+        glossaryText: tqgQualityState.glossaryText,
+        transport: createTQGAITransport(),
+        analyzer: window.TQG ? window.TQG.analyze : null
+      });
+      if(!isAppContextCurrent(inspectionContext) ||
+         !tqgQualityState ||
+         tqgQualityState.sourceText !== inspectionSourceText ||
+         tqgQualityState.targetText !== inspectionTargetText){
+        return;
+      }
+      tqgQualityState.inspection = result;
+      tqgQualityState.repair = null;
+      renderTQGQualityPanel();
+    }catch(err){
+      if(err.name !== 'AbortError' && isAppContextCurrent(inspectionContext)) showError('TQG Inspector ไม่สำเร็จ: ' + (err.message || err));
+    }finally{
+      setAiBusy(false);
+      if(isAppContextCurrent(inspectionContext)){
+        cancelBtn.classList.remove('show');
+        progressText.textContent = '';
+      }
+    }
+  }
+
+  async function repairCurrentTQGQuality(){
+    if(!tqgQualityState || !tqgQualityState.analysis || !tqgQualityState.inspection) return;
+    if(!isTQGQualityContextCurrent()){
+      resetTQGQualityPanel();
+      showQualityWarning('ผลตรวจ TQG เดิมไม่ตรงกับข้อความปัจจุบัน กรุณาตรวจผลลัพธ์ใหม่ก่อนซ่อม');
+      return;
+    }
+    if(warnIfAiBusy()) return;
+    try{
+      activeController = new AbortController();
+      setAiBusy(true);
+      resetActionStats();
+      cancelBtn.classList.add('show');
+      progressText.textContent = 'กำลังซ่อมเฉพาะช่วงที่ TQG ยืนยัน...';
+      var repairContext = captureAppContext(getCurrentProject(), getActiveBook(getCurrentProject()));
+      var repairSourceText = tqgQualityState.sourceText;
+      var repairTargetText = tqgQualityState.targetText;
+      var inspection = tqgQualityState.inspection;
+      var result = await window.TQGIntegration.repairConfirmedAnomaly({
+        completed: true,
+        analysis: tqgQualityState.analysis,
+        originalAnalysis: tqgQualityState.analysis,
+        sourceText: tqgQualityState.sourceText,
+        targetText: tqgQualityState.targetText,
+        glossaryText: tqgQualityState.glossaryText,
+        findings: tqgQualityState.analysis.findings,
+        suspiciousSpan: inspection.span,
+        inspectorResult: inspection,
+        repairInstruction: inspection.replacementHint || 'Repair only the confirmed suspicious span.',
+        transport: createTQGAITransport(),
+        analyze: window.TQG ? window.TQG.analyze : null
+      });
+      if(!isAppContextCurrent(repairContext) ||
+         !tqgQualityState ||
+         tqgQualityState.sourceText !== repairSourceText ||
+         tqgQualityState.targetText !== repairTargetText){
+        return;
+      }
+      tqgQualityState.repair = result;
+      if(result.status === 'ACCEPTED' && result.accepted === true){
+        tqgQualityState.targetText = result.output;
+        output.textContent = result.output;
+        outCount.textContent = countWords(result.output) + ' คำ';
+        spread.classList.toggle('has-result', !!result.output.trim());
+        copyBtn.disabled = false;
+        downloadBtn.disabled = false;
+        editOutputBtn.disabled = false;
+        saveRevisionBtn.disabled = false;
+      }
+      renderTQGQualityPanel();
+    }catch(err){
+      if(err.name !== 'AbortError' && isAppContextCurrent(repairContext)) showError('TQG Repair ไม่สำเร็จ: ' + (err.message || err));
+    }finally{
+      setAiBusy(false);
+      if(isAppContextCurrent(repairContext)){
+        cancelBtn.classList.remove('show');
+        progressText.textContent = '';
+      }
+    }
+  }
+
+  function setResultFocus(enabled){
+    spread.classList.toggle('result-focus', !!enabled);
+  }
+
+  function setOutputFontSize(size, persist){
+    outputFontSize = Math.max(13, Math.min(26, Math.round(Number(size) * 2) / 2 || 15.5));
+    output.style.fontSize = outputFontSize + 'px';
+    outputFontValue.textContent = outputFontSize;
+    if(persist) saveSettings();
+  }
+
+  function updateTranslationSummary(){
+    var source = document.querySelector('#sourceSeg button.active');
+    var level = document.querySelector('#levelSeg button.active');
+    var genre = document.querySelector('#genreChips .chip.active');
+    var style = document.querySelector('#styleSeg button.active');
+    document.getElementById('translationSummary').textContent = [source, level, genre, style].filter(Boolean).map(function(el){ return el.textContent.trim(); }).join(' · ');
+  }
+
+  function updateChunkInfo() {
+    var text = inputText.value.trim();
+    var infoSpan = document.getElementById('chunkInfo');
+    if (!text) {
+      infoSpan.textContent = '';
+      return;
+    }
+    var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
+    var chars = text.length;
+    var chunks = splitIntoChunks(text, maxLen);
+
+    var str = '· ' + chars.toLocaleString() + ' อักขระ';
+    if (chunks.length > 1) {
+      str += ' (คิวส่ง AI ' + chunks.length + ' ส่วน)';
+    }
+    infoSpan.textContent = str;
+  }
+
+  function setOutput(text){
+    output.textContent = text || '';
+    outCount.textContent = countWords(output.textContent) + ' คำ';
+    var hasOutput = !!output.textContent.trim();
+    spread.classList.toggle('has-result', hasOutput);
+    if(!hasOutput) stamp.classList.remove('show');
+    hideGlossaryEnforce();
+    copyBtn.disabled = !hasOutput;
+    downloadBtn.disabled = !hasOutput;
+    editOutputBtn.disabled = !hasOutput;
+    saveRevisionBtn.disabled = !hasOutput;
+    hideQualityWarning();
+    resetTQGQualityPanel();
+  }
+
+  function loadProjectDraft(proj){
+    if(!proj) return;
+    var activeBook = getActiveBook(proj);
+    if(!activeBook) return;
+    viewingHistoryId = null;
+    pendingResume = null;
+    if(resumeBtn) resumeBtn.classList.remove('show');
+    document.body.classList.remove('history-mode');
+    historyViewBanner.classList.remove('show');
+    historyViewBannerBottom.classList.remove('show');
+    chapterTitle.value = activeBook.chapterTitle || '';
+    inputText.value = activeBook.draft || '';
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    updateChunkInfo();
+    highlightSuspicious(inputText.value);
+    stamp.classList.remove('show');
+    hideGlossaryEnforce();
+    setOutput('');
+    output.contentEditable = 'false';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
+    setResultFocus(false);
+    switchMobileTab('source');
+    renderBottomHistory();
+  }
+
+  function flushPendingDraftSave(){
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = null;
+    var context = draftSaveContext;
+    draftSaveContext = null;
+    draftSaveGeneration += 1;
+    if(!context) return;
+
+    var proj = appData.projects.find(function(p){ return p.id === context.projectId; }) || null;
+    if(!proj || !context.bookId) return;
+    var book = (proj.books || []).find(function(b){ return b.id === context.bookId; }) || null;
+    if(!book) return;
+    book.draft = context.draft;
+    book.chapterTitle = context.chapterTitle;
+  }
+
+  function saveDraftSoon(){
+    var proj = getCurrentProject();
+    if(!proj) return;
+    var activeBook = getActiveBook(proj);
+    if(!activeBook) return;
+    if(saveStatusText){
+      saveStatusText.textContent = '⋯ กำลังบันทึก';
+      saveStatusText.classList.add('saving');
+    }
+    clearTimeout(draftSaveTimer);
+
+    var context = {
+      generation: draftSaveGeneration + 1,
+      projectId: proj.id,
+      bookId: activeBook.id,
+      draft: inputText.value,
+      chapterTitle: chapterTitle.value.trim()
+    };
+    draftSaveGeneration = context.generation;
+    draftSaveContext = context;
+
+    draftSaveTimer = setTimeout(function(){
+      if(!draftSaveContext || draftSaveContext.generation !== context.generation) return;
+      draftSaveTimer = null;
+      draftSaveContext = null;
+
+      var targetProj = appData.projects.find(function(p){ return p.id === context.projectId; }) || null;
+      if(!targetProj || !context.bookId) return;
+      var targetBook = (targetProj.books || []).find(function(b){ return b.id === context.bookId; }) || null;
+      if(!targetBook) return;
+      targetBook.draft = context.draft;
+      targetBook.chapterTitle = context.chapterTitle;
+      saveData();
+    }, 450);
+  }
+
+  function viewHistoryEntry(proj, entry, idx){
+    viewingHistoryId = entry.id;
+    document.body.classList.add('history-mode');
+    chapterTitle.value = entry.label || '';
+    inputText.value = entry.input;
+    inCount.textContent = countWords(entry.input) + ' คำ';
+    updateChunkInfo();
+    highlightSuspicious('');
+    setOutput(entry.output);
+    output.contentEditable = 'false';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
+    setResultFocus(true);
+    stamp.classList.remove('show');
+    requestAnimationFrame(function(){ stamp.classList.add('show'); });
+    var label = entry.label || ('แปล' + (idx + 1));
+    historyViewLabel.textContent = 'ดูประวัติ: ' + label;
+    historyViewLabelBottom.textContent = 'ประวัติ: ' + label;
+    historyViewBanner.classList.add('show');
+    historyViewBannerBottom.classList.add('show');
+    switchMobileTab('output');
+    renderBottomHistory();
+    scrollToTopTarget();
+  }
+
+  document.querySelectorAll('.close-history-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      viewingHistoryId = null;
+      document.body.classList.remove('history-mode');
+      historyViewBanner.classList.remove('show');
+      historyViewBannerBottom.classList.remove('show');
+      loadProjectDraft(getCurrentProject());
+    });
+  });
+
+  document.getElementById('renameHistoryBtnBottom').addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    if(!proj || !viewingHistoryId) return;
+    var historyList = getActiveHistoryList(proj);
+    var entry = historyList.find(function(h){ return h.id === viewingHistoryId; });
+    if(!entry) return;
+    var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', entry.label || '');
+    if(newLabel && newLabel.trim()){
+      entry.label = newLabel.trim();
+      commitChange();
+      historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+      historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
+    }
+  });
+
+  document.getElementById('deleteHistoryBtnBottom').addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    if(!proj || !viewingHistoryId) return;
+    var activeBook = getActiveBook(proj);
+    var historyList = getActiveHistoryList(proj);
+    var entry = historyList.find(function(h){ return h.id === viewingHistoryId; });
+    if(!entry) return;
+    var ok = await showConfirmDialog('ลบประวัติการแปล', 'ต้องการลบ "' + (entry.label || 'ตอนนี้') + '" หรือไม่? การลบไม่สามารถย้อนกลับได้', true);
+    if(ok){
+      var filtered = historyList.filter(function(h){ return h.id !== entry.id; });
+      if(activeBook) activeBook.history = filtered;
+      else proj.history = filtered;
+
+      commitChange();
+      viewingHistoryId = null;
+      document.body.classList.remove('history-mode');
+      historyViewBanner.classList.remove('show');
+      historyViewBannerBottom.classList.remove('show');
+      loadProjectDraft(proj);
+    }
+  });
+
+  var gearBtn = document.getElementById('gearBtn');
+  var settingsPanel = document.getElementById('settingsPanel');
+  gearBtn.addEventListener('click', function(){ settingsPanel.classList.toggle('open'); });
+
+  var translationModal = document.getElementById('translationModal');
+  var translationSettingsBtn = document.getElementById('translationSettingsBtn');
+  var translationModalClose = document.getElementById('translationModalClose');
+  function closeTranslationModal(){
+    translationModal.classList.remove('open');
+    translationModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+  }
+  function openTranslationModal(){
+    translationModal.classList.add('open');
+    translationModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+  }
+  translationSettingsBtn.addEventListener('click', openTranslationModal);
+  translationModalClose.addEventListener('click', closeTranslationModal);
+
+  var providerSel = document.getElementById('provider');
+  var modelInput = document.getElementById('model');
+  providerSel.addEventListener('change', function(){
+    modelInput.value = providerSel.value === 'openai' ? 'gpt-4o-mini' : 'gemini-flash-latest';
+    saveSettings();
+  });
+  modelInput.addEventListener('change', saveSettings);
+  document.getElementById('chunkLen').addEventListener('change', function(){
+    saveSettings();
+    updateChunkInfo();
+  });
+
+  function wireSeg(id, key){
+    var seg = document.getElementById(id);
+    seg.addEventListener('click', function(e){
+      var btn = e.target.closest('button');
+      if(!btn) return;
+      seg.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state[key] = btn.dataset.val;
+      saveSettings();
+      updateTranslationSummary();
+    });
+  }
+  wireSeg('sourceSeg', 'source');
+  wireSeg('levelSeg', 'level');
+  wireSeg('styleSeg', 'style');
+
+  var chips = document.getElementById('genreChips');
+  chips.addEventListener('click', function(e){
+    var chip = e.target.closest('.chip');
+    if(!chip) return;
+    chips.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('active'); });
+    chip.classList.add('active');
+    state.genre = chip.dataset.val;
+    saveSettings();
+    updateTranslationSummary();
+  });
+
+  var errorBox = document.getElementById('errorBox');
+
+  // Defense-in-depth boundary for unexpected browser/runtime failures.
+  window.addEventListener('unhandledrejection', function(event){
+    var reason = event && event.reason;
+    if(reason && reason.name === 'AbortError') return;
+    console.error('Unhandled Promise rejection:', reason);
+  });
+  window.addEventListener('error', function(event){
+    console.error('Unhandled runtime error:', event && (event.error || event.message));
+  });
+  var processBtn = document.getElementById('processBtn');
+  var copyBtn = document.getElementById('copyBtn');
+  var downloadBtn = document.getElementById('downloadBtn');
+  var editOutputBtn = document.getElementById('editOutputBtn');
+  var saveRevisionBtn = document.getElementById('saveRevisionBtn');
+  var clearBtn = document.getElementById('clearBtn');
+  var cancelBtn = document.getElementById('cancelBtn');
+  var resumeBtn = document.getElementById('resumeBtn');
+  var repairBtn = document.getElementById('repairBtn');
+  var quickRepairBtn = document.getElementById('quickRepairBtn');
+  var progressText = document.getElementById('progressText');
+  var mobileProcessBtn = document.getElementById('mobileProcessBtn');
+
+  if(mobileProcessBtn){
+    mobileProcessBtn.addEventListener('click', function(){ processBtn.click(); });
+  }
+
+  document.addEventListener('keydown', function(e){
+    if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+      e.preventDefault();
+      processBtn.click();
+    }
+    if((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'r' || e.key === 'R')){
+      e.preventDefault();
+      repairBtn.click();
+    }
+    if(e.key === 'Escape'){
+      if(document.body.classList.contains('zen-mode')) toggleZenMode(false);
+      else if(translationModal.classList.contains('open')) closeTranslationModal();
+      else if(settingsPanel.classList.contains('open')) settingsPanel.classList.remove('open');
+      else if(glossaryModal && glossaryModal.classList.contains('show')) closeGlossaryReviewModal(false);
+      else if(readerOverlay.classList.contains('show') && !readerTocDrawer.classList.contains('open')) closeReaderMode();
+    }
+  });
+
+  document.getElementById('outputFontDown').addEventListener('click', function(){ setOutputFontSize(outputFontSize - 1, true); });
+  document.getElementById('outputFontUp').addEventListener('click', function(){ setOutputFontSize(outputFontSize + 1, true); });
+  document.getElementById('expandSourceBtn').addEventListener('click', function(){ setResultFocus(false); inputText.focus(); });
+  document.getElementById('collapseSourceBtn').addEventListener('click', function(){ setResultFocus(true); });
+
+  chapterTitle.addEventListener('input', saveDraftSoon);
+
+  inputText.addEventListener('input', function(){
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    updateChunkInfo();
+    highlightSuspicious(inputText.value);
+    saveDraftSoon();
+  });
+
+  var chapterHeadingRegex = /^[ \t]*(?:(?:ตอนที่|ตอที่|ตอน|บทที่|บท|chapter|ch\.|episode|ep\.|第)[ \t]*[0-9〇零一二三四五六七八九十百千两]+(?:[ \t]*章)?|(?:บทนำ|บทำ|บทส่งท้าย|prologue|epilogue|番外)).*$/i;
+
+  inputText.addEventListener('paste', function(e) {
+    e.preventDefault();
+    var pasteText = (e.clipboardData || window.clipboardData).getData('text');
+    if (!pasteText) return;
+
+    pasteText = normalizeOCR(pasteText);
+    var lines = pasteText.split('\n');
+    var firstContentLineIdx = -1;
+
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim() !== '') {
+        firstContentLineIdx = i;
+        break;
+      }
+    }
+
+    var extracted = false;
+    if (firstContentLineIdx !== -1) {
+      var firstLine = lines[firstContentLineIdx].trim();
+      if (chapterHeadingRegex.test(firstLine) && chapterTitle.value.trim() === '') {
+        chapterTitle.value = firstLine;
+        lines.splice(firstContentLineIdx, 1);
+        extracted = true;
+      }
+    }
+
+    var finalPasteText = lines.join('\n').replace(/^\s+/, '');
+    var start = this.selectionStart;
+    var end = this.selectionEnd;
+    var currentVal = this.value;
+
+    this.value = currentVal.substring(0, start) + finalPasteText + currentVal.substring(end);
+    this.selectionStart = this.selectionEnd = start + finalPasteText.length;
+
+    this.dispatchEvent(new Event('input'));
+
+    if (extracted) {
+      chapterTitle.dispatchEvent(new Event('input'));
+      progressText.textContent = 'ซ่อมฟอนต์ & ดึงชื่อตอนอัตโนมัติเรียบร้อย';
+    } else {
+      progressText.textContent = 'คลีนอักษรขยะจาก OCR ให้เรียบร้อย';
+    }
+    setTimeout(function(){ progressText.textContent = ''; }, 2500);
+  });
+
+  clearBtn.addEventListener('click', async function(){
+    if (inputText.value.trim() !== '' || output.textContent.trim() !== '') {
+      var ok = await showConfirmDialog('ล้างข้อความ', 'ต้องการล้างข้อความและผลลัพธ์ทั้งหมด เพื่อเตรียมแปลเนื้อหาใหม่ใช่หรือไม่?\n\n(หากยังไม่ได้บันทึกฉบับแก้ไข ข้อมูลที่ยังไม่บันทึกจะหายไป)', true);
+      if(!ok) return;
+    }
+
+    advanceAppContextGeneration();
+    chapterTitle.value = '';
+    inputText.value = '';
+    inCount.textContent = '0 คำ';
+    updateChunkInfo();
+    highlightSuspicious('');
+
+    hideGlossaryEnforce();
+    setOutput('');
+    output.contentEditable = 'false';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
+    stamp.classList.remove('show');
+
+    if(viewingHistoryId){
+      viewingHistoryId = null;
+      document.body.classList.remove('history-mode');
+      historyViewBanner.classList.remove('show');
+      historyViewBannerBottom.classList.remove('show');
+      setResultFocus(false);
+    }
+    switchMobileTab('source');
+    saveDraftSoon();
+  });
+
+  output.addEventListener('input', function(){
+    outCount.textContent = countWords(output.textContent) + ' คำ';
+    saveRevisionBtn.disabled = !output.textContent.trim();
+  });
+  editOutputBtn.addEventListener('click', function(){
+    var editing = output.contentEditable === 'true';
+    output.contentEditable = editing ? 'false' : 'true';
+    editOutputBtn.textContent = editing ? 'แก้ไขผลลัพธ์' : 'เสร็จสิ้น';
+    if(!editing) output.focus();
+  });
+
+  saveRevisionBtn.addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    var revised = output.textContent.trim();
+    if(!proj || !revised) return;
+    var label = await showPromptDialog('ตั้งชื่อฉบับแก้ไข', (chapterTitle.value || 'ฉบับแก้ไข'));
+    if(!label) return;
+    var newEntry = {
+      id: makeId('h'), ts: Date.now(), label: label.trim(),
+      input: inputText.value, output: revised,
+      source: state.source, level: state.level, genre: state.genre, style: state.style,
+      parentId: viewingHistoryId || null
+    };
+    var activeBook = getActiveBook(proj);
+    if(activeBook) activeBook.history.push(newEntry);
+    else (proj.history = proj.history || []).push(newEntry);
+
+    viewingHistoryId = newEntry.id;
+    commitChange();
+    progressText.textContent = 'บันทึกเรียบร้อย';
+    setTimeout(function(){ progressText.textContent = ''; }, 1500);
+  });
+
+  document.getElementById('importTextBtn').addEventListener('click', function(){ document.getElementById('textFile').click(); });
+  var batchImportBtn = document.getElementById('batchImportBtn');
+  var batchFileInput = document.getElementById('batchFileInput');
+  batchImportBtn.addEventListener('click', function(){ batchFileInput.click(); });
+  batchFileInput.addEventListener('change', function(e){
+    var files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if(files.length) runBatchImport(files);
+  });
+  document.getElementById('textFile').addEventListener('change', async function(e){
+    var file = e.target.files[0];
+    e.target.value = '';
+    if(!file) return;
+
+    var rawText;
+    try{
+      rawText = await readFileAsText(file);
+    }catch(err){
+      showError('อ่านไฟล์ไม่สำเร็จ: ' + (err.message || ''));
+      return;
+    }
+
+    var segments = detectChapterSplits(rawText);
+    if(segments){
+      var wantSplit = await showConfirmDialog(
+        'พบหลายตอนในไฟล์นี้',
+        'ตรวจพบรูปแบบหัวข้อตอนในไฟล์ทั้งหมด ' + segments.length + ' ตอน (เช่น "' + segments[0].label + '") ต้องการแบ่งและแปลทีละตอนอัตโนมัติหรือไม่?\n\nกด "ยกเลิก" เพื่อนำเข้าทั้งไฟล์เป็นก้อนเดียวแบบเดิมแทน'
+      );
+      if(wantSplit){
+        var proj = getCurrentProject();
+        var key = document.getElementById('apiKey').value.trim();
+        if(!proj){ showError('กรุณาเลือกหรือสร้างเรื่องนิยายก่อน'); return; }
+        if(!key){ showError('กรุณาใส่ API Key ก่อน'); return; }
+        var virtualFiles = segments.map(function(seg){
+          return { name: safeFilename(seg.label) + '.txt', __virtualText: seg.text };
+        });
+        runBatchImport(virtualFiles);
+        return;
+      }
+    }
+
+    inputText.value = rawText;
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    updateChunkInfo();
+    highlightSuspicious(inputText.value);
+    saveDraftSoon();
+  });
+
+  document.getElementById('exportBackupBtn').addEventListener('click', async function(){
+    try{
+      var flushed = await flushSaveData();
+      if(!flushed){ await showAlertDialog('สำรองข้อมูลไม่สำเร็จ', 'ไม่สามารถบันทึกข้อมูลล่าสุดลงฐานข้อมูลได้'); return; }
+      var payload = await storageV2.exportBackup();
+      var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'prung-aksorn-backup-v2-' + new Date().toISOString().slice(0,10) + '.json';
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 0);
+    }catch(err){
+      console.error('Backup export failed:', err);
+      await showAlertDialog('สำรองข้อมูลไม่สำเร็จ', 'ไม่สามารถสร้างไฟล์สำรองข้อมูลที่มีความสมบูรณ์ได้');
+    }
+  });
+
+  document.getElementById('importBackupBtn').addEventListener('click', function(){ document.getElementById('backupFile').click(); });
+  document.getElementById('backupFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = async function(){
+      try {
+        var rawParsed = JSON.parse(String(reader.result || ''));
+        var format = storageV2.detectBackupFormat(rawParsed);
+        if(format === 'unknown'){
+          throw new Error('ไม่รู้จักรูปแบบไฟล์สำรองนี้ ระบบรองรับ Backup V2 และ Backup รุ่นเก่าก่อน V2 เท่านั้น');
+        }
+
+        var checked = await storageV2.validateBackup(rawParsed);
+        var r = checked.report;
+        var summary;
+        if(format === 'legacy'){
+          summary = 'พบไฟล์ Backup รุ่นเก่า\n\n' +
+            'ระบบจะทำการแปลง Legacy → V2 Normalized ก่อนกู้คืน\n' +
+            'Projects: '+r.projects+'\nBooks: '+r.books+'\nChapters: '+r.chapters+'\nGlossary: '+r.glossary+'\nRevisions: '+r.revisions+'\n\n' +
+            'SHA-256: VALID (คำนวณใหม่จากข้อมูล V2 ที่แปลงแล้ว)\n' +
+            'Schema ปลายทาง: 2 (supported)\n\n' +
+            'ระบบจะไม่สร้างหรือกู้คืน Translation Jobs และจะสร้าง Safety Backup อัตโนมัติก่อนแทนที่ข้อมูลปัจจุบัน';
+        }else{
+          summary = 'Projects: '+r.projects+'\nBooks: '+r.books+'\nChapters: '+r.chapters+'\nGlossary: '+r.glossary+'\nRevisions: '+r.revisions+'\n\nSHA-256: VALID\nSchema: 2 (supported)\n\nการกู้คืนจะแทนที่ข้อมูลปัจจุบันทั้งหมด และระบบจะสร้าง Safety Backup อัตโนมัติก่อนดำเนินการ';
+        }
+
+        if(await showConfirmDialog('ยืนยันการกู้คืนข้อมูล', summary, true, 'ตกลง')){
+          var result = await storageV2.restoreBackup(rawParsed);
+          if(!result.success) throw new Error('Restore did not complete.');
+          await loadData();
+          applySettingsToUI();
+          renderProjects();
+          renderBottomHistory();
+          updateActiveBanner();
+          loadProjectDraft(getCurrentProject());
+          await showAlertDialog(
+            'กู้คืนสำเร็จ',
+            format === 'legacy'
+              ? 'กู้คืน Backup รุ่นเก่าเรียบร้อยแล้ว ระบบได้แปลงข้อมูลเป็น V2 และตรวจสอบฐานข้อมูลหลังการกู้คืนสำเร็จ'
+              : 'กู้คืนข้อมูลและตรวจสอบฐานข้อมูลหลังการกู้คืนเรียบร้อยแล้ว'
+          );
+        }
+      } catch(err) {
+        console.error('Backup restore failed:', err);
+        var msg = String(err&&err.message || 'ไม่สามารถกู้คืนไฟล์สำรองได้');
+        if(msg.indexOf('rolled back safely')>=0){
+          await showAlertDialog('กู้คืนไม่สำเร็จ', msg+'\n\nข้อมูลเดิมถูกนำกลับคืนแล้ว');
+        }else if(msg.indexOf('rollback failed')>=0){
+          await showAlertDialog('เกิดข้อผิดพลาดร้ายแรง', msg+'\n\nไม่สามารถยืนยันสถานะข้อมูลได้');
+        }else{
+          await showAlertDialog('ไฟล์สำรองไม่ถูกต้อง', msg);
+        }
+      }
+    };
+    reader.onerror = function(){
+      console.error('Backup file read failed:', reader.error || file.name);
+      showAlertDialog('อ่านไฟล์สำรองไม่สำเร็จ', 'ไม่สามารถอ่านไฟล์ Backup ที่เลือกได้ กรุณาลองไฟล์อื่นอีกครั้ง').catch(function(dialogErr){
+        console.error('Backup file read error dialog failed:', dialogErr);
+      });
+    };
+    reader.onabort = function(){
+      console.warn('Backup file read aborted:', file.name);
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  });
+
+/* ---------------- ฟังก์ชันทำความสะอาดอักขระขยะ, สระเพี้ยน & โฆษณาเว็บ ---------------- */
+  function normalizeOCR(text){
+    if(!text) return '';
+
+    // 1. แปลงรหัส PUA พื้นฐานเดิม 8 ตัว
+    var puaMap = {
+      '\uE200': 'ก', '\uE201': 'ง', '\uE202': 'จ', '\uE203': 'ด',
+      '\uE204': 'ค', '\uE205': 'น', '\uE206': 'ม', '\uE207': 'ร'
+    };
+    text = text.replace(/[\uE200-\uE207]/g, function(m){ return puaMap[m] || m; });
+
+    // 2. ลบข้อความขยะ โฆษณา ปุ่มนำทาง และ Video Player Artifacts จากเว็บนิยาย
+    text = text
+      // ลบปุ่ม Previous/Next Chapter และ Table of Contents
+      .replace(/^[ \t]*(?:[‹<«]?[ \t]*(?:Previous|Next)[ \t]*Chapter[ \t]*[›>»]?|Table of Contents|Back to list)[ \t]*$/gim, '')
+      // ลบชื่อ Ad Network เช่น Ezoic
+      .replace(/^[ \t]*Ezoic[ \t]*$/gim, '')
+      // ลบปุ่มและข้อความจาก Video Player โฆษณา (Play, Unmute, Fullscreen ฯลฯ)
+      .replace(/^[ \t]*(?:[×xX]|Play|Pause|Unmute|Mute|Fullscreen|Advertisement:\s*\d+:\d+|Now Playing|Play Video|Watch on|Video channel logo)[ \t]*$/gim, '')
+      // ลบแถบหัวข้อและคำบรรยายวิดีโอโฆษณา (video of: ..., Daily Gospel ฯลฯ)
+      .replace(/^[ \t]*(?:video of:\s*.*|Watch on\s*.*|.*Play Video.*)$/gim, '')
+      .replace(/^[ \t]*(?:Daily Gospel.*|Catholic Bible.*|Fiction vs Nonfiction.*|Web Wealth.*)$/gim, '');
+
+    // 3. ล้างอักขระล่องหน, สัญลักษณ์สแกนเพี้ยน, สระแอ
+    return text
+      .replace(/\r/g, '')
+      .replace(/[\u00AD\u200B-\u200D\u2060\uFEFF\u202A-\u202E]/g, '') // ลบ zero-width, soft-hyphen, bidi
+      .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+      .replace(/[□■◆◇※¤]/g, '')
+      .replace(/â€œ/g, '"').replace(/â€ /g, '"')
+      .replace(/เเ/g, 'แ')
+      .replace(/\n{3,}/g, '\n\n'); // ยุบบรรทัดว่างที่เกิดจากการลบขยะ ให้เหลือเว้นวรรคย่อหน้าปกติ (2 บรรทัด)
+  }
+
+  /* ---------------- ระบบตรวจจับข้อความเพี้ยน & ฟอนต์ PUA ---------------- */
+  function highlightSuspicious(text){
+    var box = document.getElementById('suspiciousBox');
+    if(!box) return;
+    if(!text || !text.trim()){ box.style.display = 'none'; box.innerHTML = ''; return; }
+
+    var lines = text.split('\n');
+    var puaRegex = /[\uE000-\uF8FF]/g;
+    var danglingVowelRegex = /(?:^|\s)[ะัิีึืฺุู็่้๊๋์]/; // สระหรือวรรณยุกต์ลอยที่ไม่มีพยัญชนำหน้า
+    var symbolRegex = /[□■◆◇※¤]/g;
+    var tripleRepeatRegex = /(.)\1\1\1/;
+
+    var totalPuaCount = 0;
+    var badLines = [];
+
+    lines.forEach(function(line, idx){
+      var lineTrim = line.trim();
+      if(!lineTrim) return;
+
+      var puaMatches = lineTrim.match(puaRegex);
+      var hasDangling = danglingVowelRegex.test(lineTrim);
+      var hasSymbol = symbolRegex.test(lineTrim);
+      var hasRepeat = tripleRepeatRegex.test(lineTrim);
+
+      if(puaMatches || hasDangling || hasSymbol || hasRepeat){
+        var reasons = [];
+        if(puaMatches){
+          totalPuaCount += puaMatches.length;
+          reasons.push('ฟอนต์เพี้ยน/PUA ' + puaMatches.length + ' ตัว');
+        }
+        if(hasDangling) reasons.push('พยัญชนะต้นหาย (สระลอย)');
+        if(hasSymbol) reasons.push('มีสัญลักษณ์ขยะ');
+        if(hasRepeat) reasons.push('อักษรซ้ำผิดปกติ');
+
+        badLines.push({
+          lineNum: idx + 1,
+          preview: lineTrim.slice(0, 60),
+          reasons: reasons.join(', ')
+        });
+      }
+    });
+
+    if(badLines.length > 0){
+      box.style.display = 'block';
+      box.innerHTML = '';
+
+      var header = document.createElement('div');
+      header.innerHTML = '<b style="color:var(--pen);">⚠ พบข้อความผิดปกติ ' + badLines.length + ' บรรทัด</b> ' +
+        (totalPuaCount > 0 ? '<span style="font-size:12px;color:var(--ink-soft);">(ตรวจพบอักษรฟอนต์ซ่อน PUA รวม ' + totalPuaCount.toLocaleString() + ' ตัว)</span>' : '');
+      box.appendChild(header);
+
+      var list = document.createElement('div');
+      list.style.fontSize = '12px';
+      list.style.marginTop = '6px';
+
+      badLines.slice(0, 4).forEach(function(item){
+        var row = document.createElement('div');
+        row.style.marginBottom = '3px';
+        row.innerHTML = '<b>บรรทัด ' + item.lineNum + ':</b> <code>' + escapeHtml(item.preview) + '</code> <span style="color:var(--pen);font-size:11px;">↳ ' + item.reasons + '</span>';
+        list.appendChild(row);
+      });
+
+      if(badLines.length > 4){
+        var more = document.createElement('div');
+        more.style.marginTop = '4px';
+        more.style.fontStyle = 'italic';
+        more.style.color = 'var(--ink-soft)';
+        more.textContent = '...และอีก ' + (badLines.length - 4) + ' บรรทัดที่มีลักษณะเดียวกัน';
+        list.appendChild(more);
+      }
+
+      box.appendChild(list);
+    } else {
+      box.style.display = 'none';
+    }
+  }
+
+  quickRepairBtn.addEventListener('click', function(){
+    hideError();
+    var text = inputText.value.trim();
+    if(!text){ showError('กรุณาใส่ข้อความต้นฉบับก่อน'); return; }
+
+    inputText.value = normalizeOCR(text);
+    highlightSuspicious(inputText.value);
+    saveDraftSoon();
+
+    progressText.textContent = 'ซ่อมข้อความรวดเร็วเสร็จสิ้น';
+    setTimeout(function(){ progressText.textContent = ''; }, 2000);
+  });
+
+/* ---------------- Prompt ซ่อม OCR 2 ระดับ (ภาษาไทย vs ภาษาต่างประเทศ) ---------------- */
+  function buildOCRRepairPrompt(sampleText){
+    // ตรวจสอบว่าข้อความเป็นภาษาไทยหรือภาษาต่างประเทศ
+    var hasThai = /[\u0E00-\u0E7F]/.test(sampleText || '');
+    var isThaiMode = (state.source === 'polish') || hasThai;
+
+    if (isThaiMode) {
+      // 🇹 ระดับที่ 1: ซ่อม OCR ภาษาไทย และถอดรหัสฟอนต์ PUA
+      return `คุณคือระบบตรวจสอบและซ่อมแซมข้อความภาษาไทย (Thai OCR & Font De-obfuscation Engine)
+
+หน้าที่ของคุณ:
+1. อ่านบริบทของประโยคภาษาไทย แล้วถอดรหัสตัวอักษร PUA ที่เพี้ยน หรือตัวอักษรที่สแกนผิด ให้กลับมาเป็นคำภาษาไทยที่ถูกต้องและสมบูรณ์ 100%
+2. ซ่อมคำที่สระหรือวรรณยุกต์หลุดหายจากการสแกน และแก้สระแอเพี้ยน (เเ -> แ)
+
+[ข้อห้ามเด็ดขาด - Strict Constraints]
+1. ห้ามสรุปความ ห้ามตัดทอนเนื้อหา และห้ามแต่งเรื่องต่อเด็ดขาด!
+2. ต้องคงเนื้อหาเดิม ย่อหน้าเดิม บทสนทนา และเครื่องหมายคำพูดไว้ครบถ้วน 100%
+3. ตอบกลับเฉพาะข้อความภาษาไทยที่ซ่อมเสร็จแล้วเท่านั้น ห้ามมีคำอธิบาย คำนำ หรือข้อความเปิด/ปิด`;
+    } else {
+      //  ระดับที่ 2: ซ่อม OCR ภาษาต้นฉบับต่างประเทศ (เช่น ภาษาอังกฤษ) โดยห้ามแปล
+      return `You are a professional Raw Text OCR Corrector and Typo Repair Engine.
+
+Your task is to fix optical character recognition (OCR) scan errors, broken typography, and line-break artifacts in the provided foreign text (e.g., English).
+
+[Tasks to perform]
+1. Rejoin hyphenated words split across line breaks (e.g., "trans- lation" -> "translation", "con- dition" -> "condition").
+2. Fix common OCR character confusions (e.g., "rn" mistyped as "m", "cl" as "d", "1" or "I" as "l", broken quotes like "â€œ").
+3. Fix obvious spelling mistakes caused by scanning artifacts while preserving novel terms, character names, and original tone.
+
+[STRICT CONSTRAINTS - CRITICAL]
+1. STRICTLY DO NOT TRANSLATE! Keep the text in its original language (e.g., English) 100%.
+2. Do not summarize, truncate, or rewrite sentences.
+3. Preserve all paragraphs, dialogues, and quotation marks intact.
+4. Output ONLY the repaired original text without any explanations or conversational remarks.`;
+    }
+  }
+
+  function splitIntoChunks(text, maxLen){
+    if(text.length <= maxLen) return [text];
+    var paras = text.split(/\n\s*\n/);
+    var chunks = [], current = '';
+    function pushCurrent(){
+      if(current){ chunks.push(current); current = ''; }
+    }
+    function splitOversizedParagraph(para){
+      var parts = [];
+      var sentences = para.split(/(?<=[.!?。！？\n])\s*/).filter(Boolean);
+      var buf = '';
+      sentences.forEach(function(sen){
+        if((buf + sen).length > maxLen){
+          if(buf) parts.push(buf);
+          if(sen.length > maxLen){
+            for(var k = 0; k < sen.length; k += maxLen) parts.push(sen.slice(k, k + maxLen));
+            buf = '';
+          } else {
+            buf = sen;
+          }
+        } else {
+          buf += sen;
+        }
+      });
+      if(buf) parts.push(buf);
+      return parts;
+    }
+    for(var i=0; i<paras.length; i++){
+      var p = paras[i];
+      if(p.length > maxLen){
+        pushCurrent();
+        splitOversizedParagraph(p).forEach(function(part){ chunks.push(part); });
+        continue;
+      }
+      if((current + '\n\n' + p).length > maxLen){
+        pushCurrent();
+        current = p;
+      } else current = current ? current + '\n\n' + p : p;
+    }
+    pushCurrent();
+    return chunks;
+  }
+
+  function showError(msg){ errorBox.textContent = msg; errorBox.classList.add('show'); }
+  function hideError(){ errorBox.classList.remove('show'); }
+
+  async function callOpenAI(sys, text, key, model, signal, responseFormat){
+    var body = {
+      model: model,
+      messages: [{role:'system', content:sys}, {role:'user', content:text}],
+      temperature: 0.1
+    };
+    if(responseFormat === 'json'){
+      body.response_format = { type: 'json_object' };
+    }
+    var res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify(body),
+      signal: signal
+    });
+    if(!res.ok){
+      var errData = await res.json().catch(function(){ return {}; });
+      var e1 = new Error(errData.error && errData.error.message ? errData.error.message : ('OpenAI error: ' + res.status));
+      e1.status = res.status;
+      throw e1;
+    }
+    var data = await res.json();
+    if(data.usage) {
+      updateApiStats(model, data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0);
+    }
+    return data.choices[0].message.content;
+  }
+
+  /* เรียก Gemini โดยส่ง Key ผ่าน Header x-goog-api-key */
+  async function callGemini(sys, text, key, model, signal, responseFormat){
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
+    var generationConfig = {
+      temperature: 0.0,
+      topP: 0.1
+    };
+    if(responseFormat === 'json'){
+      generationConfig.responseMimeType = 'application/json';
+    }
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': key
+      },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: sys }] },
+        contents: [{ parts: [{ text: text }] }],
+        generationConfig: generationConfig
+      }),
+      signal: signal
+    });
+    if(!res.ok){
+      var errData = await res.json().catch(function(){ return {}; });
+      var e2 = new Error(errData.error && errData.error.message ? errData.error.message : ('Gemini error: ' + res.status));
+      e2.status = res.status;
+      throw e2;
+    }
+    var data = await res.json();
+    if(data.usageMetadata) {
+      updateApiStats(model, data.usageMetadata.promptTokenCount || 0, data.usageMetadata.candidatesTokenCount || 0);
+    }
+
+    if(data.promptFeedback && data.promptFeedback.blockReason){
+      var eBlocked = new Error('Gemini ปฏิเสธคำขอนี้ทั้งหมด เนื่องจาก ' + describeGeminiBlockReason(data.promptFeedback.blockReason) + ' — ลองแบ่งเนื้อหาให้สั้น/เบาลง หรือสลับไปใช้โมเดล Gemini รุ่นเต็ม (ไม่ใช่ lite) แทน');
+      eBlocked.status = 'gemini_blocked';
+      throw eBlocked;
+    }
+
+    var candidate = data.candidates && data.candidates[0];
+    var parts = candidate && candidate.content && candidate.content.parts;
+    var textOut = (parts && parts.length) ? parts.map(function(p){ return p.text || ''; }).join('') : '';
+
+    if(!textOut){
+      var reasonMsg = describeGeminiFinishReason(candidate && candidate.finishReason);
+      var eEmpty = new Error('Gemini ไม่สามารถแปลข้อความส่วนนี้ได้ (' + reasonMsg + ') — ลองแบ่งเนื้อหาให้สั้นลง หรือสลับไปใช้โมเดล Gemini รุ่นเต็ม (ไม่ใช่ lite) แทน');
+      eEmpty.status = 'gemini_empty';
+      throw eEmpty;
+    }
+
+    if(candidate.finishReason === 'MAX_TOKENS'){
+      showError('คำเตือน: คำแปลของส่วนนี้อาจถูกตัดกลางคัน เพราะยาวเกินขีดจำกัดคำตอบของโมเดล ' + model + ' — แนะนำให้ลดขนาด "ความยาวสูงสุดต่อส่วน" ลงแล้วลองแปลส่วนนี้ใหม่');
+    }
+
+    return textOut;
+  }
+
+  var pendingResume = null;
+  var pendingBatchResume = null;
+  var activeTranslationJobId = null;
+  var activeTranslationJobRevision = null;
+  var translationRecoveryJobs = [];
+  var RECOVERY_UI_STORAGE_KEY = 'prungAksornRecoveryUI-v1';
+  var recoveryDismissed = Object.create(null);
+  var aiBusy = false;
+
+  function loadTranslationRecoveryUIState(){
+    try{
+      var raw = localStorage.getItem(RECOVERY_UI_STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      if(parsed && typeof parsed === 'object' && !Array.isArray(parsed)){
+        Object.keys(parsed).forEach(function(key){
+          if(Number.isFinite(Number(parsed[key]))) recoveryDismissed[key] = Number(parsed[key]);
+        });
+      }
+    }catch(e){
+      console.warn('Translation recovery UI state load failed:', e);
+    }
+  }
+
+  function saveTranslationRecoveryUIState(){
+    try{
+      localStorage.setItem(RECOVERY_UI_STORAGE_KEY, JSON.stringify(recoveryDismissed));
+    }catch(e){
+      console.warn('Translation recovery UI state save failed:', e);
+    }
+  }
+
+  function pruneTranslationRecoveryUIState(){
+    var keys = Object.keys(recoveryDismissed);
+    if(keys.length <= 200) return;
+    keys.sort(function(a,b){ return recoveryDismissed[a] - recoveryDismissed[b]; });
+    while(keys.length > 200) delete recoveryDismissed[keys.shift()];
+    saveTranslationRecoveryUIState();
+  }
+
+  function getTranslationRecoveryStateKey(job){
+    return String(job && job.jobId || '') + '@' +
+      String(job && Number.isInteger(job.revision) ? job.revision : (job && job.updatedAt || 0));
+  }
+
+  function isTranslationRecoveryDismissed(job){
+    return !!recoveryDismissed[getTranslationRecoveryStateKey(job)];
+  }
+
+  function dismissTranslationRecoveryJob(job){
+    if(!job || !job.jobId) return;
+    recoveryDismissed[getTranslationRecoveryStateKey(job)] = Date.now();
+    pruneTranslationRecoveryUIState();
+    saveTranslationRecoveryUIState();
+    refreshTranslationRecoveryUI();
+  }
+
+  function getTranslationRecoveryLogicalKey(job){
+    if(job && job.chapterId){
+      return [job.projectId || '', job.bookId || '', job.chapterId].join('|');
+    }
+    return 'job|' + String(job && job.jobId || '');
+  }
+
+  function hasCompletedTranslationHistory(job){
+    if(!job || !job.projectId || !job.chapterId) return false;
+    var proj = appData.projects.find(function(p){ return p.id === job.projectId; });
+    return !!(proj && findEntryById(proj, job.chapterId));
+  }
+
+  function dedupeTranslationRecoveryCandidates(candidates){
+    var latest = Object.create(null);
+    candidates.forEach(function(job){
+      var key = getTranslationRecoveryLogicalKey(job);
+      var prev = latest[key];
+      if(!prev ||
+         Number(job.updatedAt || 0) > Number(prev.updatedAt || 0) ||
+         (Number(job.updatedAt || 0) === Number(prev.updatedAt || 0) && Number(job.revision || 0) > Number(prev.revision || 0))){
+        latest[key] = job;
+      }
+    });
+    return Object.keys(latest).map(function(key){ return latest[key]; })
+      .sort(function(a,b){
+        return Number(b.updatedAt || 0) - Number(a.updatedAt || 0) ||
+               Number(b.revision || 0) - Number(a.revision || 0);
+      });
+  }
+  function setTranslationSettingsLocked(locked){
+    document.querySelectorAll('#sourceSeg button, #levelSeg button, #genreChips button, #styleSeg button').forEach(function(btn){
+      btn.disabled = !!locked;
+    });
+  }
+
+  function setAiBusy(busy){
+    aiBusy = busy;
+    processBtn.disabled = busy;
+    if(resumeBtn) resumeBtn.disabled = busy;
+    repairBtn.disabled = busy;
+    if(batchImportBtn) batchImportBtn.disabled = busy;
+    providerSel.disabled = busy;
+    modelInput.disabled = busy;
+    document.getElementById('chunkLen').disabled = busy;
+  }
+  function warnIfAiBusy(){
+    if(aiBusy){
+      showError('กำลังมีงาน AI อีกอย่างทำงานอยู่ กรุณารอให้เสร็จหรือกดยกเลิกก่อน');
+      return true;
+    }
+    return false;
+  }
+
+  /* =============================================================
+     ระบบตรวจจับและแทนที่คำศัพท์ที่ AI ลืมใช้ (Post-Translation Glossary Enforcer)
+     ============================================================= */
+  var glossaryEnforceBox = document.getElementById('glossaryEnforceBox');
+
+  function hideGlossaryEnforce(){
+    if(!glossaryEnforceBox) return;
+    glossaryEnforceBox.style.display = 'none';
+    glossaryEnforceBox.innerHTML = '';
+  }
+
+  // ฟังก์ชันสแกนหาคำที่ต้นฉบับมี แต่คำแปลภาษาไทยไม่มีคำนั้นปรากฏอยู่
+  function checkMissedGlossaryTerms(sourceText, targetText, glossaryText){
+    if(!sourceText || !targetText || !glossaryText || !glossaryText.trim()) return [];
+
+    var lines = glossaryText.split('\n');
+    var missed = [];
+    var seen = Object.create(null);
+
+    lines.forEach(function(line){
+      var cleanLine = line.trim().replace(/^[-*•\d.]+\s*/, '').trim();
+      if(!cleanLine || cleanLine.startsWith('[') || cleanLine.startsWith('#')) return;
+      if(!cleanLine.includes('=')) return;
+
+      var parts = cleanLine.split('=');
+      var src = parts[0].trim();
+      var trans = parts.slice(1).join('=').trim();
+      if(!src || !trans) return;
+
+      var keyLower = src.toLowerCase();
+      if(seen[keyLower]) return;
+
+      // ถ้าคำต้นฉบับปรากฏในข้อความต้นฉบับ แต่ "คำแปลไทย" กลับไม่ปรากฏในข้อความผลลัพธ์
+      if(isTermInText(src, sourceText) && targetText.indexOf(trans) === -1){
+        seen[keyLower] = true;
+        missed.push({ src: src, trans: trans });
+      }
+    });
+
+    return missed;
+  }
+
+  // ฟังก์ชันแสดงแถบแจ้งเตือนและปุ่มแก้ไข
+  function renderGlossaryEnforceWarning(missedTerms){
+    if(!glossaryEnforceBox) return;
+    if(!missedTerms || missedTerms.length === 0){
+      hideGlossaryEnforce();
+      return;
+    }
+
+    glossaryEnforceBox.innerHTML = '';
+
+    var header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.style.marginBottom = '8px';
+    header.innerHTML = '<b style="color:var(--gold);font-size:13.5px;">⚠ พบคำศัพท์ที่ AI อาจไม่ได้แปลตามคลังคำ (' + missedTerms.length + ' คำ):</b>';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'icon-btn';
+    closeBtn.textContent = '✕';
+    closeBtn.title = 'ซ่อนคำเตือนนี้';
+    closeBtn.addEventListener('click', hideGlossaryEnforce);
+    header.appendChild(closeBtn);
+    glossaryEnforceBox.appendChild(header);
+
+    var list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '6px';
+
+    missedTerms.forEach(function(term){
+      var row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.justifyContent = 'space-between';
+      row.style.gap = '8px';
+      row.style.padding = '6px 10px';
+      row.style.background = 'var(--paper-card)';
+      row.style.border = '1px solid var(--paper-line)';
+      row.style.borderRadius = '4px';
+
+      var label = document.createElement('span');
+      label.innerHTML = '<code>' + escapeHtml(term.src) + '</code> ➔ <b style="color:var(--pen);">' + escapeHtml(term.trans) + '</b>';
+      row.appendChild(label);
+
+      var actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.gap = '6px';
+
+      // ปุ่มแทนที่คำด้วยตัวเอง
+      var replaceManualBtn = document.createElement('button');
+      replaceManualBtn.className = 'utility-btn';
+      replaceManualBtn.style.padding = '3px 8px';
+      replaceManualBtn.style.fontSize = '11.5px';
+      replaceManualBtn.textContent = '✎ แทนที่คำ';
+      replaceManualBtn.addEventListener('click', async function(){
+        var wrongWord = await showPromptDialog('พิมพ์คำในผลลัพธ์ที่ต้องการแทนที่ด้วย "' + term.trans + '":', '');
+        if(wrongWord && wrongWord.trim()){
+          var curOutput = output.textContent;
+          var regex = new RegExp(escapeRegex(wrongWord.trim()), 'g');
+          output.textContent = curOutput.replace(regex, term.trans);
+          output.dispatchEvent(new Event('input'));
+          // ตรวจสอบซ้ำหลังแทนที่
+          var remaining = checkMissedGlossaryTerms(inputText.value, output.textContent, getCurrentProject().glossary);
+          renderGlossaryEnforceWarning(remaining);
+        }
+      });
+      actions.appendChild(replaceManualBtn);
+
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+
+    glossaryEnforceBox.appendChild(list);
+
+    // ปุ่มกดให้ AI แก้ไขคำทั้งหมดแบบรวมศูนย์ใน 1 คลิก
+    var aiFixAllContainer = document.createElement('div');
+    aiFixAllContainer.style.marginTop = '10px';
+    aiFixAllContainer.style.display = 'flex';
+    aiFixAllContainer.style.justifyContent = 'flex-end';
+
+    var aiFixAllBtn = document.createElement('button');
+    aiFixAllBtn.className = 'utility-btn';
+    aiFixAllBtn.style.background = 'var(--gold)';
+    aiFixAllBtn.style.color = '#fff';
+    aiFixAllBtn.style.borderColor = 'var(--gold)';
+    aiFixAllBtn.style.fontWeight = '600';
+    aiFixAllBtn.textContent = '⚡ ให้ AI ช่วยแทนที่คำศัพท์ทั้งหมดในผลลัพธ์ทันที';
+    aiFixAllBtn.addEventListener('click', function(){
+      runSurgicalGlossaryFixWithAI(missedTerms);
+    });
+    aiFixAllContainer.appendChild(aiFixAllBtn);
+    glossaryEnforceBox.appendChild(aiFixAllContainer);
+
+    glossaryEnforceBox.style.display = 'block';
+  }
+
+  // คำสั่งยิงให้ AI ทำ Surgical Edit แทนที่เฉพาะคำที่หลุดโดยไม่แตะต้องประโยคอื่น
+  async function runSurgicalGlossaryFixWithAI(missedTerms){
+    var key = document.getElementById('apiKey').value.trim();
+    if(!key){ await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน'); return; }
+    if(warnIfAiBusy()) return;
+    var surgicalContext = captureAppContext(getCurrentProject(), getActiveBook(getCurrentProject()));
+    var surgicalOutputSnapshot = output.textContent;
+
+    var termRules = missedTerms.map(function(t){ return '- ต้นฉบับ: "' + t.src + '" ต้องแปลเป็น: "' + t.trans + '"'; }).join('\n');
+    var sys = "คุณคือระบบตรวจสอบและแก้ไขคุณภาพข้อความแปลภาษาไทย "
+      + "มีหน้าที่แก้ไขคำศัพท์เฉพาะที่แปลผิดและตรวจจับข้อความภาษาต่างประเทศที่หลุดปะปนมาในบทแปล "
+      + "โดยต้องรักษาเนื้อหาต้นฉบับส่วนที่ถูกต้องไว้ให้มากที่สุด\n\n" + "[รายการคำศัพท์เฉพาะ]\n" + (termRules || "ไม่มีรายการคำศัพท์ที่ต้องแก้ไข")
+      + "\n\n" + "[ภารกิจที่ 1: ตรวจสอบคำศัพท์เฉพาะ]\n"
+      + "1. ตรวจสอบคำศัพท์ในข้อความเทียบกับรายการคำศัพท์ที่กำหนด\n"
+      + "2. แก้ไขคำศัพท์ที่แปลไม่ตรงตามรายการ โดยพิจารณาความหมายและบริบทประกอบ\n"
+      + "3. หากคำศัพท์ถูกต้องอยู่แล้ว ให้คงข้อความเดิมไว้\n" + "4. ห้ามแทนที่คำที่ตรงกันเพียงบางส่วน หากอาจทำให้ความหมายหรือรูปคำผิดเพี้ยน\n\n"
+      + "[ภารกิจที่ 2: ตรวจจับภาษาต่างประเทศที่หลุดปะปน]\n" + "1. ตรวจสอบข้อความภาษาไทยเพื่อค้นหาคำ วลี หรือประโยคภาษาต่างประเทศที่อาจหลงเหลือจากการแปล\n"
+      + "2. พิจารณาว่าข้อความภาษาต่างประเทศนั้นเป็นส่วนหนึ่งของเนื้อหาที่ควรแปลหรือเป็นคำที่จำเป็นต้องคงไว้\n"
+      + "3. หากพบคำหรือวลีภาษาต่างประเทศที่เป็นข้อผิดพลาดจากการแปล ให้แปลหรือแทนที่เป็นภาษาไทยตามความหมายและบริบทของประโยค\n"
+      + "4. หากไม่สามารถระบุความหมายได้อย่างมั่นใจ ห้ามเดาความหมายหรือสร้างข้อความทดแทน ให้คงข้อความเดิมไว้\n" + "5. ห้ามถือว่าคำภาษาต่างประเทศทุกคำเป็นข้อผิดพลาดโดยอัตโนมัติ\n\n" +
+      "[ข้อยกเว้นที่ต้องระมัดระวัง]\n" + "1. ชื่อบุคคล ชื่อสถานที่ ชื่อองค์กร ชื่อสำนัก ชื่อทักษะ และชื่อเฉพาะที่ควรคงรูปเดิม\n" +
+      "2. คำทับศัพท์ภาษาไทยที่ใช้กันตามปกติ\n" + "3. คำศัพท์เฉพาะหรือคำต่างประเทศที่มีความจำเป็นต่อเนื้อหา\n" +
+      "4. ตัวเลข สัญลักษณ์ อักษรย่อ และข้อความที่ไม่ใช่เนื้อหาสำหรับแปล\n" + "5. ข้อความภาษาต่างประเทศที่เป็นส่วนหนึ่งของบทสนทนา ชื่อเรื่อง หรือข้อความอ้างอิงที่ไม่ควรแปลตามบริบท\n\n" +
+      "[ข้อจำกัดในการแก้ไข]\n" + "1. แก้ไขเฉพาะคำศัพท์ที่ผิดและข้อความภาษาต่างประเทศที่ยืนยันได้ว่าเป็นข้อผิดพลาดจากการแปล\n" +
+      "2. ห้ามเรียบเรียง เขียนใหม่ สรุป ขยายความ หรือตัดทอนประโยคที่ถูกต้องอยู่แล้ว\n" +
+      "3. ห้ามเปลี่ยนแปลงเนื้อหา ลำดับประโยค ลำดับย่อหน้า หรือโครงสร้างของข้อความโดยไม่จำเป็น\n" +
+      "4. รักษาเครื่องหมายวรรคตอน เครื่องหมายคำพูด การเว้นวรรค และรูปแบบข้อความเดิมให้มากที่สุด\n" +
+      "5. ห้ามเพิ่มเนื้อหาใหม่หรือแต่งเติมข้อมูลที่ไม่มีอยู่ในข้อความต้นฉบับ\n" +
+      "6. หากไม่พบข้อผิดพลาด ให้คงข้อความต้นฉบับไว้โดยไม่เปลี่ยนแปลง\n\n" +
+      "[รูปแบบผลลัพธ์]\n" +
+      "1. ส่งคืนข้อความฉบับเต็มหลังตรวจสอบและแก้ไขแล้วเท่านั้น\n" +
+      "2. ห้ามรายงานรายการคำที่ตรวจพบหรือคำที่แก้ไข\n" +
+      "3. ห้ามแสดงเหตุผล ขั้นตอนการวิเคราะห์ หรือคำอธิบายเพิ่มเติม\n" +
+      "4. ห้ามใช้ Markdown หรือเพิ่มข้อความครอบผลลัพธ์";
+
+    activeController = new AbortController();
+    setAiBusy(true);
+    cancelBtn.classList.add('show');
+    progressText.textContent = 'กำลังให้ AI แทนที่คำศัพท์ให้ตรงตามคลังคำ...';
+
+    try {
+      var currentOutput = surgicalOutputSnapshot;
+      var fixedResult = await callAIWithRetry(sys, currentOutput, key, modelInput.value, activeController.signal, 1);
+      if(fixedResult && fixedResult.trim()){
+        if(!isAppContextCurrent(surgicalContext) || output.textContent !== surgicalOutputSnapshot) return;
+        output.textContent = fixedResult.trim();
+        output.dispatchEvent(new Event('input'));
+        hideGlossaryEnforce();
+        progressText.textContent = 'แก้ไขคำศัพท์ให้ตรงตามคลังคำเรียบร้อย!';
+        setTimeout(function(){ if(isAppContextCurrent(surgicalContext) && progressText.textContent.includes('แก้ไขคำศัพท์ให้ตรงตามคลังคำเรียบร้อย!')) progressText.textContent = ''; }, 3000);
+      }
+    } catch(err){
+      if(err.name !== 'AbortError' && isAppContextCurrent(surgicalContext)) await showAlertDialog('แก้ไขไม่สำเร็จ', err.message);
+    } finally {
+      setAiBusy(false);
+      if(isAppContextCurrent(surgicalContext)){
+        cancelBtn.classList.remove('show');
+        progressText.textContent = '';
+      }
+    }
+  }
+
+  async function runTranslation(chunks, proj, key, model, startIndex, existingResults, originalText, chapterId, jobId, sourceSnapshotText, settingsSnapshot){
+    activeController = new AbortController();
+    setAiBusy(true);
+    resetActionStats();
+    if(resumeBtn) resumeBtn.classList.remove('show');
+    cancelBtn.classList.add('show');
+    hideGlossaryEnforce();
+
+    var results = existingResults.slice();
+    var activeBook = getActiveBook(proj);
+    var translationContext = captureAppContext(proj, activeBook);
+    var translationTitle = String(chapterTitle.value || 'แปลใหม่');
+    setOutput(results.join('\n\n'));
+    var previousTail = results.length ? getTail(results[results.length - 1], 300) : '';
+    var translationJobId = jobId || makeId('tj');
+    var translationChapterId = chapterId || makeId('h');
+    var translationRetryCount = 0;
+    var translationProvider = providerSel.value;
+    var translationSettingsSnapshot = normalizeTranslationSettingsSnapshot(settingsSnapshot, translationProvider, model, document.getElementById('chunkLen').value);
+    var translationJobRevision = null;
+    if(!jobId){
+      try{
+        var createdJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:translationProvider,model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length,sourceSnapshot:{text:String(sourceSnapshotText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(chapterTitle.value || ''),normalized:true},settingsSnapshot:translationSettingsSnapshot});
+        var runningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',expectedRevision:createdJob.revision});
+        translationJobRevision = runningJob.revision;
+      }catch(jobErr){
+        setAiBusy(false);
+        if(isAppContextCurrent(translationContext)){
+          cancelBtn.classList.remove('show');
+          showError('ไม่สามารถสร้าง Translation Job ได้: ' + (jobErr.message || jobErr));
+        }
+        return;
+      }
+    }else{
+      var recoveredSettingsSnapshot = normalizeTranslationSettingsSnapshot(settingsSnapshot, translationProvider, model, document.getElementById('chunkLen').value);
+      var recoveredRunningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',settingsSnapshot:recoveredSettingsSnapshot,expectedRevision:Number(pendingResume && pendingResume.revision || 0)});
+      translationJobRevision = recoveredRunningJob.revision;
+      translationProvider = recoveredRunningJob.provider;
+      translationSettingsSnapshot = normalizeTranslationSettingsSnapshot(recoveredRunningJob.settingsSnapshot || settingsSnapshot, translationProvider, recoveredRunningJob.model, recoveredRunningJob.chunkSize);
+    }
+    activeTranslationJobId = translationJobId;
+    activeTranslationJobRevision = translationJobRevision;
+    setTranslationSettingsLocked(true);
+    var chunkRatios = [];
+    var suspiciousChunks = [];
+
+    try {
+      for(var i = startIndex; i < chunks.length; i++){
+        // ตรวจนับจำนวนคำศัพท์ที่ตรวจพบใน Chunk ปัจจุบัน
+        var termCheck = filterRelevantGlossary(proj.glossary, chunks[i]);
+        var badge = termCheck.count > 0 ? (' (ใช้คลังคำ ' + termCheck.count + ' คำ)') : '';
+
+        if(isAppContextCurrent(translationContext)){
+          progressText.textContent = 'กำลังปรุงส่วนที่ ' + (i + 1) + '/' + chunks.length + badge;
+        }
+
+        // ส่ง chunks[i] เข้าไปด้วย Snapshot ของ settings เพื่อไม่ให้ global UI state เปลี่ยน prompt ระหว่าง Job
+        var sys = buildTranslatePromptWithSettings(proj, previousTail, chunks[i], translationSettingsSnapshot);
+        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2, translationProvider);
+        var partTrim = part.trim();
+
+        var analysis = analyzeChunkRatio(chunks[i], partTrim, chunkRatios);
+        if(analysis){
+          chunkRatios.push(analysis.ratio);
+          if(analysis.suspicious) suspiciousChunks.push({ index: i, reasons: analysis.reasons });
+        }
+
+        previousTail = getTail(partTrim, 300);
+        translationRetryCount = 0;
+        var checkpointedJob = await PrungAksornStorageV2.checkpointTranslationJob({jobId:translationJobId,retryCount:translationRetryCount,expectedRevision:translationJobRevision},i,partTrim,previousTail);
+        translationJobRevision = checkpointedJob.revision;
+        activeTranslationJobRevision = translationJobRevision;
+        results.push(partTrim);
+        if(isAppContextCurrent(translationContext)){
+          setOutput(results.join('\n\n'));
+        }
+      }
+      await PrungAksornStorageV2.completeTranslationJob(translationJobId, translationJobRevision);
+      var translationOutput = results.join('\n\n');
+      var translationContextCurrent = isAppContextCurrent(translationContext);
+      activeTranslationJobRevision = null;
+      pendingResume = null;
+      activeTranslationJobId = null;
+      if(translationContextCurrent) clearTranslationRecoveryUI();
+
+      var newEntry = { id: translationChapterId, ts: Date.now(), label: translationTitle, input: originalText, output: translationOutput };
+      if(activeBook) activeBook.history.push(newEntry);
+      else (proj.history = proj.history || []).push(newEntry);
+
+      commitChange();
+
+      if(translationContextCurrent){
+        setOutput(translationOutput);
+        analyzeTQGCompletedOutput(sourceSnapshotText || normalizeOCR(originalText || ''), translationOutput, proj);
+        viewingHistoryId = newEntry.id;
+        stamp.classList.add('show');
+        setResultFocus(true);
+        switchMobileTab('output');
+        scrollToTopTarget();
+        refreshTranslationRecoveryUI();
+
+        if(suspiciousChunks.length){
+          var warnMsg = '⚠ พบ ' + suspiciousChunks.length + ' ส่วนที่คำแปลอาจไม่ครบถ้วน แนะนำให้ตรวจทานเพิ่มเติม:\n' +
+            suspiciousChunks.map(function(s){ return '• ส่วนที่ ' + (s.index + 1) + ': ' + s.reasons.join('; '); }).join('\n');
+          showQualityWarning(warnMsg);
+        }
+
+        var missed = checkMissedGlossaryTerms(originalText, translationOutput, proj.glossary);
+        renderGlossaryEnforceWarning(missed);
+
+        var statsStr = '';
+        if(currentActionTokens > 0) statsStr = ' (ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
+        progressText.textContent = 'ปรุงอักษรเสร็จสิ้น' + statsStr;
+        setTimeout(function(){ if(isAppContextCurrent(translationContext) && progressText.textContent.includes('ปรุงอักษรเสร็จสิ้น')) progressText.textContent = ''; }, 4000);
+      } else {
+        refreshTranslationRecoveryUI();
+      }
+
+    } catch(err){
+      if(err.name !== 'AbortError'){
+        var failedJob = await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:i,retryCount:translationRetryCount,timestamp:Date.now()},translationJobRevision);
+        translationJobRevision = failedJob.revision;
+        activeTranslationJobId = null;
+        if(isAppContextCurrent(translationContext)){
+          pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision, settingsSnapshot: translationSettingsSnapshot };
+          showError((err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)');
+          if(resumeBtn) resumeBtn.classList.add('show');
+          refreshTranslationRecoveryUI();
+        }else{
+          pendingResume = null;
+        }
+      } else {
+        await PrungAksornStorageV2.cancelTranslationJob(translationJobId,translationJobRevision);
+        pendingResume = null;
+        activeTranslationJobId = null;
+      }
+    } finally {
+      setTranslationSettingsLocked(false);
+      setAiBusy(false);
+      if(isAppContextCurrent(translationContext)){
+        cancelBtn.classList.remove('show');
+        if(!progressText.textContent.includes('ปรุงอักษรเสร็จสิ้น')) progressText.textContent = '';
+      }
+    }
+  }
+
+  var batchInProgress = false;
+  var batchCancelled = false;
+
+  function readFileAsText(file){
+    if(file && typeof file.__virtualText === 'string'){
+      return Promise.resolve(file.__virtualText);
+    }
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){ resolve(String(reader.result || '')); };
+      reader.onerror = function(){ reject(new Error('อ่านไฟล์ไม่สำเร็จ: ' + file.name)); };
+      reader.readAsText(file, 'UTF-8');
+    });
+  }
+
+  function detectChapterSplits(text){
+    var pattern = /^[ \t]*(?:(?:บทที่|ตอนที่)[ \t]*\d+|Chapter[ \t]*\d+|Ch\.[ \t]*\d+|第[ \t]*(?:\d+|[〇零一二三四五六七八九十百千两]+)[ \t]*章)[^\n]*$/gim;
+    var matches = [];
+    var m;
+    while((m = pattern.exec(text)) !== null){
+      matches.push({ index: m.index, heading: m[0].trim().slice(0, 60) });
+      if(m.index === pattern.lastIndex) pattern.lastIndex++;
+    }
+    if(matches.length < 2) return null;
+
+    var segments = [];
+    var prefix = text.slice(0, matches[0].index).trim();
+    for(var i = 0; i < matches.length; i++){
+      var start = matches[i].index;
+      var end = (i + 1 < matches.length) ? matches[i + 1].index : text.length;
+      var segText = text.slice(start, end).trim();
+      if(i === 0 && prefix) segText = prefix + '\n\n' + segText;
+      if(segText) segments.push({ label: matches[i].heading, text: segText });
+    }
+    return segments.length >= 2 ? segments : null;
+  }
+
+  async function runSingleTranslationForBatch(chunks, proj, key, model, label, originalText, batchId, batchIndex, chunkSize, normalizedText, targetBookId){
+    var results = [];
+    var previousTail = '';
+    var activeBook = (proj.books || []).find(function(b){ return b.id === targetBookId; }) || null;
+    if(!activeBook) throw new Error('ไม่พบ Book ต้นทางของ Batch');
+    var translationJobId = makeId('tj');
+    var translationChapterId = makeId('h');
+    var jobCreated = false;
+    var translationJobCompleted = false;
+    var batchProvider = providerSel.value;
+    var batchSettingsSnapshot = captureTranslationSettingsSnapshot(batchProvider, model, chunkSize);
+    var batchContext = captureAppContext(proj, activeBook);
+    var batchJobRevision = null;
+    try{
+      var batchCreatedJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'batch',batchId:batchId,batchIndex:batchIndex,provider:batchProvider,model:model,chunkSize:chunkSize,totalChunks:chunks.length,sourceSnapshot:{text:String(normalizedText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(label || ''),normalized:true},settingsSnapshot:batchSettingsSnapshot});
+      jobCreated = true;
+      var batchRunningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',expectedRevision:batchCreatedJob.revision});
+      batchJobRevision = batchRunningJob.revision;
+      activeTranslationJobRevision = batchJobRevision;
+      activeTranslationJobId = translationJobId;
+      for(var i = 0; i < chunks.length; i++){
+        // ส่ง chunks[i] เข้าไปด้วย Snapshot ของ settings เพื่อไม่ให้ global UI state เปลี่ยน prompt ระหว่าง Batch Job
+        var sys = buildTranslatePromptWithSettings(proj, previousTail, chunks[i], batchSettingsSnapshot);
+        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2, batchProvider);
+        var partTrim = part.trim();
+        previousTail = getTail(partTrim, 300);
+        var batchCheckpointedJob = await PrungAksornStorageV2.checkpointTranslationJob({jobId:translationJobId,retryCount:0,expectedRevision:batchJobRevision},i,partTrim,previousTail);
+        batchJobRevision = batchCheckpointedJob.revision;
+        activeTranslationJobRevision = batchJobRevision;
+        results.push(partTrim);
+      }
+      await PrungAksornStorageV2.completeTranslationJob(translationJobId,batchJobRevision);
+      if(isAppContextCurrent(batchContext)){
+        analyzeTQGCompletedOutput(normalizedText || normalizeOCR(originalText || ''), results.join('\n\n'), proj);
+      }
+      batchJobRevision = null;
+      activeTranslationJobRevision = null;
+      translationJobCompleted = true;
+      activeTranslationJobId = null;
+
+      var outputText = results.join('\n\n');
+      var newEntry = { id: translationChapterId, ts: Date.now(), label: label, input: originalText, output: outputText };
+      if(activeBook) activeBook.history.push(newEntry);
+      else (proj.history = proj.history || []).push(newEntry);
+    }catch(err){
+      if(jobCreated && !translationJobCompleted){
+        try{
+          if(err.name === 'AbortError') await PrungAksornStorageV2.cancelTranslationJob(translationJobId,batchJobRevision);
+          else await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'BATCH_TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:typeof i === 'number' ? i : null,retryCount:0,timestamp:Date.now()},batchJobRevision);
+        }catch(jobErr){
+          console.warn('Batch translation job state checkpoint failed:', jobErr);
+        }
+      }
+      activeTranslationJobId = null;
+      throw err;
+    }
+  }
+  async function runBatchImport(files){
+    var proj = getCurrentProject();
+    var key = document.getElementById('apiKey').value.trim();
+    if(!proj){ showError('กรุณาเลือกหรือสร้างเรื่องนิยายก่อน'); return; }
+    if(!key){ showError('กรุณาใส่ API Key ก่อน'); return; }
+    if(batchInProgress || warnIfAiBusy()) return;
+    var batchTargetBook = getActiveBook(proj);
+    if(!batchTargetBook){ showError('ไม่พบเล่มต้นทางของ Batch'); return; }
+    var batchTargetBookId = batchTargetBook.id;
+
+    hideError();
+    var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
+    batchInProgress = true;
+    batchCancelled = false;
+    resetTQGQualityPanel();
+    setAiBusy(true);
+    setTranslationSettingsLocked(true);
+    resetActionStats();
+    cancelBtn.classList.add('show');
+
+    var batchId = makeId('batch');
+    var succeeded = [];
+    var failed = [];
+
+    for(var idx = 0; idx < files.length; idx++){
+      if(batchCancelled) break;
+      var f = files[idx];
+      progressText.textContent = 'กำลังแปลไฟล์ ' + (idx + 1) + '/' + files.length + ': ' + f.name;
+      try{
+        activeController = new AbortController();
+        var raw = await readFileAsText(f);
+        var text = normalizeOCR(raw);
+        var chunks = splitIntoChunks(text, maxLen);
+        var label = f.name.replace(/\.[^.]+$/, '');
+        await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text, batchId, idx, maxLen, text, batchTargetBookId);
+        succeeded.push(f.name);
+        commitChange();
+      }catch(err){
+        if(err.name === 'AbortError'){ batchCancelled = true; break; }
+        failed.push(f.name + ' (' + (err.message || 'เกิดข้อผิดพลาด') + ')');
+      }
+    }
+
+    batchInProgress = false;
+    setTranslationSettingsLocked(false);
+    setAiBusy(false);
+    cancelBtn.classList.remove('show');
+    progressText.textContent = '';
+
+    var summary = 'นำเข้าเสร็จสิ้น: สำเร็จ ' + succeeded.length + '/' + files.length + ' ไฟล์';
+    if(batchCancelled) summary += ' (ยกเลิกก่อนครบ)';
+    if(currentActionTokens > 0) summary += '\n\n(ใช้ API ไปทั้งหมด ' + currentActionTokens.toLocaleString() + ' tokens, ประมาณ $' + currentActionCost.toFixed(4) + ')';
+    if(failed.length) summary += '\n\nล้มเหลว:\n- ' + failed.join('\n- ');
+    refreshTranslationRecoveryUI();
+    await showAlertDialog('สรุปผลการนำเข้า', summary);
+  }
+
+  processBtn.addEventListener('click', async function(){
+    hideError();
+    if(warnIfAiBusy()) return;
+    var proj = getCurrentProject();
+    var text = inputText.value.trim();
+    var key = document.getElementById('apiKey').value.trim();
+    if(!proj || !text || !key){ showError('กรุณาเลือกเรื่อง ใส่เนื้อหา และ API Key'); return; }
+
+    var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
+    var normalizedText = normalizeOCR(text);
+    var chunks = splitIntoChunks(normalizedText, maxLen);
+    pendingResume = null;
+    pendingBatchResume = null;
+    if(resumeBtn){ resumeBtn.classList.remove('show'); resumeBtn.textContent='ดำเนินการต่อ'; }
+    await runTranslation(chunks, proj, key, modelInput.value, 0, [], text, makeId('h'), null, normalizedText);
+  });
+
+  if(resumeBtn){
+    resumeBtn.addEventListener('click', async function(){
+      hideError();
+      if(warnIfAiBusy()) return;
+      if(pendingBatchResume){
+        var batchState=pendingBatchResume;
+        await runBatchTranslationRecovery(batchState);
+        return;
+      }
+      if(!pendingResume) return;
+      var key = document.getElementById('apiKey').value.trim() || pendingResume.key;
+      if(pendingResume.provider && providerSel.value !== pendingResume.provider){ showError('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก ' + pendingResume.provider + ' ก่อนดำเนินการต่อ'); return; }
+      if(modelInput.value !== pendingResume.model){ showError('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก ' + pendingResume.model + ' ก่อนดำเนินการต่อ'); return; }
+      await runTranslation(pendingResume.chunks, pendingResume.proj, key, pendingResume.model, pendingResume.startIndex, pendingResume.results, pendingResume.originalText, pendingResume.chapterId, pendingResume.jobId, pendingResume.sourceSnapshotText, pendingResume.settingsSnapshot);
+    });
+  }
+
+  repairBtn.addEventListener('click', async function(){
+    hideError();
+    if(warnIfAiBusy()) return;
+    var text = inputText.value.trim();
+    var key = document.getElementById('apiKey').value.trim();
+    var repairContext = captureAppContext(getCurrentProject(), getActiveBook(getCurrentProject()));
+    var repairSourceSnapshot = text;
+    var repairModelSnapshot = modelInput.value;
+    if(!text || !key){ showError('กรุณาใส่เนื้อหาและ API Key'); return; }
+
+    text = normalizeOCR(text);
+    var chunks = splitIntoChunks(text, 1800);
+
+    activeController = new AbortController();
+    setAiBusy(true);
+    resetActionStats();
+    cancelBtn.classList.add('show');
+    progressText.textContent = 'กำลังซ่อม OCR ด้วย AI...';
+    var sys = buildOCRRepairPrompt(text); //  ส่ง text เข้าไปเพื่อให้ระบบเลือกโหมดอัตโนมัติ
+    var repairedParts = [];
+
+    try {
+      for(var i=0; i<chunks.length; i++){
+        if(isAppContextCurrent(repairContext)) progressText.textContent = chunks.length > 1 ? ('กำลังซ่อมส่วนที่ ' + (i+1) + '/' + chunks.length) : 'กำลังซ่อม OCR ด้วย AI...';
+        var repaired = await callAIWithRetry(sys, chunks[i], key, repairModelSnapshot, activeController.signal, 2);
+        if(!isAppContextCurrent(repairContext) || inputText.value.trim() !== repairSourceSnapshot) return;
+        repairedParts.push(repaired.trim());
+      }
+      if(!isAppContextCurrent(repairContext) || inputText.value.trim() !== repairSourceSnapshot) return;
+      inputText.value = repairedParts.join('\n\n');
+      highlightSuspicious(inputText.value);
+      saveDraftSoon();
+
+      var statsStr = '';
+      if(currentActionTokens > 0) statsStr = ' (ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
+      progressText.textContent = 'ซ่อม OCR ด้วย AI เรียบร้อย' + statsStr;
+      setTimeout(function(){ if(isAppContextCurrent(repairContext) && progressText.textContent.includes('ซ่อม OCR ด้วย AI เรียบร้อย')) progressText.textContent = ''; }, 4000);
+    } catch(err){
+      if(err.name !== 'AbortError' && isAppContextCurrent(repairContext)) showError(err.message);
+    } finally {
+      setAiBusy(false);
+      if(isAppContextCurrent(repairContext)) cancelBtn.classList.remove('show');
+    }
+  });
+
+  cancelBtn.addEventListener('click', function(){
+    batchCancelled = true;
+    if(activeController) activeController.abort();
+  });
+
+  copyBtn.addEventListener('click', function(){
+    navigator.clipboard.writeText(output.textContent).then(function(){
+      copyBtn.textContent = 'คัดลอกแล้ว';
+      setTimeout(function(){ copyBtn.textContent = 'คัดลอก'; }, 1500);
+    }).catch(function(err){
+      console.error('Clipboard copy failed:', err);
+      showError('ไม่สามารถคัดลอกข้อความไปยังคลิปบอร์ดได้');
+    });
+  });
+
+  downloadBtn.addEventListener('click', function(){
+    var blob = new Blob([output.textContent], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    var objectUrl = URL.createObjectURL(blob);
+    a.href = objectUrl;
+    a.download = safeFilename(getCurrentProject() ? getCurrentProject().name : '') + '-ผลลัพธ์.txt';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(objectUrl); }, 0);
+  });
+
+  var SCRIPT_LOAD_PROMISES = Object.create(null);
+
+  var SRI_MAP = {
+    'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js': 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==',
+    'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js': 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==',
+    'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js': 'sha512-Qlv6VSKh1gDKGoJbnyA5RMXYcvnpIqhO++MhIM2fStMcGT9i2T//tSwYFlcyoRRDcDZ+TYHpH8azBBCyhpSeqw==',
+    'https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js': 'sha512-Qlv6VSKh1gDKGoJbnyA5RMXYcvnpIqhO++MhIM2fStMcGT9i2T//tSwYFlcyoRRDcDZ+TYHpH8azBBCyhpSeqw==',
+    'https://cdn.jsdelivr.net/npm/docx@8.2.3/build/index.umd.js': 'sha512-erFzi4xuyr2QqWOecuCJdsIqdTiv8o6z9kEfX0IM8zw8DfDjSV4bS42S9S7AqDyuORJmV6/VOCc4GRbkmWfKvg==',
+    'https://unpkg.com/docx@8.2.3/build/index.umd.js': 'sha512-erFzi4xuyr2QqWOecuCJdsIqdTiv8o6z9kEfX0IM8zw8DfDjSV4bS42S9S7AqDyuORJmV6/VOCc4GRbkmWfKvg==',
+    'https://unpkg.com/docx@8.2.3/build/index.iife.js': 'sha512-2mTPer9hvSxXSdLrNwaASIey5V9Tnb0D39T2wRHsNyt3PAsDUTEZK3PMNqqyFHzHkPK5z7X/yCieCEFMj9Cd3Q=='
+  };
+
+  function loadScript(src, integrity){
+    if(SCRIPT_LOAD_PROMISES[src]) return SCRIPT_LOAD_PROMISES[src];
+    var existing = document.querySelector('script[src="' + src + '"]');
+    if(existing && existing.dataset.prungLoaded === 'true') return Promise.resolve();
+
+    var promise = new Promise(function(resolve, reject){
+      var s = existing || document.createElement('script');
+      var timer = null;
+      var settled = false;
+      var hash = integrity || (typeof SRI_MAP !== 'undefined' ? SRI_MAP[src] : null);
+
+      function cleanup(){
+        if(timer) clearTimeout(timer);
+        s.removeEventListener('load', onLoad);
+        s.removeEventListener('error', onError);
+      }
+      function onLoad(){
+        if(settled) return;
+        settled = true;
+        cleanup();
+        s.dataset.prungLoaded = 'true';
+        resolve();
+      }
+      function onError(){
+        if(settled) return;
+        settled = true;
+        cleanup();
+        if(!existing && s.parentNode) s.parentNode.removeChild(s);
+        delete SCRIPT_LOAD_PROMISES[src];
+        reject(new Error('โหลดไฟล์ ' + src + ' ไม่สำเร็จ'));
+      }
+
+      s.addEventListener('load', onLoad, { once: true });
+      s.addEventListener('error', onError, { once: true });
+      timer = setTimeout(onError, 15000);
+
+      if(!existing){
+        s.src = src;
+        if(hash){
+          s.integrity = hash;
+          s.crossOrigin = 'anonymous';
+          s.referrerPolicy = 'no-referrer';
+        }
+        document.head.appendChild(s);
+      }
+    });
+
+    SCRIPT_LOAD_PROMISES[src] = promise;
+    return promise;
+  }
+
+  document.getElementById('exportDocxBtn').addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    var historyList = getActiveHistoryList(proj);
+    if(!proj || !historyList || historyList.length === 0){
+      await showAlertDialog('ไม่พบข้อมูล', 'ไม่พบประวัติการแปลในเล่มนี้สำหรับสร้างไฟล์ Word');
+      return;
+    }
+    if(navigator.onLine === false){
+      await showAlertDialog('ต้องใช้อินเทอร์เน็ต', 'การส่งออกไฟล์ Word ต้องโหลดระบบแปลงไฟล์จากอินเทอร์เน็ตก่อนใช้งานครั้งแรก แต่ตอนนี้ดูเหมือนอุปกรณ์ของคุณออฟไลน์อยู่ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+      return;
+    }
+
+    progressText.textContent = 'กำลังเตรียมระบบแปลงไฟล์ Word (.docx)...';
+    try {
+      try {
+        await loadScript('https://cdn.jsdelivr.net/npm/docx@8.2.3/build/index.umd.js');
+      } catch(e1) {
+        try {
+          await loadScript('https://unpkg.com/docx@8.2.3/build/index.umd.js');
+        } catch(e2) {
+          await loadScript('https://unpkg.com/docx@8.2.3/build/index.iife.js');
+        }
+      }
+
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js');
+      } catch(e1) {
+        await loadScript('https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js');
+      }
+
+      var docxLib = window.docx;
+      if(!docxLib){ await showAlertDialog('ไม่พร้อมใช้งาน', 'ระบบแปลงไฟล์ Word ไม่พร้อมใช้งาน'); return; }
+
+      progressText.textContent = 'กำลังสร้างเอกสาร Word...';
+      var activeBook = getActiveBook(proj);
+      var bookTitle = activeBook ? activeBook.title : 'นิยาย';
+
+      var children = [];
+      children.push(new docxLib.Paragraph({
+        children: [new docxLib.TextRun({ text: proj.name + ' — ' + bookTitle, bold: true, size: 36, font: 'Sarabun' })],
+        space: { after: 400 }
+      }));
+
+      historyList.forEach(function(entry, idx){
+        var titleText = entry.label || ('ตอนที่ ' + (idx + 1));
+        children.push(new docxLib.Paragraph({
+          children: [new docxLib.TextRun({ text: titleText, bold: true, size: 28, font: 'Sarabun' })],
+          heading: docxLib.HeadingLevel.HEADING_1,
+          space: { before: 300, after: 200 },
+          pageBreakBefore: idx > 0
+        }));
+
+        var lines = (entry.output || '').split('\n');
+        lines.forEach(function(line){
+          if(line.trim()){
+            children.push(new docxLib.Paragraph({
+              children: [new docxLib.TextRun({ text: line, size: 24, font: 'Sarabun' })],
+              space: { after: 120 },
+              lineSpacing: { line: 360 }
+            }));
+          }
+        });
+      });
+
+      var doc = new docxLib.Document({
+        sections: [{ properties: {}, children: children }]
+      });
+
+      var blob = await docxLib.Packer.toBlob(doc);
+      saveAs(blob, safeFilename(proj.name + '-' + bookTitle) + '.docx');
+      progressText.textContent = 'ส่งออกไฟล์ Word สำเร็จ!';
+    } catch(err){
+      var msg = 'เกิดข้อผิดพลาดในการสร้างไฟล์ Word: ' + (err.message || '');
+      if(navigator.onLine === false || /โหลดไฟล์/.test(err.message || '')){
+        msg += '\n\n(อาจเกิดจากไม่มีการเชื่อมต่ออินเทอร์เน็ต การส่งออกไฟล์ Word ต้องใช้อินเทอร์เน็ตเพื่อโหลดระบบแปลงไฟล์)';
+      }
+      await showAlertDialog('เกิดข้อผิดพลาด', msg);
+    } finally {
+      setTimeout(function(){ progressText.textContent = ''; }, 2000);
+    }
+  });
+
+  document.getElementById('exportEpubBtn').addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    var historyList = getActiveHistoryList(proj);
+    if(!proj || !historyList || historyList.length === 0){
+      await showAlertDialog('ไม่พบข้อมูล', 'ไม่พบประวัติการแปลในเล่มนี้สำหรับสร้าง E-Book');
+      return;
+    }
+    if(navigator.onLine === false){
+      await showAlertDialog('ต้องใช้อินเทอร์เน็ต', 'การส่งออกไฟล์ E-Book ต้องโหลดระบบบีบอัดไฟล์จากอินเทอร์เน็ตก่อนใช้งานครั้งแรก แต่ตอนนี้ดูเหมือนอุปกรณ์ของคุณออฟไลน์อยู่ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+      return;
+    }
+
+    progressText.textContent = 'กำลังเตรียมระบบสร้างไฟล์ E-Book (.epub)...';
+    try {
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+      } catch(e1) {
+        await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+      }
+
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js');
+      } catch(e1) {
+        await loadScript('https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js');
+      }
+
+      if(!window.JSZip){ await showAlertDialog('ไม่พร้อมใช้งาน', 'ระบบบีบอัดไฟล์ไม่พร้อมใช้งาน'); return; }
+
+      progressText.textContent = 'กำลังสร้างไฟล์ E-Book...';
+      var activeBook = getActiveBook(proj);
+      var bookTitle = activeBook ? activeBook.title : 'นิยาย';
+      var zip = new JSZip();
+
+      zip.file('mimetype', 'application/epub+zip', { compression: "STORE" });
+      var containerXml = '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>';
+      zip.file('META-INF/container.xml', containerXml);
+
+      var manifestItems = '';
+      var spineItems = '';
+      var tocNav = '';
+
+      historyList.forEach(function(entry, idx){
+        var chId = 'chap_' + (idx + 1);
+        var chFileName = chId + '.xhtml';
+        var chTitle = entry.label || ('ตอนที่ ' + (idx + 1));
+
+        var paras = (entry.output || '').split('\n').map(function(p){
+          return p.trim() ? ('<p>' + escapeHtml(p) + '</p>') : '';
+        }).join('\n');
+
+        var xhtmlContent = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>' + escapeHtml(chTitle) + '</title><style>body{font-family:serif;line-height:1.8;padding:5%;} h1{text-align:center;margin-bottom:1.5em;}</style></head><body><h1>' + escapeHtml(chTitle) + '</h1>' + paras + '</body></html>';
+
+        zip.file('OEBPS/' + chFileName, xhtmlContent);
+        manifestItems += '<item id="' + chId + '" href="' + chFileName + '" media-type="application/xhtml+xml"/>\n';
+        spineItems += '<itemref idref="' + chId + '"/>\n';
+        tocNav += '<li><a href="' + chFileName + '">' + escapeHtml(chTitle) + '</a></li>\n';
+      });
+
+      var opfContent = '<?xml version="1.0" encoding="utf-8"?><package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>' + escapeHtml(proj.name) + ' - ' + escapeHtml(bookTitle) + '</dc:title><dc:language>th</dc:language><dc:identifier id="BookId">urn:prung-aksorn:book:' + escapeHtml((activeBook && activeBook.id) ? activeBook.id : (proj.id || 'default')) + '</dc:identifier></metadata><manifest>' + manifestItems + '</manifest><spine>' + spineItems + '</spine></package>';
+      zip.file('OEBPS/content.opf', opfContent);
+
+      var blob = await zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
+      saveAs(blob, safeFilename(proj.name + '-' + bookTitle) + '.epub');
+      progressText.textContent = 'ส่งออกไฟล์ E-Book (.epub) สำเร็จ!';
+    } catch(err){
+      var msg = 'เกิดข้อผิดพลาดในการสร้างไฟล์ EPUB: ' + (err.message || '');
+      if(navigator.onLine === false || /โหลดไฟล์/.test(err.message || '')){
+        msg += '\n\n(อาจเกิดจากไม่มีการเชื่อมต่ออินเทอร์เน็ต การส่งออกไฟล์ E-Book ต้องใช้อินเทอร์เน็ตเพื่อโหลดระบบบีบอัดไฟล์)';
+      }
+      await showAlertDialog('เกิดข้อผิดพลาด', msg);
+    } finally {
+      setTimeout(function(){ progressText.textContent = ''; }, 2000);
+    }
+  });
+
+  var checkConsistencyBtn = document.getElementById('checkConsistencyBtn');
+  checkConsistencyBtn.addEventListener('click', async function(){
+    var proj = getCurrentProject();
+    var activeBook = getActiveBook(proj);
+    var historyList = getActiveHistoryList(proj);
+    var key = document.getElementById('apiKey').value.trim();
+
+    if(!proj || !historyList || historyList.length < 2){
+      await showAlertDialog('ยังตรวจสอบไม่ได้', 'ต้องมีอย่างน้อย 2 ตอนที่แปลแล้วในเล่มนี้ก่อน จึงจะเทียบความสม่ำเสมอข้ามตอนได้');
+      return;
+    }
+    if(!proj.glossary || !proj.glossary.trim()){
+      await showAlertDialog('ยังไม่มีคลังคำ', 'กรุณาใส่คลังคำเฉพาะเรื่อง (ชื่อตัวละคร/สถานที่) ไว้ก่อน จึงจะมีสิ่งให้เทียบความสม่ำเสมอได้');
+      return;
+    }
+    if(!key){
+      await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน');
+      return;
+    }
+
+    var taggedText = historyList.map(function(entry, idx){
+      var label = entry.label || ('ตอนที่ ' + (idx + 1));
+      return '=== ' + label + ' ===\n' + (entry.output || '');
+    }).join('\n\n');
+
+    var maxLen = parseInt(document.getElementById('chunkLen').value, 10) || 3000;
+    var batches = splitIntoChunks(taggedText, Math.max(maxLen, 4000));
+
+    var sys = 'คุณเป็นบรรณาธิการตรวจทานความสม่ำเสมอของคำศัพท์เฉพาะในนิยายแปล ' +
+      'นี่คือคลังคำที่กำหนดไว้ล่วงหน้า (รูปแบบ "ต้นฉบับ = คำแปลไทย"):\n' + proj.glossary.trim() + '\n\n' +
+      'เนื้อหาที่ให้มาจะมีป้ายชื่อกำกับแต่ละตอนไว้ในรูปแบบ "=== ชื่อตอน ===" ให้ตรวจสอบว่ามีการแปล/สะกด ' +
+      'ชื่อตัวละคร สถานที่ หรือคำศัพท์เฉพาะ ที่ไม่ตรงกับคลังคำ หรือสะกด/แปลไม่ตรงกันระหว่างตอนหรือไม่ ' +
+      'ถ้าพบให้รายงานเป็นข้อๆ ระบุชื่อตอนที่พบ คำที่ใช้ไม่ตรงกัน และคำที่ควรจะเป็นตามคลังคำ (ถ้ามี) ' +
+      'ถ้าไม่พบปัญหาเลยในส่วนที่ตรวจ ให้ตอบว่า "ไม่พบความไม่สอดคล้องกัน" เท่านั้น ' +
+      'ตอบเป็นภาษาไทย กระชับ เป็นข้อๆ ห้ามมีคำนำหรือคำลงท้าย';
+
+    var reportParts = [];
+    checkConsistencyBtn.disabled = true;
+    resetActionStats();
+    try{
+      for(var i = 0; i < batches.length; i++){
+        progressText.textContent = batches.length > 1
+          ? ('กำลังตรวจสอบความสม่ำเสมอ ส่วนที่ ' + (i + 1) + '/' + batches.length + '...')
+          : 'กำลังตรวจสอบความสม่ำเสมอของคลังคำทั้งเล่ม...';
+        var result = await callAIWithRetry(sys, batches[i], key, modelInput.value, activeController ? activeController.signal : null, 2);
+        if(result && result.trim()){
+          reportParts.push(batches.length > 1 ? ('— ส่วนที่ ' + (i + 1) + ' —\n' + result.trim()) : result.trim());
+        }
+      }
+      var fullReport = reportParts.join('\n\n').trim();
+      if(!fullReport) fullReport = 'ไม่พบความไม่สอดคล้องกัน';
+
+      if(currentActionTokens > 0) {
+        fullReport += '\n\n---\n(ใช้ไปทั้งหมด ' + currentActionTokens.toLocaleString() + ' tokens, ประมาณ $' + currentActionCost.toFixed(4) + ')';
+      }
+
+      diffTitleEl.textContent = 'รายงานความสม่ำเสมอของคลังคำ — ' + (activeBook ? activeBook.title : proj.name);
+      diffBody.textContent = fullReport;
+      diffOverlay.classList.add('show');
+    }catch(err){
+      await showAlertDialog('ตรวจสอบไม่สำเร็จ', 'เกิดข้อผิดพลาด: ' + (err.message || ''));
+    }finally{
+      checkConsistencyBtn.disabled = false;
+      progressText.textContent = '';
+    }
+  });
+
+  /* ---------------- Reader Mode Logic ---------------- */
+  var readerOverlay = document.getElementById('readerOverlay');
+  var readerContent = document.getElementById('readerContent');
+  var readerTocList = document.getElementById('readerTocList');
+  var readerTocDrawer = document.getElementById('readerTocDrawer');
+  var readerBackdrop = document.getElementById('readerBackdrop');
+  var readerBookTitle = document.getElementById('readerBookTitle');
+  var readerFontValue = document.getElementById('readerFontValue');
+
+  var readerFontSize = 18;
+  var readerCurrentBook = null;
+  var readerScrollTimer = null;
+
+function setReaderFontSize(size, persist) {
+    readerFontSize = Math.max(14, Math.min(32, size));
+    readerContent.style.fontSize = readerFontSize + 'px';
+    readerFontValue.textContent = readerFontSize;
+
+    // บันทึกลง IndexedDB เมื่อมีการปรับขนาดฟอนต์
+    if (persist && appData.settings) {
+      appData.settings.readerFontSize = readerFontSize;
+      saveData();
+    }
+  }
+
+  document.getElementById('readerFontDown').addEventListener('click', function(){ setReaderFontSize(readerFontSize - 1, true); });
+  document.getElementById('readerFontUp').addEventListener('click', function(){ setReaderFontSize(readerFontSize + 1, true); });
+
+  /* ---------------- Text-to-Speech (TTS) ---------------- */
+  var readerTtsBtn = document.getElementById('readerTtsBtn');
+  var readerTtsBar = document.getElementById('readerTtsBar');
+  var ttsPlayPauseBtn = document.getElementById('ttsPlayPauseBtn');
+  var ttsStopBtn = document.getElementById('ttsStopBtn');
+  var ttsPrevBtn = document.getElementById('ttsPrevBtn');
+  var ttsNextBtn = document.getElementById('ttsNextBtn');
+  var ttsRateSlider = document.getElementById('ttsRateSlider');
+  var ttsRateValue = document.getElementById('ttsRateValue');
+  var ttsVoiceSelect = document.getElementById('ttsVoiceSelect');
+  var ttsStatusText = document.getElementById('ttsStatusText');
+  var ttsCloseBarBtn = document.getElementById('ttsCloseBarBtn');
+
+  var ttsSupported = ('speechSynthesis' in window);
+  var ttsQueue = [];
+  var ttsIndex = -1;
+  var ttsState = 'stopped';
+  var ttsVoicesLoaded = false;
+
+  var ttsPlayIconSvg = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none;"><polygon points="6,4 20,12 6,20"/></svg>';
+  var ttsPauseIconSvg = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+
+  if(!ttsSupported && readerTtsBtn){
+    readerTtsBtn.disabled = true;
+    readerTtsBtn.title = 'เบราว์เซอร์นี้ไม่รองรับการอ่านออกเสียง';
+  }
+
+  function populateTtsVoices(){
+    if(!ttsSupported) return;
+    var voices = window.speechSynthesis.getVoices();
+    if(!voices.length) return;
+    ttsVoicesLoaded = true;
+    var thVoices = voices.filter(function(v){ return /^th/i.test(v.lang); });
+    var otherVoices = voices.filter(function(v){ return !/^th/i.test(v.lang); });
+    ttsVoiceSelect.innerHTML = '';
+    function addOptGroup(label, list){
+      if(!list.length) return;
+      var group = document.createElement('optgroup');
+      group.label = label;
+      list.forEach(function(v){
+        var opt = document.createElement('option');
+        opt.value = v.voiceURI;
+        opt.textContent = v.name + ' (' + v.lang + ')';
+        group.appendChild(opt);
+      });
+      ttsVoiceSelect.appendChild(group);
+    }
+    addOptGroup('เสียงไทย', thVoices);
+    addOptGroup('เสียงอื่นๆ', otherVoices);
+
+    var savedURI = appData.settings && appData.settings.ttsVoiceURI;
+    if(savedURI && voices.some(function(v){ return v.voiceURI === savedURI; })){
+      ttsVoiceSelect.value = savedURI;
+    } else if(thVoices.length){
+      ttsVoiceSelect.value = thVoices[0].voiceURI;
+    }
+  }
+  if(ttsSupported){
+    populateTtsVoices();
+    window.speechSynthesis.onvoiceschanged = populateTtsVoices;
+    var savedRate = (appData.settings && appData.settings.ttsRate) || '1';
+    ttsRateSlider.value = savedRate;
+    ttsRateValue.textContent = parseFloat(savedRate).toFixed(1) + 'x';
+  }
+
+  function getSelectedTtsVoice(){
+    if(!ttsSupported) return null;
+    var voices = window.speechSynthesis.getVoices();
+    var uri = ttsVoiceSelect.value;
+    return voices.find(function(v){ return v.voiceURI === uri; }) || null;
+  }
+
+  function buildTtsQueue(startEl){
+    var nodes = readerContent.querySelectorAll('h2, p');
+    ttsQueue = [];
+    var startIdx = 0;
+    var foundStart = false;
+    nodes.forEach(function(el){
+      var text = (el.textContent || '').trim();
+      if(!text) return;
+      ttsQueue.push({ el: el, text: text });
+      if(!foundStart && startEl && el === startEl){
+        startIdx = ttsQueue.length - 1;
+        foundStart = true;
+      }
+    });
+    return startIdx;
+  }
+
+  function findStartElementFromScroll(){
+    var nodes = readerContent.querySelectorAll('h2, p');
+    var scrollTop = readerOverlay.scrollTop + 80;
+    var candidate = null;
+    for(var i = 0; i < nodes.length; i++){
+      if(nodes[i].offsetTop >= scrollTop){ candidate = nodes[i]; break; }
+    }
+    return candidate || nodes[0] || null;
+  }
+
+  function clearTtsHighlight(){
+    var prev = readerContent.querySelector('p.tts-active');
+    if(prev) prev.classList.remove('tts-active');
+  }
+
+  function updatePlayPauseIcon(){
+    ttsPlayPauseBtn.innerHTML = (ttsState === 'playing') ? ttsPauseIconSvg : ttsPlayIconSvg;
+    ttsPlayPauseBtn.title = (ttsState === 'playing') ? 'หยุดชั่วคราว' : 'เล่น';
+  }
+
+  function speakIndex(idx){
+    if(!ttsSupported) return;
+    if(idx < 0 || idx >= ttsQueue.length){
+      stopTts();
+      return;
+    }
+    ttsIndex = idx;
+    clearTtsHighlight();
+    var item = ttsQueue[idx];
+    if(item.el.tagName === 'P'){
+      item.el.classList.add('tts-active');
+      item.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      item.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    var utt = new SpeechSynthesisUtterance(item.text);
+    var voice = getSelectedTtsVoice();
+    if(voice) utt.voice = voice;
+    utt.rate = parseFloat(ttsRateSlider.value) || 1;
+    utt.lang = voice ? voice.lang : 'th-TH';
+
+    utt.onend = function(){
+      if(ttsState === 'playing') speakIndex(ttsIndex + 1);
+    };
+    utt.onerror = function(e){
+      if(e.error === 'interrupted' || e.error === 'canceled') return;
+      ttsStatusText.textContent = 'เกิดข้อผิดพลาดในการอ่านออกเสียง';
+      stopTts();
+    };
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utt);
+    ttsStatusText.textContent = 'กำลังอ่าน ' + (idx + 1) + '/' + ttsQueue.length;
+    updatePlayPauseIcon();
+  }
+
+  function playTts(){
+    if(!ttsSupported){
+      showAlertDialog('ไม่รองรับ', 'เบราว์เซอร์นี้ไม่รองรับการอ่านออกเสียง (Web Speech API)');
+      return;
+    }
+    readerTtsBar.classList.add('show');
+    if(ttsState === 'paused' && ttsIndex >= 0){
+      ttsState = 'playing';
+      window.speechSynthesis.resume();
+      ttsStatusText.textContent = 'กำลังอ่าน ' + (ttsIndex + 1) + '/' + ttsQueue.length;
+      updatePlayPauseIcon();
+    } else {
+      var startEl = findStartElementFromScroll();
+      var startIdx = buildTtsQueue(startEl);
+      if(!ttsQueue.length){
+        ttsStatusText.textContent = 'ไม่มีเนื้อหาให้อ่าน';
+        return;
+      }
+      ttsState = 'playing';
+      speakIndex(startIdx);
+    }
+  }
+
+  function pauseTts(){
+    if(!ttsSupported) return;
+    ttsState = 'paused';
+    window.speechSynthesis.pause();
+    ttsStatusText.textContent = 'หยุดชั่วคราว';
+    updatePlayPauseIcon();
+  }
+
+  function stopTts(){
+    if(!ttsSupported) return;
+    ttsState = 'stopped';
+    ttsIndex = -1;
+    ttsQueue = [];
+    window.speechSynthesis.cancel();
+    clearTtsHighlight();
+    ttsStatusText.textContent = '';
+    readerTtsBar.classList.remove('show');
+    updatePlayPauseIcon();
+  }
+
+  readerTtsBtn.addEventListener('click', function(){
+    if(readerTtsBar.classList.contains('show') && ttsState === 'stopped'){
+      readerTtsBar.classList.remove('show');
+    } else {
+      readerTtsBar.classList.add('show');
+      if(!ttsVoicesLoaded) populateTtsVoices();
+    }
+  });
+
+  ttsCloseBarBtn.addEventListener('click', function(){ stopTts(); });
+  ttsPlayPauseBtn.addEventListener('click', function(){
+    if(ttsState === 'playing') pauseTts();
+    else playTts();
+  });
+  ttsStopBtn.addEventListener('click', stopTts);
+
+  ttsPrevBtn.addEventListener('click', function(){
+    if(!ttsQueue.length){ playTts(); return; }
+    var wasPlaying = (ttsState === 'playing');
+    var newIdx = Math.max(0, ttsIndex - 1);
+    if(wasPlaying){ speakIndex(newIdx); }
+    else {
+      ttsIndex = newIdx; clearTtsHighlight();
+      ttsQueue[newIdx].el.classList.add('tts-active');
+      ttsQueue[newIdx].el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  ttsNextBtn.addEventListener('click', function(){
+    if(!ttsQueue.length){ playTts(); return; }
+    if(ttsIndex >= ttsQueue.length - 1) return;
+    var wasPlaying = (ttsState === 'playing');
+    var newIdx = ttsIndex + 1;
+    if(wasPlaying){ speakIndex(newIdx); }
+    else {
+      ttsIndex = newIdx; clearTtsHighlight();
+      ttsQueue[newIdx].el.classList.add('tts-active');
+      ttsQueue[newIdx].el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  ttsRateSlider.addEventListener('input', function(){
+    ttsRateValue.textContent = parseFloat(ttsRateSlider.value).toFixed(1) + 'x';
+  });
+  ttsRateSlider.addEventListener('change', function(){
+    if(appData.settings) appData.settings.ttsRate = ttsRateSlider.value;
+    saveData();
+    if(ttsState === 'playing') speakIndex(ttsIndex);
+  });
+
+  ttsVoiceSelect.addEventListener('change', function(){
+    if(appData.settings) appData.settings.ttsVoiceURI = ttsVoiceSelect.value;
+    saveData();
+    if(ttsState === 'playing') speakIndex(ttsIndex);
+  });
+
+  readerOverlay.addEventListener('scroll', function() {
+    if (!readerCurrentBook) return;
+    clearTimeout(readerScrollTimer);
+    var readerScrollBook = readerCurrentBook;
+    readerScrollTimer = setTimeout(function() {
+      readerScrollTimer = null;
+      if (readerCurrentBook === readerScrollBook && readerOverlay.classList.contains('show')) {
+        readerScrollBook.readerScrollPos = readerOverlay.scrollTop;
+        saveData();
+      }
+    }, 500);
+  }, { passive: true });
+
+/* =============================================================
+     ฟังก์ชันสแกนคลังคำจากทุกตอนในเล่ม (Whole-Book Glossary Mining)
+     ใช้เทคนิค Bilingual Alignment: อ่านต้นฉบับคู่กับคำแปลจริง
+     ============================================================= */
+  var mineBookGlossaryBtn = document.getElementById('mineBookGlossaryBtn');
+  if(mineBookGlossaryBtn){
+    mineBookGlossaryBtn.addEventListener('click', async function(){
+      var proj = getCurrentProject();
+      var activeBook = getActiveBook(proj);
+      var historyList = getActiveHistoryList(proj);
+      var key = document.getElementById('apiKey').value.trim();
+
+      if(!proj || !historyList || historyList.length === 0){
+        await showAlertDialog('ไม่มีข้อมูล', 'ยังไม่มีตอนที่แปลในเล่มนี้สำหรับสแกนคลังคำ');
+        return;
+      }
+      if(!key){
+        await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน');
+        return;
+      }
+      if(warnIfAiBusy()) return;
+
+      var genre = state.genre || 'ทั่วไป';
+      var isThaiSource = (state.source === 'polish');
+      var sys = "";
+
+      if (isThaiSource) {
+        // กรณีโหมดขัดเกลาสำนวนภาษาไทย
+        sys = "คุณคือบรรณาธิการภาษาไทยผู้เชี่ยวชาญนิยายแนว " + genre + "\n" +
+              "หน้าที่ของคุณคือ: อ่านตัวอย่างเนื้อหาของแต่ละตอน แล้วดึงเฉพาะชื่อเฉพาะ คำทับศัพท์ หรือคำศัพท์สำคัญของทั้งเล่ม\n" +
+              "รูปแบบผลลัพธ์: 'คำที่พบ = คำสะกดมาตรฐานที่ถูกต้อง' บรรทัดละ 1 คำ ห้ามตอบคำซ้ำกันสองฝั่ง ห้ามใส่ bullet";
+      } else {
+        // กรณีโหมดแปลภาษาต่างประเทศ (Bilingual Alignment)
+        sys = "คุณคือนักสกัดคำศัพท์และจับคู่คำแปลสองภาษา (Bilingual Terminology Alignment Specialist) ผู้เชี่ยวชาญนิยายแนว " + genre + "\n\n" +
+              "หน้าที่ของคุณคือ: อ่านข้อความ 'ต้นฉบับ' คู่กับ 'คำแปล' ในแต่ละตอนต่อไปนี้ แล้วดึงเฉพาะ 'ชื่อเฉพาะและศัพท์เฉพาะ' (ชื่อตัวละคร, สัตว์อสูร, สถานที่, สำนัก, ระดับพลัง, สมุนไพร, โอสถ, อาวุธ)\n" +
+              "โดยนำคำภาษาต้นฉบับมาจับคู่กับ 'คำแปลภาษาไทยที่ใช้จริงในเนื้อหา' ของเรื่องนี้\n\n" +
+              "[กฎเหล็กเด็ดขาดเรื่องภาษา - STRICT CONSTRAINTS]\n" +
+              "1. รูปแบบต้องเป็น: [คำภาษาต้นฉบับเป๊ะๆ จากต้นฉบับ] = [คำแปลภาษาไทยที่ใช้จริงในคำแปล]\n" +
+              "2. ฝั่งซ้าย (ก่อนเครื่องหมาย =) ต้องเป็นภาษาต้นทางตามที่ปรากฏในต้นฉบับ 100% (เช่น ภาษาอังกฤษ หรือ ภาษาจีน) ห้ามแปลหรือทับศัพท์เป็นภาษาไทยเด็ดขาด!\n" +
+              "   ✅ ถูกต้อง: Jian Chen = เจี้ยนเฉิน\n" +
+              "   ✅ ถูกต้อง: Chaotic Body = ร่างบรรพกาล\n" +
+              "   ❌ ผิดเด็ดขาด: เจี้ยนเฉิน = เจี้ยนเฉิน (ห้ามเป็นภาษาไทยทั้งสองฝั่ง)\n" +
+              "3. ห้ามสกัดคำศัพท์สามัญทั่วไป (เช่น sword, forest, city, monster, water)\n" +
+              "4. ตอบเฉพาะรายการคำศัพท์บรรทัดละ 1 คำ ห้ามใส่ bullet ห้ามใส่ตัวเลขลำดับ และห้ามมีคำอธิบายเพิ่มเติม";
+      }
+
+      // กระชับเนื้อหาตัวอย่าง: ดึงชื่อตอน + 4 ย่อหน้าสำคัญ (ลดขนาดข้อมูลลง 50%)
+      var pairedBookText = historyList.map(function(entry, idx){
+        var title = entry.label || ('ตอนที่ ' + (idx + 1));
+        var inputExcerpt = (entry.input || '').slice(0, 450).trim();
+        var outputExcerpt = (entry.output || '').slice(0, 450).trim();
+
+        if (inputExcerpt) {
+          return '=== ' + title + ' ===\n[ต้นฉบับ]:\n' + inputExcerpt + '\n[คำแปล]:\n' + outputExcerpt;
+        } else {
+          return '=== ' + title + ' ===\n[คำแปล]:\n' + outputExcerpt;
+        }
+      }).join('\n\n');
+
+      // 2. ขยายขนาด Chunk เป็น 7500 ตัวอักษร (ลดจำนวนรอบในการส่ง API ลงเหลือแค่ 4-8 รอบ)
+      var chunks = splitIntoChunks(pairedBookText, 7500);
+      var rawResults = '';
+
+      activeController = new AbortController();
+      setAiBusy(true);
+      resetActionStats();
+      cancelBtn.classList.add('show');
+
+      try {
+        for(var i = 0; i < chunks.length; i++){
+          progressText.textContent = chunks.length > 1
+            ? ('กำลังสแกนคลังคำทั้งเล่ม ส่วนที่ ' + (i + 1) + '/' + chunks.length + ' (คุมความเร็ว Rate Limit)...')
+            : 'กำลังสแกนคลังคำจากทุกตอนในเล่ม...';
+
+          var result = await callAIWithRetry(sys, chunks[i], key, modelInput.value, activeController.signal, 1);
+          if(result && result.trim()) rawResults += '\n' + result.trim();
+
+          // 3. หน่วงเวลา 3.2 วินาทีระหว่างก้อน (ป้องกันการยิงเกิน 20 RPM 100%)
+          if (i < chunks.length - 1) {
+            await sleep(4100);
+          }
+        }
+
+        // แยกคู่คำศัพท์ และกรองคำซ้ำ
+        var parsedItems = [];
+        var seen = Object.create(null);
+        var existingKeys = Object.create(null);
+        (proj.glossary || '').split('\n').forEach(function(line){
+          var k = line.split('=')[0].trim().toLowerCase();
+          if(k) existingKeys[k] = true;
+        });
+
+        rawResults.split('\n').forEach(function(rawLine){
+          var line = rawLine.trim().replace(/^[-*•\d.]+\s*/, '').trim();
+          if(!line.includes('=')) return;
+          var parts = line.split('=');
+          var src = parts[0].trim();
+          var trans = parts.slice(1).join('=').trim();
+          if(!src || !trans) return;
+
+          // ดักจับ: ห้ามคำฝั่งซ้ายตรงกับฝั่งขวา (ป้องกันคำไทย = คำไทย)
+          if(src.toLowerCase() === trans.toLowerCase()) return;
+
+          var kLower = src.toLowerCase();
+          if(!seen[kLower]){
+            seen[kLower] = true;
+            parsedItems.push({
+              src: src,
+              trans: trans,
+              selected: !existingKeys[kLower] // ถ้ามีในคลังคำเดิมแล้วจะ uncheck ไว้ล่วงหน้า
+            });
+          }
+        });
+
+        if(parsedItems.length === 0){
+          await showAlertDialog('ไม่พบคำศัพท์ใหม่', 'AI สแกนทั้งเล่มแล้วแต่ไม่พบคำศัพท์เฉพาะใหม่เพิ่มเติม');
+          return;
+        }
+
+        // เปิด Pop-up ตาราง Checklist ให้ผู้ใช้ตรวจสอบและเลือก
+        var approved = await showGlossaryReviewModal(parsedItems);
+        if(approved && approved.length > 0){
+          proj.glossary = dedupeGlossary(proj.glossary || '', approved.join('\n'));
+          renderProjects();
+          saveData();
+
+          var statsStr = '';
+          if(currentActionTokens > 0) statsStr = '\n\n(ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ประมาณ $' + currentActionCost.toFixed(4) + ')';
+          await showAlertDialog('สำเร็จ', 'บันทึกคำศัพท์ของเล่มนี้จำนวน ' + approved.length + ' คำ เข้าสู่คลังคำเรียบร้อยแล้ว' + statsStr);
+        }
+      } catch(err){
+        if(err.name !== 'AbortError') await showAlertDialog('ทำไม่สำเร็จ', err.message);
+      } finally {
+        setAiBusy(false);
+        cancelBtn.classList.remove('show');
+        progressText.textContent = '';
+      }
+    });
+  }
+
+  /* =============================================================
+     ฟังก์ชันสืบทอดบริบทและสำนวนข้ามเล่ม (Cross-Book Style Inheritance)
+     1. สกัดคู่มือสรรพนามและน้ำเสียงลงช่อง Context
+     2. จับคู่คำศัพท์ข้ามภาษา (English = Thai) เข้าสู่คลังคำ
+     ============================================================= */
+  var inheritCrossBookBtn = document.getElementById('inheritCrossBookBtn');
+  if(inheritCrossBookBtn){
+    inheritCrossBookBtn.addEventListener('click', async function(){
+      var proj = getCurrentProject();
+      var activeBook = getActiveBook(proj);
+      var key = document.getElementById('apiKey').value.trim();
+
+      if(!proj || !proj.books || proj.books.length < 2){
+        await showAlertDialog('ต้องมีอย่างน้อย 2 เล่ม', 'คุณต้องสร้างอย่างน้อย 2 เล่มในเรื่องนี้เพื่อสืบทอดสำนวนจากเล่มก่อนหน้า');
+        return;
+      }
+      if(!key){
+        await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน');
+        return;
+      }
+      if(warnIfAiBusy()) return;
+
+      // แสดงรายชื่อเล่มอื่นที่ไม่ใช่เล่มปัจจุบัน
+      var otherBooks = proj.books.filter(function(b){ return b.id !== activeBook.id; });
+      var bookOptionsText = otherBooks.map(function(b, idx){ return (idx + 1) + '. ' + b.title; }).join('\n');
+
+      var promptMsg = 'ต้องการใช้เล่มใดเป็น "เล่มต้นแบบสำนวน" สำหรับ ' + activeBook.title + '?\n\nพิมพ์หมายเลขเล่มที่ต้องการ:\n' + bookOptionsText;
+      var selectedIdxStr = await showPromptDialog(promptMsg, '1');
+      if(!selectedIdxStr) return;
+
+      var chosenIndex = parseInt(selectedIdxStr.trim(), 10) - 1;
+      var refBook = otherBooks[chosenIndex];
+      if(!refBook || !refBook.history || refBook.history.length === 0){
+        await showAlertDialog('ไม่มีข้อมูล', 'เล่มต้นแบบที่เลือกยังไม่มีประวัติการแปล');
+        return;
+      }
+
+      // ดึงตัวอย่างข้อความภาษาไทยจากเล่มต้นแบบ (เล่ม 1)
+      var refThaiSample = refBook.history.slice(0, 10).map(function(h){ return (h.output || '').slice(0, 800); }).join('\n\n');
+      var targetInputText = inputText.value.trim(); // ข้อความต้นฉบับเล่มใหม่ (เช่น ภาษาอังกฤษ)
+
+      activeController = new AbortController();
+      setAiBusy(true);
+      resetActionStats();
+      cancelBtn.classList.add('show');
+      progressText.textContent = 'กำลังวิเคราะห์สำนวนและจับคู่คำศัพท์จาก ' + refBook.title + '...';
+
+      try {
+        // ขั้นตอนที่ 1: สกัดสรรพนามและคู่มือตัวละคร (Pronoun & Persona Bible)
+        var sysTone = "คุณคือนักวิเคราะห์วรรณกรรม อ่านตัวอย่างนิยายภาษาไทยต่อไปนี้ แล้วสรุป 'คู่มือสำนวนและสรรพนามของตัวละคร' สั้นๆ กระชับ:\n" +
+                      "- ระบุว่าตัวละครเอกและตัวละครสำคัญแทนตัวเองว่าอะไร (ข้า, ผม, ฉัน) และเรียกคนอื่นว่าอะไร (เจ้า, ท่าน, เธอ)\n" +
+                      "- ระบุระดับภาษาและโทนเสียงของเรื่อง (โบราณ, ปัจจุบัน, สุภาพ, ดุดัน)\n" +
+                      "ตอบเฉพาะข้อสรุปเป็นข้อๆ ห้ามมีคำนำ";
+        var toneResult = await callAIWithRetry(sysTone, refThaiSample.slice(0, 4000), key, modelInput.value, activeController.signal, 1);
+
+        if(toneResult && toneResult.trim()){
+          var newContext = (proj.context ? proj.context.trim() + '\n\n' : '') +
+                           '[คู่มือสำนวนและสรรพนามจาก ' + refBook.title + ']\n' + toneResult.trim();
+          proj.context = newContext;
+        }
+
+        // ขั้นตอนที่ 2: ถ้ามีข้อความต้นฉบับภาษาอังกฤษ ให้จับคู่คำศัพท์ English = Thai
+        var matchedTerms = [];
+        if(targetInputText){
+          progressText.textContent = 'กำลังจับคู่คำศัพท์ระหว่างต้นฉบับใหม่กับสำนวนเดิมใน ' + refBook.title + '...';
+          var sysAlign = "คุณคือนักแปลนิยายมืออาชีพ\n" +
+                         "นี่คือตัวอย่างสำนวนภาษาไทยที่เคยแปลไว้ในเล่มก่อนหน้า:\n" + refThaiSample.slice(0, 3000) + "\n\n" +
+                         "หน้าที่ของคุณคือ: อ่านข้อความต้นฉบับของเล่มใหม่ต่อไปนี้ แล้วจับคู่ชื่อเฉพาะ/ศัพท์เฉพาะ ให้ตรงกับคำแปลไทยที่เคยใช้ในเล่มก่อนหน้า\n" +
+                         "รูปแบบผลลัพธ์: [คำภาษาต้นฉบับเป๊ะๆ จากต้นฉบับ] = [คำแปลไทยที่เคยใช้ในเล่มก่อนหน้า]\n" +
+                         "ห้ามทับศัพท์ภาษาไทยฝั่งซ้าย และห้ามมีคำอธิบายเพิ่มเติม";
+          var alignResult = await callAIWithRetry(sysAlign, targetInputText.slice(0, 4000), key, modelInput.value, activeController.signal, 1);
+
+          if(alignResult && alignResult.trim()){
+            var seen = Object.create(null);
+            alignResult.split('\n').forEach(function(line){
+              var l = line.trim().replace(/^[-*•\d.]+\s*/, '');
+              if(l.includes('=')){
+                var p = l.split('=');
+                var src = p[0].trim();
+                var trans = p.slice(1).join('=').trim();
+                if(src && trans && src.toLowerCase() !== trans.toLowerCase()){
+                  if(!seen[src.toLowerCase()]){
+                    seen[src.toLowerCase()] = true;
+                    matchedTerms.push({ src: src, trans: trans, selected: true });
+                  }
+                }
+              }
+            });
+          }
+        }
+
+        // เปิด Pop-up Checklist ให้ตรวจคำศัพท์ที่จับคู่ได้
+        if(matchedTerms.length > 0){
+          var approved = await showGlossaryReviewModal(matchedTerms);
+          if(approved && approved.length > 0){
+            proj.glossary = dedupeGlossary(proj.glossary || '', approved.join('\n'));
+          }
+        }
+
+        renderProjects();
+        saveData();
+
+        var successMsg = '1. บันทึกคู่มือสรรพนามและน้ำเสียงของ ' + refBook.title + ' ลงในช่องบริบทเรียบร้อยแล้ว\n' +
+                         (matchedTerms.length > 0 ? '2. จับคู่คำศัพท์ข้ามเล่มเข้าสู่คลังคำเรียบร้อยแล้ว' : '2. พร้อมแปลเล่มใหม่ต่อด้วยสำนวนเดิมทันที');
+        await showAlertDialog('สืบทอดสำนวนสำเร็จ!', successMsg);
+      } catch(err){
+        if(err.name !== 'AbortError') await showAlertDialog('ทำไม่สำเร็จ', err.message);
+      } finally {
+        setAiBusy(false);
+        cancelBtn.classList.remove('show');
+        progressText.textContent = '';
+      }
+    });
+  }
+
+  function openReaderMode(proj, bookId) {
+    var book = (proj.books || []).find(function(b) { return b.id === bookId; });
+    if (!book) return;
+    var historyList = book.history || [];
+    if (historyList.length === 0) {
+      showAlertDialog('ไม่มีข้อมูล', 'ยังไม่มีตอนที่แปลในเล่มนี้');
+      return;
+    }
+
+    clearTimeout(readerScrollTimer);
+    readerScrollTimer = null;
+    readerCurrentBook = book;
+    readerBookTitle.textContent = proj.name + ' - ' + book.title;
+    readerContent.innerHTML = '';
+    readerTocList.innerHTML = '';
+
+    var savedReaderFont = (appData.settings && Number(appData.settings.readerFontSize)) || 18;
+    setReaderFontSize(savedReaderFont, false);
+
+
+    var contentFrag = document.createDocumentFragment();
+    var tocFrag = document.createDocumentFragment();
+
+    historyList.forEach(function(entry, idx) {
+      var titleText = entry.label || ('ตอนที่ ' + (idx + 1));
+      var chId = 'rm-chap-' + entry.id;
+
+      var chContainer = document.createElement('div');
+      chContainer.style.marginBottom = '40px';
+
+      var h2 = document.createElement('h2');
+      h2.id = chId;
+      h2.textContent = titleText;
+      chContainer.appendChild(h2);
+
+      var paras = (entry.output || '').split('\n');
+      paras.forEach(function(p) {
+        if (p.trim()) {
+          var pEl = document.createElement('p');
+          pEl.textContent = p.trim();
+          chContainer.appendChild(pEl);
+        }
+      });
+      contentFrag.appendChild(chContainer);
+
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + chId;
+      a.textContent = titleText;
+      a.addEventListener('click', function(e) {
+        e.preventDefault();
+        var target = document.getElementById(chId);
+        if(target) {
+          target.scrollIntoView({ behavior: 'smooth' });
+          clearTimeout(readerScrollTimer);
+          var readerScrollBook = book;
+          readerScrollTimer = setTimeout(function() {
+            readerScrollTimer = null;
+            if (readerCurrentBook === readerScrollBook && readerOverlay.classList.contains('show')) {
+              readerScrollBook.readerScrollPos = readerOverlay.scrollTop;
+              saveData();
+            }
+          }, 600);
+        }
+        closeReaderToc();
+      });
+      li.appendChild(a);
+      tocFrag.appendChild(li);
+    });
+
+    readerContent.appendChild(contentFrag);
+    readerTocList.appendChild(tocFrag);
+
+    readerOverlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+
+    requestAnimationFrame(function() {
+      if (book.readerScrollPos) {
+        readerOverlay.scrollTop = book.readerScrollPos;
+      } else {
+        readerOverlay.scrollTop = 0;
+      }
+    });
+  }
+
+  async function closeReaderMode() {
+    stopTts();
+    clearTimeout(readerScrollTimer);
+    readerScrollTimer = null;
+    if(readerCurrentBook){
+      readerCurrentBook.readerScrollPos = readerOverlay.scrollTop;
+      await saveDataImmediate();
+    }
+    readerOverlay.classList.remove('show');
+    document.body.style.overflow = '';
+    readerContent.innerHTML = '';
+    readerCurrentBook = null;
+    closeReaderToc();
+  }
+
+  function openReaderToc() {
+    readerTocDrawer.classList.add('open');
+    readerBackdrop.classList.add('show');
+  }
+
+  function closeReaderToc() {
+    readerTocDrawer.classList.remove('open');
+    readerBackdrop.classList.remove('show');
+  }
+
+  document.getElementById('readerCloseBtn').addEventListener('click', closeReaderMode);
+  document.getElementById('readerTocBtn').addEventListener('click', openReaderToc);
+  document.getElementById('readerTocCloseBtn').addEventListener('click', closeReaderToc);
+  readerBackdrop.addEventListener('click', closeReaderToc);
+
+  var openReaderBtnBottom = document.getElementById('openReaderBtnBottom');
+  if(openReaderBtnBottom) {
+    openReaderBtnBottom.addEventListener('click', function(){
+      var proj = getCurrentProject();
+      if(proj) {
+        var activeBook = getActiveBook(proj);
+        if(activeBook) openReaderMode(proj, activeBook.id);
+      }
+    });
+  }
+
+/* ---------------- External Auto-Ingestion Receiver (พร้อมแปลชื่อตอนเป็นไทย) ---------------- */
+  async function importExternalChapter(title, content, autoStart) {
+    if (!content) return;
+    var proj = getCurrentProject();
+    if (!proj) {
+      showError('กรุณาสร้างหรือเลือกเรื่องนิยายก่อนรับข้อมูลจากเว็บ');
+      return;
+    }
+    var ingestBook = getActiveBook(proj);
+    if(!ingestBook){
+      showError('ไม่พบเล่มต้นทางของข้อมูลที่นำเข้า');
+      return;
+    }
+    advanceAppContextGeneration();
+    var ingestContext = captureAppContext(proj, ingestBook);
+    hideError();
+    hideGlossaryEnforce();
+
+    // 1. Stage 1: คลีนข้อความชื่อตอนด่วนด้วย Regex
+    var cleanTitle = (title || '').trim();
+    // แยกคำที่ติดกัน เช่น "GodChapter 3391" -> "Chapter 3391"
+    cleanTitle = cleanTitle.replace(/([a-zA-Z])(Chapter\s*\d+)/i, '$1 $2');
+
+    var chapMatch = cleanTitle.match(/(?:Chapter|ตอนที่|บทที่)\s*(\d+)[:\s-]*(.*)/i);
+    var chapNum = chapMatch ? chapMatch[1] : '';
+    var rawSubtitle = chapMatch ? chapMatch[2].trim() : cleanTitle;
+
+    // ตั้งค่าชื่อตอนเบื้องต้นทันที (เช่น "บทที่ 3391: Natural Spirit")
+    if (chapNum) {
+      chapterTitle.value = 'บทที่ ' + chapNum + (rawSubtitle ? ': ' + rawSubtitle : '');
+    } else {
+      chapterTitle.value = cleanTitle || 'ตอนใหม่';
+    }
+
+    inputText.value = normalizeOCR(content.trim());
+    inCount.textContent = countWords(inputText.value) + ' คำ';
+    updateChunkInfo();
+    highlightSuspicious(inputText.value);
+    saveDraftSoon();
+    switchMobileTab('source');
+
+    progressText.textContent = ' นำเข้าเนื้อหาเรียบร้อย กำลังเตรียมแปล...';
+
+    // 2. Stage 2: สั่งแปลชื่อตอนเป็นภาษาไทยด้วย AI แบบเบื้องหลัง (Background Parallel Task)
+    var key = document.getElementById('apiKey').value.trim();
+    if (key && rawSubtitle && /[a-zA-Z]/.test(rawSubtitle)) {
+      (async function translateTitleBackground() {
+        try {
+          var filterRes = filterRelevantGlossary(proj.glossary, rawSubtitle);
+          var glossHint = filterRes.text ? (' ยึดตามคลังคำ: ' + filterRes.text) : '';
+          var sysTitle = "คุณคือนักแปลนิยาย แปลชื่อตอนภาษาอังกฤษต่อไปนี้เป็นชื่อตอนภาษาไทยที่สละสลวย กระชับ เหมาะกับนิยายแฟนตาซี/กำลังภายใน" +
+                         glossHint + " ตอบเฉพาะชื่อตอนภาษาไทยเท่านั้น ห้ามใส่เครื่องหมายคำพูด ห้ามมีคำนำ";
+          var translatedSub = await callAIWithRetry(sysTitle, rawSubtitle, key, modelInput.value, null, 1);
+          if (translatedSub && translatedSub.trim()) {
+            var finalTitle = chapNum ? ('บทที่ ' + chapNum + ': ' + translatedSub.trim()) : translatedSub.trim();
+            var targetProj = appData.projects.find(function(p){ return p.id === ingestContext.projectId; }) || null;
+            var targetBook = targetProj && (targetProj.books || []).find(function(b){ return b.id === ingestContext.bookId; }) || null;
+            if(!targetBook || !isAppContextCurrent(ingestContext)) return;
+            targetBook.chapterTitle = finalTitle;
+            chapterTitle.value = finalTitle;
+            saveData();
+          }
+        } catch(e) {
+          console.warn('แปลชื่อตอนไม่สำเร็จ ใช้ชื่อเดิม:', e);
+        }
+      })();
+    }
+
+    // 3. สั่งเริ่มแปลเนื้อหาทันที
+    if (autoStart && !aiBusy) {
+      setTimeout(function() {
+        if(!isAppContextCurrent(ingestContext) || aiBusy) return;
+        processBtn.click();
+      }, 400);
+    }
+  }
+
+  // ดักฟังสัญญาณที่ส่งมาจาก Tampermonkey
+  function validatePrungIngestMessage(e) {
+    if (!e || e.source !== window || e.origin !== window.location.origin) return null;
+    var data = e.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    if (data.type !== 'PRUNG_INGEST') return null;
+    if (data.title !== undefined && (typeof data.title !== 'string' || data.title.length > 500)) return null;
+    if (typeof data.content !== 'string' || !data.content.trim() || data.content.length > 500000) return null;
+    if (data.autoStart !== undefined && typeof data.autoStart !== 'boolean') return null;
+    return {
+      title: typeof data.title === 'string' ? data.title : '',
+      content: data.content,
+      autoStart: data.autoStart === true
+    };
+  }
+
+  // External ingestion receiver
+  window.addEventListener('message', function(e) {
+    var ingestMessage = validatePrungIngestMessage(e);
+    if (ingestMessage) {
+      importExternalChapter(ingestMessage.title, ingestMessage.content, ingestMessage.autoStart)
+        .catch(function(err){
+          console.error('External chapter import failed:', err);
+        });
+    }
+  });
+
+  /* เริ่มต้นระบบแบบ Asynchronous */
+  (async function initApp(){
+    var loaded = await loadData();
+    if(!loaded) throw new Error('IndexedDB initialization failed.');
+    loadTranslationRecoveryUIState();
+    applySettingsToUI();
+    renderProjects();
+    renderBottomHistory();
+    updateActiveBanner();
+    loadProjectDraft(getCurrentProject());
+    await scanTranslationJobs();
+  })().catch(function(err){
+    storageReady = false;
+    console.error('Application initialization failed:', err);
+    showError('ไม่สามารถเปิดฐานข้อมูลของแอปได้อย่างปลอดภัย กรุณารีโหลดหน้าเว็บและลองอีกครั้ง');
+  });
+
+})();
+
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(() => {
+      console.log('Service Worker Registered');
+    }).catch(err => {
+      console.warn('Service Worker registration failed:', err);
+    });
+  }

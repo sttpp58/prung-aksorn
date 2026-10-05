@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -63,10 +62,6 @@ function parseCspMeta(html) {
   return directives;
 }
 
-function sha256Base64(value) {
-  return crypto.createHash('sha256').update(value, 'utf8').digest('base64');
-}
-
 function assertCspContract(indexHtml) {
   const csp = parseCspMeta(indexHtml);
   const requireDirective = (name, values) => {
@@ -96,12 +91,7 @@ function assertCspContract(indexHtml) {
   assert(!scriptSources.includes("'unsafe-inline'"), 'CSP script-src does not enable unsafe-inline JavaScript');
 
   const inlineScripts = extractInlineScripts(indexHtml);
-  const inlineHashes = inlineScripts.map((source) => `'sha256-${sha256Base64(source)}'`);
-  assert(inlineHashes.length === 2, 'CSP contract tracks exactly the two trusted inline runtime blocks');
-  for (const hash of inlineHashes) {
-    assert(scriptSources.includes(hash), `CSP script-src includes trusted inline hash ${hash}`);
-  }
-
+  assert(inlineScripts.length === 0, 'CSP contract contains no inline JavaScript blocks');
   const markupOnly = indexHtml
     .replace(/<script\b[\s\S]*?<\/script>/gi, '')
     .replace(/<style\b[\s\S]*?<\/style>/gi, '');
@@ -112,12 +102,14 @@ function assertCspContract(indexHtml) {
   let match;
   while ((match = scriptTagPattern.exec(indexHtml)) !== null) externalScriptUrls.push(match[1]);
   assert(externalScriptUrls.includes('storage-v2.js'), 'CSP contract sees local storage runtime script');
+  assert(externalScriptUrls.includes('app.js'), 'CSP contract sees external application entrypoint');
   const dynamicCdnOrigins = ['https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'https://unpkg.com'];
   for (const origin of dynamicCdnOrigins) {
     assert(indexHtml.includes(origin), `CSP contract sees dynamic CDN origin ${origin}`);
   }
+  assert(/<link\s+rel=["']stylesheet["']\s+href=["'](?:\.\/)?styles\.css["'][^>]*>/i.test(indexHtml), 'CSP contract sees external stylesheet');
 
-  pass('CSP contract: fail-closed directives, trusted inline hashes, and explicit origins');
+  pass('CSP contract: fail-closed directives and explicit external runtime assets');
 }
 
 function readGitFileAtRef(ref, file) {
@@ -178,6 +170,8 @@ function assertServiceWorkerReleaseGuard(indexHtml, sw, manifest) {
     'tqg-repair.js',
     'tqg-ui.js',
     'tqg-integration.js',
+    'app.js',
+    'styles.css',
     'icons/icon-192.png',
     'icons/icon-512.png'
   ]);
@@ -362,35 +356,45 @@ function assertAllRevisionCallSites(indexSource) {
 }
 
 function main() {
-  const indexHtml = readText('index.html');
+  const pageHtml = readText('index.html');
+  let indexHtml = pageHtml;
   const storage = readText('storage-v2.js');
   const sw = readText('sw.js');
   const tqgUi = readText('tqg-ui.js');
   const tqgIntegration = readText('tqg-integration.js');
   const manifestText = readText('manifest.json');
+  const app = readText('app.js');
+  const styles = readText('styles.css');
 
   parseJavaScript(storage, 'storage-v2.js');
+  parseJavaScript(app, 'app.js');
   parseJavaScript(tqgUi, 'tqg-ui.js');
   parseJavaScript(tqgIntegration, 'tqg-integration.js');
 
   assert(/TQG-07-2026-09-30/.test(tqgUi), 'TQG Quality UI module version is present');
   assert(!/[\u{1F000}-\u{1FAFF}]/u.test(tqgUi), 'TQG Quality UI module contains no emoji');
   assert(/TQG-08-2026-09-30/.test(tqgIntegration), 'TQG Integration module version is present');
-  assert(/TQGQualityUI/.test(indexHtml), 'index.html references TQG Quality UI');
+  assert(/TQGQualityUI/.test(app), 'app.js references TQG Quality UI');
 
   assertCspContract(indexHtml);
 
   const inlineScripts = extractInlineScripts(indexHtml);
-  assert(inlineScripts.length > 0, 'index.html contains inline JavaScript');
-  inlineScripts.forEach((source, index) =>
-    parseJavaScript(source, `index.html inline script #${index + 1}`)
+  assert(inlineScripts.length === 0, 'index.html contains no inline JavaScript');
+  assert(
+    (indexHtml.match(/<script\s+src=["'](?:\.\/)?app\.js["'][^>]*><\/script>/gi) || []).length === 1,
+    'index.html loads app.js exactly once'
   );
-  pass(`index.html inline JavaScript syntax: ${inlineScripts.length} block(s)`);
+  assert(
+    /<link\s+rel=["']stylesheet["']\s+href=["'](?:\.\/)?styles\.css["'][^>]*>/i.test(indexHtml),
+    'index.html loads styles.css'
+  );
+  assert(styles.trim().length > 0, 'styles.css contains extracted application styles');
 
   assert(
     /<script\b[^>]*\bsrc=["'](?:\.\/)?storage-v2\.js["'][^>]*>/i.test(indexHtml),
     'index.html loads storage-v2.js'
   );
+  indexHtml = app;
   assert(
     /function\s+flushPendingSaveOnLifecycle\s*\(/.test(indexHtml) &&
       /addEventListener\(['"]visibilitychange['"]/.test(indexHtml) &&
@@ -583,18 +587,18 @@ function main() {
     'callGemini'
   ]) {
     assert(
-      new RegExp(`function\\s+${functionName}\\s*\\(`).test(indexHtml),
-      `core function remains present: ${functionName}`
+      new RegExp(`function\\s+${functionName}\\s*\\(`).test(app),
+      `core function remains present in app.js: ${functionName}`
     );
   }
 
-  assertAllRevisionCallSites(indexHtml);
+  assertAllRevisionCallSites(app);
 
   assert(
     /['"]\.\/storage-v2\.js['"]/.test(sw),
     'Service Worker app shell includes storage-v2.js'
   );
-  for (const asset of ['tqg.js','tqg-inspector.js','tqg-repair.js','tqg-ui.js','tqg-integration.js']) {
+  for (const asset of ['tqg.js','tqg-inspector.js','tqg-repair.js','tqg-ui.js','tqg-integration.js','app.js','styles.css']) {
     assert(new RegExp("['\\\"]\\./" + asset + "['\\\"]").test(sw), 'Service Worker app shell includes ' + asset);
   }
   assert(
@@ -618,7 +622,7 @@ function main() {
     fail(`manifest.json is invalid JSON: ${error.message}`);
   }
   assert(manifest && typeof manifest === 'object', 'manifest.json parses as an object');
-  assertServiceWorkerReleaseGuard(indexHtml, sw, manifest);
+  assertServiceWorkerReleaseGuard(pageHtml, sw, manifest);
   assert(
     Array.isArray(manifest.icons) &&
       manifest.icons.some((icon) => icon && /(?:^|\/)icons\/icon-192\.png$/.test(String(icon.src || ''))),

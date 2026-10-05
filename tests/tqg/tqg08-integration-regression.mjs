@@ -24,6 +24,7 @@ function check(condition, message) {
 
 const integrationSource = read('tqg-integration.js');
 const indexSource = read('index.html');
+const appSource = read('app.js');
 const swSource = read('sw.js');
 const integration = requireFromRoot(path.join(ROOT, 'tqg-integration.js'));
 
@@ -174,7 +175,7 @@ function functionBody(source, functionName) {
 }
 
 for (const functionName of ['runTranslation', 'runSingleTranslationForBatch', 'runBatchTranslationRecovery', 'retryBatchTranslationJob']) {
-  const body = functionBody(indexSource, functionName);
+  const body = functionBody(appSource, functionName);
   check(body.length > 0, functionName + ' body is present for integration placement check');
   const completion = body.lastIndexOf('completeTranslationJob(');
   const integrationCall = body.lastIndexOf('analyzeTQGCompletedOutput(');
@@ -186,17 +187,17 @@ for (const functionName of ['runTranslation', 'runSingleTranslationForBatch', 'r
   }
 }
 
-const checkpointPos = indexSource.indexOf('checkpointTranslationJob(');
-const firstTqgPos = indexSource.indexOf('analyzeTQGCompletedOutput(');
+const checkpointPos = appSource.indexOf('checkpointTranslationJob(');
+const firstTqgPos = appSource.indexOf('analyzeTQGCompletedOutput(');
 check(checkpointPos < firstTqgPos, 'TQG completion analysis is not placed before the first checkpoint');
-const integrationCalls = indexSource.match(/TQGIntegration\.analyzeCompletedOutput/g) || [];
-const completionHelperCalls = indexSource.match(/analyzeTQGCompletedOutput\(/g) || [];
+const integrationCalls = appSource.match(/TQGIntegration\.analyzeCompletedOutput/g) || [];
+const completionHelperCalls = appSource.match(/analyzeTQGCompletedOutput\(/g) || [];
 check(integrationCalls.length === 1, 'TQG deterministic integration is centralized in one helper');
 check(completionHelperCalls.length === 5, 'one helper plus four completed-output integration call sites are present');
-check(/function analyzeTQGCompletedOutput\([\s\S]*?state\.source\s*!==\s*'translate'[\s\S]*?try\s*\{[\s\S]*?TQGIntegration\.analyzeCompletedOutput[\s\S]*?catch\s*\(err\)/.test(indexSource), 'TQG completion helper is translate-only and fail-safe');
-check(/function isTQGQualityContextCurrent\(\)/.test(indexSource), 'TQG actions have a current-context guard');
-check(/function isTQGQualityContextCurrent\(\)\{[\s\S]*?state\.source\s*!==\s*'translate'/.test(indexSource), 'TQG actions remain translate-only');
-check(/if\(!isTQGQualityContextCurrent\(\)\)\{/.test(indexSource), 'stale TQG context is rejected before AI actions');
+check(/function analyzeTQGCompletedOutput\([\s\S]*?state\.source\s*!==\s*'translate'[\s\S]*?try\s*\{[\s\S]*?TQGIntegration\.analyzeCompletedOutput[\s\S]*?catch\s*\(err\)/.test(appSource), 'TQG completion helper is translate-only and fail-safe');
+check(/function isTQGQualityContextCurrent\(\)/.test(appSource), 'TQG actions have a current-context guard');
+check(/function isTQGQualityContextCurrent\(\)\{[\s\S]*?state\.source\s*!==\s*'translate'/.test(appSource), 'TQG actions remain translate-only');
+check(/if\(!isTQGQualityContextCurrent\(\)\)\{/.test(appSource), 'stale TQG context is rejected before AI actions');
 check(/tqg\.js/.test(indexSource) && /tqg-inspector\.js/.test(indexSource) && /tqg-repair\.js/.test(indexSource) && /tqg-integration\.js/.test(indexSource), 'index.html loads all TQG runtime modules');
 check(/\.\/tqg\.js/.test(swSource) && /\.\/tqg-inspector\.js/.test(swSource) && /\.\/tqg-repair\.js/.test(swSource) && /\.\/tqg-integration\.js/.test(swSource), 'Service Worker app shell includes all TQG runtime modules');
 

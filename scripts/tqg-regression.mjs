@@ -735,7 +735,8 @@ function functionBody(source, functionName) {
   }
   return '';
 }
-const indexSource = read('index.html');
+const pageSource = read('index.html');
+const indexSource = read('app.js');
 const swSource = read('sw.js');
 const tqgSource = read('tqg.js');
 const inspectorSource = read('tqg-inspector.js');
@@ -804,11 +805,11 @@ for (const token of [
   );
 }
 check(
-  /['"](?:\.\/)?tqg\.js['"]/.test(indexSource) &&
-    /['"](?:\.\/)?tqg-inspector\.js['"]/.test(indexSource) &&
-    /['"](?:\.\/)?tqg-repair\.js['"]/.test(indexSource) &&
-    /['"](?:\.\/)?tqg-ui\.js['"]/.test(indexSource) &&
-    /['"](?:\.\/)?tqg-integration\.js['"]/.test(indexSource),
+  /['"](?:\.\/)?tqg\.js['"]/.test(pageSource) &&
+    /['"](?:\.\/)?tqg-inspector\.js['"]/.test(pageSource) &&
+    /['"](?:\.\/)?tqg-repair\.js['"]/.test(pageSource) &&
+    /['"](?:\.\/)?tqg-ui\.js['"]/.test(pageSource) &&
+    /['"](?:\.\/)?tqg-integration\.js['"]/.test(pageSource),
   'index.html loads the complete TQG runtime set'
 );
 
