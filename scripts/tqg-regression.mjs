@@ -97,6 +97,7 @@ for (const phase of [
   'tests/tqg/tqg04-suspicion-regression.mjs',
   'tests/tqg/tqg05-ai-inspector-regression.mjs',
   'tests/tqg/tqg06-targeted-repair-regression.mjs',
+  'tests/tqg/tqg-repair-production-contract-regression.mjs',
   'tests/tqg/tqg07-quality-ui-regression.mjs',
   'tests/tqg/tqg08-integration-regression.mjs',
   'tests/tqg/tqg-d2-observability-regression.mjs',
