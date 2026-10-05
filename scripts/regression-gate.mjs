@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -48,6 +49,75 @@ function extractInlineScripts(html) {
     }
   }
   return scripts;
+}
+
+function parseCspMeta(html) {
+  const match = html.match(/<meta\b[^>]*http-equiv=["']Content-Security-Policy["'][^>]*content=(["'])([\s\S]*?)\1[^>]*>/i);
+  if (!match) fail('Content-Security-Policy meta tag is missing');
+  const directives = new Map();
+  for (const rawDirective of match[2].split(';')) {
+    const tokens = rawDirective.trim().split(/\s+/).filter(Boolean);
+    if (!tokens.length) continue;
+    directives.set(tokens[0], tokens.slice(1));
+  }
+  return directives;
+}
+
+function sha256Base64(value) {
+  return crypto.createHash('sha256').update(value, 'utf8').digest('base64');
+}
+
+function assertCspContract(indexHtml) {
+  const csp = parseCspMeta(indexHtml);
+  const requireDirective = (name, values) => {
+    const actual = csp.get(name);
+    assert(actual, `CSP directive ${name} is present`);
+    for (const value of values) {
+      assert(actual.includes(value), `CSP ${name} allows required source ${value}`);
+    }
+  };
+
+  requireDirective('default-src', ["'self'"]);
+  requireDirective('base-uri', ["'self'"]);
+  requireDirective('object-src', ["'none'"]);
+  requireDirective('frame-src', ["'none'"]);
+  requireDirective('form-action', ["'self'"]);
+  requireDirective('script-src', ["'self'", 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'https://unpkg.com']);
+  requireDirective('script-src-attr', ["'none'"]);
+  requireDirective('style-src', ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com']);
+  requireDirective('font-src', ["'self'", 'https://fonts.gstatic.com']);
+  requireDirective('img-src', ["'self'", 'data:', 'blob:']);
+  requireDirective('media-src', ["'self'", 'blob:']);
+  requireDirective('connect-src', ["'self'", 'https://api.openai.com', 'https://generativelanguage.googleapis.com']);
+  requireDirective('worker-src', ["'self'", 'blob:']);
+  requireDirective('manifest-src', ["'self'"]);
+
+  const scriptSources = csp.get('script-src') || [];
+  assert(!scriptSources.includes("'unsafe-inline'"), 'CSP script-src does not enable unsafe-inline JavaScript');
+
+  const inlineScripts = extractInlineScripts(indexHtml);
+  const inlineHashes = inlineScripts.map((source) => `'sha256-${sha256Base64(source)}'`);
+  assert(inlineHashes.length === 2, 'CSP contract tracks exactly the two trusted inline runtime blocks');
+  for (const hash of inlineHashes) {
+    assert(scriptSources.includes(hash), `CSP script-src includes trusted inline hash ${hash}`);
+  }
+
+  const markupOnly = indexHtml
+    .replace(/<script\b[\s\S]*?<\/script>/gi, '')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, '');
+  assert(!/<[^>]+\son[a-z]+\s*=/.test(markupOnly), 'HTML contains no inline event-handler attributes');
+
+  const externalScriptUrls = [];
+  const scriptTagPattern = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+  let match;
+  while ((match = scriptTagPattern.exec(indexHtml)) !== null) externalScriptUrls.push(match[1]);
+  assert(externalScriptUrls.includes('storage-v2.js'), 'CSP contract sees local storage runtime script');
+  const dynamicCdnOrigins = ['https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'https://unpkg.com'];
+  for (const origin of dynamicCdnOrigins) {
+    assert(indexHtml.includes(origin), `CSP contract sees dynamic CDN origin ${origin}`);
+  }
+
+  pass('CSP contract: fail-closed directives, trusted inline hashes, and explicit origins');
 }
 
 function extractCalls(source, functionName) {
@@ -233,6 +303,8 @@ function main() {
   assert(!/[\u{1F000}-\u{1FAFF}]/u.test(tqgUi), 'TQG Quality UI module contains no emoji');
   assert(/TQG-08-2026-09-30/.test(tqgIntegration), 'TQG Integration module version is present');
   assert(/TQGQualityUI/.test(indexHtml), 'index.html references TQG Quality UI');
+
+  assertCspContract(indexHtml);
 
   const inlineScripts = extractInlineScripts(indexHtml);
   assert(inlineScripts.length > 0, 'index.html contains inline JavaScript');
