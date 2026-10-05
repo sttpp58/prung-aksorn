@@ -3,7 +3,7 @@
     if (!book) return;
     var historyList = book.history || [];
     if (historyList.length === 0) {
-      showAlertDialog('เนเธกเนเธกเธตเธเนเธญเธกเธนเธฅ', 'เธขเธฑเธเนเธกเนเธกเธตเธ•เธญเธเธ—เธตเนเนเธเธฅเนเธเน€เธฅเนเธกเธเธตเน');
+      showAlertDialog('ไม่มีข้อมูล', 'ยังไม่มีตอนที่แปลในเล่มนี้');
       return;
     }
 
@@ -22,7 +22,7 @@
     var tocFrag = document.createDocumentFragment();
 
     historyList.forEach(function(entry, idx) {
-      var titleText = entry.label || ('เธ•เธญเธเธ—เธตเน ' + (idx + 1));
+      var titleText = entry.label || ('ตอนที่ ' + (idx + 1));
       var chId = 'rm-chap-' + entry.id;
 
       var chContainer = document.createElement('div');

@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const source = fs.readFileSync('app.js', 'utf8');
+const source = [
+  'app/05-dialog-ai-core.js',
+  'app/08-tqg-controller.js',
+  'app/11-ai-providers-recovery-state.js'
+].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 
 function extractFunction(sourceText, functionName) {
   const pattern = new RegExp('(?:async\\s+)?function\\s+' + functionName + '\\s*\\(');

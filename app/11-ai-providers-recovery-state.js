@@ -26,7 +26,7 @@
     return data.choices[0].message.content;
   }
 
-  /* เน€เธฃเธตเธขเธ Gemini เนเธ”เธขเธชเนเธ Key เธเนเธฒเธ Header x-goog-api-key */
+  /* เรียก Gemini โดยส่ง Key ผ่าน Header x-goog-api-key */
   async function callGemini(sys, text, key, model, signal, responseFormat){
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
     var generationConfig = {
@@ -61,7 +61,7 @@
     }
 
     if(data.promptFeedback && data.promptFeedback.blockReason){
-      var eBlocked = new Error('Gemini เธเธเธดเน€เธชเธเธเธณเธเธญเธเธตเนเธ—เธฑเนเธเธซเธกเธ” เน€เธเธทเนเธญเธเธเธฒเธ ' + describeGeminiBlockReason(data.promptFeedback.blockReason) + ' โ€” เธฅเธญเธเนเธเนเธเน€เธเธทเนเธญเธซเธฒเนเธซเนเธชเธฑเนเธ/เน€เธเธฒเธฅเธ เธซเธฃเธทเธญเธชเธฅเธฑเธเนเธเนเธเนเนเธกเน€เธ”เธฅ Gemini เธฃเธธเนเธเน€เธ•เนเธก (เนเธกเนเนเธเน lite) เนเธ—เธ');
+      var eBlocked = new Error('Gemini ปฏิเสธคำขอนี้ทั้งหมด เนื่องจาก ' + describeGeminiBlockReason(data.promptFeedback.blockReason) + ' — ลองแบ่งเนื้อหาให้สั้น/เบาลง หรือสลับไปใช้โมเดล Gemini รุ่นเต็ม (ไม่ใช่ lite) แทน');
       eBlocked.status = 'gemini_blocked';
       throw eBlocked;
     }
@@ -72,13 +72,13 @@
 
     if(!textOut){
       var reasonMsg = describeGeminiFinishReason(candidate && candidate.finishReason);
-      var eEmpty = new Error('Gemini เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เนเธเธฅเธเนเธญเธเธงเธฒเธกเธชเนเธงเธเธเธตเนเนเธ”เน (' + reasonMsg + ') โ€” เธฅเธญเธเนเธเนเธเน€เธเธทเนเธญเธซเธฒเนเธซเนเธชเธฑเนเธเธฅเธ เธซเธฃเธทเธญเธชเธฅเธฑเธเนเธเนเธเนเนเธกเน€เธ”เธฅ Gemini เธฃเธธเนเธเน€เธ•เนเธก (เนเธกเนเนเธเน lite) เนเธ—เธ');
+      var eEmpty = new Error('Gemini ไม่สามารถแปลข้อความส่วนนี้ได้ (' + reasonMsg + ') — ลองแบ่งเนื้อหาให้สั้นลง หรือสลับไปใช้โมเดล Gemini รุ่นเต็ม (ไม่ใช่ lite) แทน');
       eEmpty.status = 'gemini_empty';
       throw eEmpty;
     }
 
     if(candidate.finishReason === 'MAX_TOKENS'){
-      showError('เธเธณเน€เธ•เธทเธญเธ: เธเธณเนเธเธฅเธเธญเธเธชเนเธงเธเธเธตเนเธญเธฒเธเธ–เธนเธเธ•เธฑเธ”เธเธฅเธฒเธเธเธฑเธ เน€เธเธฃเธฒเธฐเธขเธฒเธงเน€เธเธดเธเธเธตเธ”เธเธณเธเธฑเธ”เธเธณเธ•เธญเธเธเธญเธเนเธกเน€เธ”เธฅ ' + model + ' โ€” เนเธเธฐเธเธณเนเธซเนเธฅเธ”เธเธเธฒเธ” "เธเธงเธฒเธกเธขเธฒเธงเธชเธนเธเธชเธธเธ”เธ•เนเธญเธชเนเธงเธ" เธฅเธเนเธฅเนเธงเธฅเธญเธเนเธเธฅเธชเนเธงเธเธเธตเนเนเธซเธกเน');
+      showError('คำเตือน: คำแปลของส่วนนี้อาจถูกตัดกลางคัน เพราะยาวเกินขีดจำกัดคำตอบของโมเดล ' + model + ' — แนะนำให้ลดขนาด "ความยาวสูงสุดต่อส่วน" ลงแล้วลองแปลส่วนนี้ใหม่');
     }
 
     return textOut;
@@ -188,14 +188,14 @@
   }
   function warnIfAiBusy(){
     if(aiBusy){
-      showError('เธเธณเธฅเธฑเธเธกเธตเธเธฒเธ AI เธญเธตเธเธญเธขเนเธฒเธเธ—เธณเธเธฒเธเธญเธขเธนเน เธเธฃเธธเธ“เธฒเธฃเธญเนเธซเนเน€เธชเธฃเนเธเธซเธฃเธทเธญเธเธ”เธขเธเน€เธฅเธดเธเธเนเธญเธ');
+      showError('กำลังมีงาน AI อีกอย่างทำงานอยู่ กรุณารอให้เสร็จหรือกดยกเลิกก่อน');
       return true;
     }
     return false;
   }
 
   /* =============================================================
-     เธฃเธฐเธเธเธ•เธฃเธงเธเธเธฑเธเนเธฅเธฐเนเธ—เธเธ—เธตเนเธเธณเธจเธฑเธเธ—เนเธ—เธตเน AI เธฅเธทเธกเนเธเน (Post-Translation Glossary Enforcer)
+     ระบบตรวจจับและแทนที่คำศัพท์ที่ AI ลืมใช้ (Post-Translation Glossary Enforcer)
      ============================================================= */
   var glossaryEnforceBox = document.getElementById('glossaryEnforceBox');
 
@@ -205,7 +205,7 @@
     glossaryEnforceBox.innerHTML = '';
   }
 
-  // เธเธฑเธเธเนเธเธฑเธเธชเนเธเธเธซเธฒเธเธณเธ—เธตเนเธ•เนเธเธเธเธฑเธเธกเธต เนเธ•เนเธเธณเนเธเธฅเธ เธฒเธฉเธฒเนเธ—เธขเนเธกเนเธกเธตเธเธณเธเธฑเนเธเธเธฃเธฒเธเธเธญเธขเธนเน
+  // ฟังก์ชันสแกนหาคำที่ต้นฉบับมี แต่คำแปลภาษาไทยไม่มีคำนั้นปรากฏอยู่
   function checkMissedGlossaryTerms(sourceText, targetText, glossaryText){
     if(!sourceText || !targetText || !glossaryText || !glossaryText.trim()) return [];
 
@@ -214,7 +214,7 @@
     var seen = Object.create(null);
 
     lines.forEach(function(line){
-      var cleanLine = line.trim().replace(/^[-*โ€ข\d.]+\s*/, '').trim();
+      var cleanLine = line.trim().replace(/^[-*•\d.]+\s*/, '').trim();
       if(!cleanLine || cleanLine.startsWith('[') || cleanLine.startsWith('#')) return;
       if(!cleanLine.includes('=')) return;
 
@@ -226,7 +226,7 @@
       var keyLower = src.toLowerCase();
       if(seen[keyLower]) return;
 
-      // เธ–เนเธฒเธเธณเธ•เนเธเธเธเธฑเธเธเธฃเธฒเธเธเนเธเธเนเธญเธเธงเธฒเธกเธ•เนเธเธเธเธฑเธ เนเธ•เน "เธเธณเนเธเธฅเนเธ—เธข" เธเธฅเธฑเธเนเธกเนเธเธฃเธฒเธเธเนเธเธเนเธญเธเธงเธฒเธกเธเธฅเธฅเธฑเธเธเน
+      // ถ้าคำต้นฉบับปรากฏในข้อความต้นฉบับ แต่ "คำแปลไทย" กลับไม่ปรากฏในข้อความผลลัพธ์
       if(isTermInText(src, sourceText) && targetText.indexOf(trans) === -1){
         seen[keyLower] = true;
         missed.push({ src: src, trans: trans });
@@ -236,7 +236,7 @@
     return missed;
   }
 
-  // เธเธฑเธเธเนเธเธฑเธเนเธชเธ”เธเนเธ–เธเนเธเนเธเน€เธ•เธทเธญเธเนเธฅเธฐเธเธธเนเธกเนเธเนเนเธ
+  // ฟังก์ชันแสดงแถบแจ้งเตือนและปุ่มแก้ไข
   function renderGlossaryEnforceWarning(missedTerms){
     if(!glossaryEnforceBox) return;
     if(!missedTerms || missedTerms.length === 0){
@@ -251,12 +251,12 @@
     header.style.justifyContent = 'space-between';
     header.style.alignItems = 'center';
     header.style.marginBottom = '8px';
-    header.innerHTML = '<b style="color:var(--gold);font-size:13.5px;">โ  เธเธเธเธณเธจเธฑเธเธ—เนเธ—เธตเน AI เธญเธฒเธเนเธกเนเนเธ”เนเนเธเธฅเธ•เธฒเธกเธเธฅเธฑเธเธเธณ (' + missedTerms.length + ' เธเธณ):</b>';
+    header.innerHTML = '<b style="color:var(--gold);font-size:13.5px;">⚠ พบคำศัพท์ที่ AI อาจไม่ได้แปลตามคลังคำ (' + missedTerms.length + ' คำ):</b>';
 
     var closeBtn = document.createElement('button');
     closeBtn.className = 'icon-btn';
-    closeBtn.textContent = 'โ•';
-    closeBtn.title = 'เธเนเธญเธเธเธณเน€เธ•เธทเธญเธเธเธตเน';
+    closeBtn.textContent = '✕';
+    closeBtn.title = 'ซ่อนคำเตือนนี้';
     closeBtn.addEventListener('click', hideGlossaryEnforce);
     header.appendChild(closeBtn);
     glossaryEnforceBox.appendChild(header);
@@ -278,27 +278,27 @@
       row.style.borderRadius = '4px';
 
       var label = document.createElement('span');
-      label.innerHTML = '<code>' + escapeHtml(term.src) + '</code> โ” <b style="color:var(--pen);">' + escapeHtml(term.trans) + '</b>';
+      label.innerHTML = '<code>' + escapeHtml(term.src) + '</code> ➔ <b style="color:var(--pen);">' + escapeHtml(term.trans) + '</b>';
       row.appendChild(label);
 
       var actions = document.createElement('div');
       actions.style.display = 'flex';
       actions.style.gap = '6px';
 
-      // เธเธธเนเธกเนเธ—เธเธ—เธตเนเธเธณเธ”เนเธงเธขเธ•เธฑเธงเน€เธญเธ
+      // ปุ่มแทนที่คำด้วยตัวเอง
       var replaceManualBtn = document.createElement('button');
       replaceManualBtn.className = 'utility-btn';
       replaceManualBtn.style.padding = '3px 8px';
       replaceManualBtn.style.fontSize = '11.5px';
-      replaceManualBtn.textContent = 'โ เนเธ—เธเธ—เธตเนเธเธณ';
+      replaceManualBtn.textContent = '✎ แทนที่คำ';
       replaceManualBtn.addEventListener('click', async function(){
-        var wrongWord = await showPromptDialog('เธเธดเธกเธเนเธเธณเนเธเธเธฅเธฅเธฑเธเธเนเธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเนเธ—เธเธ—เธตเนเธ”เนเธงเธข "' + term.trans + '":', '');
+        var wrongWord = await showPromptDialog('พิมพ์คำในผลลัพธ์ที่ต้องการแทนที่ด้วย "' + term.trans + '":', '');
         if(wrongWord && wrongWord.trim()){
           var curOutput = output.textContent;
           var regex = new RegExp(escapeRegex(wrongWord.trim()), 'g');
           output.textContent = curOutput.replace(regex, term.trans);
           output.dispatchEvent(new Event('input'));
-          // เธ•เธฃเธงเธเธชเธญเธเธเนเธณเธซเธฅเธฑเธเนเธ—เธเธ—เธตเน
+          // ตรวจสอบซ้ำหลังแทนที่
           var remaining = checkMissedGlossaryTerms(inputText.value, output.textContent, getCurrentProject().glossary);
           renderGlossaryEnforceWarning(remaining);
         }
@@ -311,7 +311,7 @@
 
     glossaryEnforceBox.appendChild(list);
 
-    // เธเธธเนเธกเธเธ”เนเธซเน AI เนเธเนเนเธเธเธณเธ—เธฑเนเธเธซเธกเธ”เนเธเธเธฃเธงเธกเธจเธนเธเธขเนเนเธ 1 เธเธฅเธดเธ
+    // ปุ่มกดให้ AI แก้ไขคำทั้งหมดแบบรวมศูนย์ใน 1 คลิก
     var aiFixAllContainer = document.createElement('div');
     aiFixAllContainer.style.marginTop = '10px';
     aiFixAllContainer.style.display = 'flex';
@@ -323,7 +323,7 @@
     aiFixAllBtn.style.color = '#fff';
     aiFixAllBtn.style.borderColor = 'var(--gold)';
     aiFixAllBtn.style.fontWeight = '600';
-    aiFixAllBtn.textContent = 'โก เนเธซเน AI เธเนเธงเธขเนเธ—เธเธ—เธตเนเธเธณเธจเธฑเธเธ—เนเธ—เธฑเนเธเธซเธกเธ”เนเธเธเธฅเธฅเธฑเธเธเนเธ—เธฑเธเธ—เธต';
+    aiFixAllBtn.textContent = '⚡ ให้ AI ช่วยแทนที่คำศัพท์ทั้งหมดในผลลัพธ์ทันที';
     aiFixAllBtn.addEventListener('click', function(){
       runSurgicalGlossaryFixWithAI(missedTerms);
     });
@@ -333,4 +333,4 @@
     glossaryEnforceBox.style.display = 'block';
   }
 
-  // เธเธณเธชเธฑเนเธเธขเธดเธเนเธซเน AI เธ—เธณ Surgical Edit เนเธ—เธเธ—เธตเนเน€เธเธเธฒเธฐเธเธณเธ—เธตเนเธซเธฅเธธเธ”เนเธ”เธขเนเธกเนเนเธ•เธฐเธ•เนเธญเธเธเธฃเธฐเนเธขเธเธญเธทเนเธ
+  // คำสั่งยิงให้ AI ทำ Surgical Edit แทนที่เฉพาะคำที่หลุดโดยไม่แตะต้องประโยคอื่น

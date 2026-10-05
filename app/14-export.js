@@ -3,7 +3,7 @@
     var a = document.createElement('a');
     var objectUrl = URL.createObjectURL(blob);
     a.href = objectUrl;
-    a.download = safeFilename(getCurrentProject() ? getCurrentProject().name : '') + '-เธเธฅเธฅเธฑเธเธเน.txt';
+    a.download = safeFilename(getCurrentProject() ? getCurrentProject().name : '') + '-ผลลัพธ์.txt';
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(objectUrl); }, 0);
   });
@@ -49,7 +49,7 @@
         cleanup();
         if(!existing && s.parentNode) s.parentNode.removeChild(s);
         delete SCRIPT_LOAD_PROMISES[src];
-        reject(new Error('เนเธซเธฅเธ”เนเธเธฅเน ' + src + ' เนเธกเนเธชเธณเน€เธฃเนเธ'));
+        reject(new Error('โหลดไฟล์ ' + src + ' ไม่สำเร็จ'));
       }
 
       s.addEventListener('load', onLoad, { once: true });
@@ -75,15 +75,15 @@
     var proj = getCurrentProject();
     var historyList = getActiveHistoryList(proj);
     if(!proj || !historyList || historyList.length === 0){
-      await showAlertDialog('เนเธกเนเธเธเธเนเธญเธกเธนเธฅ', 'เนเธกเนเธเธเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเนเธเธฅเนเธเน€เธฅเนเธกเธเธตเนเธชเธณเธซเธฃเธฑเธเธชเธฃเนเธฒเธเนเธเธฅเน Word');
+      await showAlertDialog('ไม่พบข้อมูล', 'ไม่พบประวัติการแปลในเล่มนี้สำหรับสร้างไฟล์ Word');
       return;
     }
     if(navigator.onLine === false){
-      await showAlertDialog('เธ•เนเธญเธเนเธเนเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ•', 'เธเธฒเธฃเธชเนเธเธญเธญเธเนเธเธฅเน Word เธ•เนเธญเธเนเธซเธฅเธ”เธฃเธฐเธเธเนเธเธฅเธเนเธเธฅเนเธเธฒเธเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ•เธเนเธญเธเนเธเนเธเธฒเธเธเธฃเธฑเนเธเนเธฃเธ เนเธ•เนเธ•เธญเธเธเธตเนเธ”เธนเน€เธซเธกเธทเธญเธเธญเธธเธเธเธฃเธ“เนเธเธญเธเธเธธเธ“เธญเธญเธเนเธฅเธเนเธญเธขเธนเน เธเธฃเธธเธ“เธฒเน€เธเธทเนเธญเธกเธ•เนเธญเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ•เนเธฅเนเธงเธฅเธญเธเนเธซเธกเน');
+      await showAlertDialog('ต้องใช้อินเทอร์เน็ต', 'การส่งออกไฟล์ Word ต้องโหลดระบบแปลงไฟล์จากอินเทอร์เน็ตก่อนใช้งานครั้งแรก แต่ตอนนี้ดูเหมือนอุปกรณ์ของคุณออฟไลน์อยู่ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
       return;
     }
 
-    progressText.textContent = 'เธเธณเธฅเธฑเธเน€เธ•เธฃเธตเธขเธกเธฃเธฐเธเธเนเธเธฅเธเนเธเธฅเน Word (.docx)...';
+    progressText.textContent = 'กำลังเตรียมระบบแปลงไฟล์ Word (.docx)...';
     try {
       try {
         await loadScript('https://cdn.jsdelivr.net/npm/docx@8.2.3/build/index.umd.js');
@@ -102,20 +102,20 @@
       }
 
       var docxLib = window.docx;
-      if(!docxLib){ await showAlertDialog('เนเธกเนเธเธฃเนเธญเธกเนเธเนเธเธฒเธ', 'เธฃเธฐเธเธเนเธเธฅเธเนเธเธฅเน Word เนเธกเนเธเธฃเนเธญเธกเนเธเนเธเธฒเธ'); return; }
+      if(!docxLib){ await showAlertDialog('ไม่พร้อมใช้งาน', 'ระบบแปลงไฟล์ Word ไม่พร้อมใช้งาน'); return; }
 
-      progressText.textContent = 'เธเธณเธฅเธฑเธเธชเธฃเนเธฒเธเน€เธญเธเธชเธฒเธฃ Word...';
+      progressText.textContent = 'กำลังสร้างเอกสาร Word...';
       var activeBook = getActiveBook(proj);
-      var bookTitle = activeBook ? activeBook.title : 'เธเธดเธขเธฒเธข';
+      var bookTitle = activeBook ? activeBook.title : 'นิยาย';
 
       var children = [];
       children.push(new docxLib.Paragraph({
-        children: [new docxLib.TextRun({ text: proj.name + ' โ€” ' + bookTitle, bold: true, size: 36, font: 'Sarabun' })],
+        children: [new docxLib.TextRun({ text: proj.name + ' — ' + bookTitle, bold: true, size: 36, font: 'Sarabun' })],
         space: { after: 400 }
       }));
 
       historyList.forEach(function(entry, idx){
-        var titleText = entry.label || ('เธ•เธญเธเธ—เธตเน ' + (idx + 1));
+        var titleText = entry.label || ('ตอนที่ ' + (idx + 1));
         children.push(new docxLib.Paragraph({
           children: [new docxLib.TextRun({ text: titleText, bold: true, size: 28, font: 'Sarabun' })],
           heading: docxLib.HeadingLevel.HEADING_1,
@@ -141,13 +141,13 @@
 
       var blob = await docxLib.Packer.toBlob(doc);
       saveAs(blob, safeFilename(proj.name + '-' + bookTitle) + '.docx');
-      progressText.textContent = 'เธชเนเธเธญเธญเธเนเธเธฅเน Word เธชเธณเน€เธฃเนเธ!';
+      progressText.textContent = 'ส่งออกไฟล์ Word สำเร็จ!';
     } catch(err){
-      var msg = 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธชเธฃเนเธฒเธเนเธเธฅเน Word: ' + (err.message || '');
-      if(navigator.onLine === false || /เนเธซเธฅเธ”เนเธเธฅเน/.test(err.message || '')){
-        msg += '\n\n(เธญเธฒเธเน€เธเธดเธ”เธเธฒเธเนเธกเนเธกเธตเธเธฒเธฃเน€เธเธทเนเธญเธกเธ•เนเธญเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ• เธเธฒเธฃเธชเนเธเธญเธญเธเนเธเธฅเน Word เธ•เนเธญเธเนเธเนเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ•เน€เธเธทเนเธญเนเธซเธฅเธ”เธฃเธฐเธเธเนเธเธฅเธเนเธเธฅเน)';
+      var msg = 'เกิดข้อผิดพลาดในการสร้างไฟล์ Word: ' + (err.message || '');
+      if(navigator.onLine === false || /โหลดไฟล์/.test(err.message || '')){
+        msg += '\n\n(อาจเกิดจากไม่มีการเชื่อมต่ออินเทอร์เน็ต การส่งออกไฟล์ Word ต้องใช้อินเทอร์เน็ตเพื่อโหลดระบบแปลงไฟล์)';
       }
-      await showAlertDialog('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”', msg);
+      await showAlertDialog('เกิดข้อผิดพลาด', msg);
     } finally {
       setTimeout(function(){ progressText.textContent = ''; }, 2000);
     }
@@ -157,15 +157,15 @@
     var proj = getCurrentProject();
     var historyList = getActiveHistoryList(proj);
     if(!proj || !historyList || historyList.length === 0){
-      await showAlertDialog('เนเธกเนเธเธเธเนเธญเธกเธนเธฅ', 'เนเธกเนเธเธเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเนเธเธฅเนเธเน€เธฅเนเธกเธเธตเนเธชเธณเธซเธฃเธฑเธเธชเธฃเนเธฒเธ E-Book');
+      await showAlertDialog('ไม่พบข้อมูล', 'ไม่พบประวัติการแปลในเล่มนี้สำหรับสร้าง E-Book');
       return;
     }
     if(navigator.onLine === false){
-      await showAlertDialog('เธ•เนเธญเธเนเธเนเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ•', 'เธเธฒเธฃเธชเนเธเธญเธญเธเนเธเธฅเน E-Book เธ•เนเธญเธเนเธซเธฅเธ”เธฃเธฐเธเธเธเธตเธเธญเธฑเธ”เนเธเธฅเนเธเธฒเธเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ•เธเนเธญเธเนเธเนเธเธฒเธเธเธฃเธฑเนเธเนเธฃเธ เนเธ•เนเธ•เธญเธเธเธตเนเธ”เธนเน€เธซเธกเธทเธญเธเธญเธธเธเธเธฃเธ“เนเธเธญเธเธเธธเธ“เธญเธญเธเนเธฅเธเนเธญเธขเธนเน เธเธฃเธธเธ“เธฒเน€เธเธทเนเธญเธกเธ•เนเธญเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ•เนเธฅเนเธงเธฅเธญเธเนเธซเธกเน');
+      await showAlertDialog('ต้องใช้อินเทอร์เน็ต', 'การส่งออกไฟล์ E-Book ต้องโหลดระบบบีบอัดไฟล์จากอินเทอร์เน็ตก่อนใช้งานครั้งแรก แต่ตอนนี้ดูเหมือนอุปกรณ์ของคุณออฟไลน์อยู่ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
       return;
     }
 
-    progressText.textContent = 'เธเธณเธฅเธฑเธเน€เธ•เธฃเธตเธขเธกเธฃเธฐเธเธเธชเธฃเนเธฒเธเนเธเธฅเน E-Book (.epub)...';
+    progressText.textContent = 'กำลังเตรียมระบบสร้างไฟล์ E-Book (.epub)...';
     try {
       try {
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
@@ -179,11 +179,11 @@
         await loadScript('https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js');
       }
 
-      if(!window.JSZip){ await showAlertDialog('เนเธกเนเธเธฃเนเธญเธกเนเธเนเธเธฒเธ', 'เธฃเธฐเธเธเธเธตเธเธญเธฑเธ”เนเธเธฅเนเนเธกเนเธเธฃเนเธญเธกเนเธเนเธเธฒเธ'); return; }
+      if(!window.JSZip){ await showAlertDialog('ไม่พร้อมใช้งาน', 'ระบบบีบอัดไฟล์ไม่พร้อมใช้งาน'); return; }
 
-      progressText.textContent = 'เธเธณเธฅเธฑเธเธชเธฃเนเธฒเธเนเธเธฅเน E-Book...';
+      progressText.textContent = 'กำลังสร้างไฟล์ E-Book...';
       var activeBook = getActiveBook(proj);
-      var bookTitle = activeBook ? activeBook.title : 'เธเธดเธขเธฒเธข';
+      var bookTitle = activeBook ? activeBook.title : 'นิยาย';
       var zip = new JSZip();
 
       zip.file('mimetype', 'application/epub+zip', { compression: "STORE" });
@@ -197,7 +197,7 @@
       historyList.forEach(function(entry, idx){
         var chId = 'chap_' + (idx + 1);
         var chFileName = chId + '.xhtml';
-        var chTitle = entry.label || ('เธ•เธญเธเธ—เธตเน ' + (idx + 1));
+        var chTitle = entry.label || ('ตอนที่ ' + (idx + 1));
 
         var paras = (entry.output || '').split('\n').map(function(p){
           return p.trim() ? ('<p>' + escapeHtml(p) + '</p>') : '';
@@ -216,13 +216,13 @@
 
       var blob = await zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
       saveAs(blob, safeFilename(proj.name + '-' + bookTitle) + '.epub');
-      progressText.textContent = 'เธชเนเธเธญเธญเธเนเธเธฅเน E-Book (.epub) เธชเธณเน€เธฃเนเธ!';
+      progressText.textContent = 'ส่งออกไฟล์ E-Book (.epub) สำเร็จ!';
     } catch(err){
-      var msg = 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธชเธฃเนเธฒเธเนเธเธฅเน EPUB: ' + (err.message || '');
-      if(navigator.onLine === false || /เนเธซเธฅเธ”เนเธเธฅเน/.test(err.message || '')){
-        msg += '\n\n(เธญเธฒเธเน€เธเธดเธ”เธเธฒเธเนเธกเนเธกเธตเธเธฒเธฃเน€เธเธทเนเธญเธกเธ•เนเธญเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ• เธเธฒเธฃเธชเนเธเธญเธญเธเนเธเธฅเน E-Book เธ•เนเธญเธเนเธเนเธญเธดเธเน€เธ—เธญเธฃเนเน€เธเนเธ•เน€เธเธทเนเธญเนเธซเธฅเธ”เธฃเธฐเธเธเธเธตเธเธญเธฑเธ”เนเธเธฅเน)';
+      var msg = 'เกิดข้อผิดพลาดในการสร้างไฟล์ EPUB: ' + (err.message || '');
+      if(navigator.onLine === false || /โหลดไฟล์/.test(err.message || '')){
+        msg += '\n\n(อาจเกิดจากไม่มีการเชื่อมต่ออินเทอร์เน็ต การส่งออกไฟล์ E-Book ต้องใช้อินเทอร์เน็ตเพื่อโหลดระบบบีบอัดไฟล์)';
       }
-      await showAlertDialog('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”', msg);
+      await showAlertDialog('เกิดข้อผิดพลาด', msg);
     } finally {
       setTimeout(function(){ progressText.textContent = ''; }, 2000);
     }
@@ -236,33 +236,33 @@
     var key = document.getElementById('apiKey').value.trim();
 
     if(!proj || !historyList || historyList.length < 2){
-      await showAlertDialog('เธขเธฑเธเธ•เธฃเธงเธเธชเธญเธเนเธกเนเนเธ”เน', 'เธ•เนเธญเธเธกเธตเธญเธขเนเธฒเธเธเนเธญเธข 2 เธ•เธญเธเธ—เธตเนเนเธเธฅเนเธฅเนเธงเนเธเน€เธฅเนเธกเธเธตเนเธเนเธญเธ เธเธถเธเธเธฐเน€เธ—เธตเธขเธเธเธงเธฒเธกเธชเธกเนเธณเน€เธชเธกเธญเธเนเธฒเธกเธ•เธญเธเนเธ”เน');
+      await showAlertDialog('ยังตรวจสอบไม่ได้', 'ต้องมีอย่างน้อย 2 ตอนที่แปลแล้วในเล่มนี้ก่อน จึงจะเทียบความสม่ำเสมอข้ามตอนได้');
       return;
     }
     if(!proj.glossary || !proj.glossary.trim()){
-      await showAlertDialog('เธขเธฑเธเนเธกเนเธกเธตเธเธฅเธฑเธเธเธณ', 'เธเธฃเธธเธ“เธฒเนเธชเนเธเธฅเธฑเธเธเธณเน€เธเธเธฒเธฐเน€เธฃเธทเนเธญเธ (เธเธทเนเธญเธ•เธฑเธงเธฅเธฐเธเธฃ/เธชเธ–เธฒเธเธ—เธตเน) เนเธงเนเธเนเธญเธ เธเธถเธเธเธฐเธกเธตเธชเธดเนเธเนเธซเนเน€เธ—เธตเธขเธเธเธงเธฒเธกเธชเธกเนเธณเน€เธชเธกเธญเนเธ”เน');
+      await showAlertDialog('ยังไม่มีคลังคำ', 'กรุณาใส่คลังคำเฉพาะเรื่อง (ชื่อตัวละคร/สถานที่) ไว้ก่อน จึงจะมีสิ่งให้เทียบความสม่ำเสมอได้');
       return;
     }
     if(!key){
-      await showAlertDialog('เธขเธฑเธเนเธกเนเนเธ”เนเนเธชเน API Key', 'เธเธฃเธธเธ“เธฒเนเธชเน API Key เนเธเธซเธเนเธฒเธ•เธฑเนเธเธเนเธฒเธเนเธญเธ');
+      await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน');
       return;
     }
 
     var taggedText = historyList.map(function(entry, idx){
-      var label = entry.label || ('เธ•เธญเธเธ—เธตเน ' + (idx + 1));
+      var label = entry.label || ('ตอนที่ ' + (idx + 1));
       return '=== ' + label + ' ===\n' + (entry.output || '');
     }).join('\n\n');
 
     var maxLen = parseInt(document.getElementById('chunkLen').value, 10) || 3000;
     var batches = splitIntoChunks(taggedText, Math.max(maxLen, 4000));
 
-    var sys = 'เธเธธเธ“เน€เธเนเธเธเธฃเธฃเธ“เธฒเธเธดเธเธฒเธฃเธ•เธฃเธงเธเธ—เธฒเธเธเธงเธฒเธกเธชเธกเนเธณเน€เธชเธกเธญเธเธญเธเธเธณเธจเธฑเธเธ—เนเน€เธเธเธฒเธฐเนเธเธเธดเธขเธฒเธขเนเธเธฅ ' +
-      'เธเธตเนเธเธทเธญเธเธฅเธฑเธเธเธณเธ—เธตเนเธเธณเธซเธเธ”เนเธงเนเธฅเนเธงเธเธซเธเนเธฒ (เธฃเธนเธเนเธเธ "เธ•เนเธเธเธเธฑเธ = เธเธณเนเธเธฅเนเธ—เธข"):\n' + proj.glossary.trim() + '\n\n' +
-      'เน€เธเธทเนเธญเธซเธฒเธ—เธตเนเนเธซเนเธกเธฒเธเธฐเธกเธตเธเนเธฒเธขเธเธทเนเธญเธเธณเธเธฑเธเนเธ•เนเธฅเธฐเธ•เธญเธเนเธงเนเนเธเธฃเธนเธเนเธเธ "=== เธเธทเนเธญเธ•เธญเธ ===" เนเธซเนเธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเธกเธตเธเธฒเธฃเนเธเธฅ/เธชเธฐเธเธ” ' +
-      'เธเธทเนเธญเธ•เธฑเธงเธฅเธฐเธเธฃ เธชเธ–เธฒเธเธ—เธตเน เธซเธฃเธทเธญเธเธณเธจเธฑเธเธ—เนเน€เธเธเธฒเธฐ เธ—เธตเนเนเธกเนเธ•เธฃเธเธเธฑเธเธเธฅเธฑเธเธเธณ เธซเธฃเธทเธญเธชเธฐเธเธ”/เนเธเธฅเนเธกเนเธ•เธฃเธเธเธฑเธเธฃเธฐเธซเธงเนเธฒเธเธ•เธญเธเธซเธฃเธทเธญเนเธกเน ' +
-      'เธ–เนเธฒเธเธเนเธซเนเธฃเธฒเธขเธเธฒเธเน€เธเนเธเธเนเธญเน เธฃเธฐเธเธธเธเธทเนเธญเธ•เธญเธเธ—เธตเนเธเธ เธเธณเธ—เธตเนเนเธเนเนเธกเนเธ•เธฃเธเธเธฑเธ เนเธฅเธฐเธเธณเธ—เธตเนเธเธงเธฃเธเธฐเน€เธเนเธเธ•เธฒเธกเธเธฅเธฑเธเธเธณ (เธ–เนเธฒเธกเธต) ' +
-      'เธ–เนเธฒเนเธกเนเธเธเธเธฑเธเธซเธฒเน€เธฅเธขเนเธเธชเนเธงเธเธ—เธตเนเธ•เธฃเธงเธ เนเธซเนเธ•เธญเธเธงเนเธฒ "เนเธกเนเธเธเธเธงเธฒเธกเนเธกเนเธชเธญเธ”เธเธฅเนเธญเธเธเธฑเธ" เน€เธ—เนเธฒเธเธฑเนเธ ' +
-      'เธ•เธญเธเน€เธเนเธเธ เธฒเธฉเธฒเนเธ—เธข เธเธฃเธฐเธเธฑเธ เน€เธเนเธเธเนเธญเน เธซเนเธฒเธกเธกเธตเธเธณเธเธณเธซเธฃเธทเธญเธเธณเธฅเธเธ—เนเธฒเธข';
+    var sys = 'คุณเป็นบรรณาธิการตรวจทานความสม่ำเสมอของคำศัพท์เฉพาะในนิยายแปล ' +
+      'นี่คือคลังคำที่กำหนดไว้ล่วงหน้า (รูปแบบ "ต้นฉบับ = คำแปลไทย"):\n' + proj.glossary.trim() + '\n\n' +
+      'เนื้อหาที่ให้มาจะมีป้ายชื่อกำกับแต่ละตอนไว้ในรูปแบบ "=== ชื่อตอน ===" ให้ตรวจสอบว่ามีการแปล/สะกด ' +
+      'ชื่อตัวละคร สถานที่ หรือคำศัพท์เฉพาะ ที่ไม่ตรงกับคลังคำ หรือสะกด/แปลไม่ตรงกันระหว่างตอนหรือไม่ ' +
+      'ถ้าพบให้รายงานเป็นข้อๆ ระบุชื่อตอนที่พบ คำที่ใช้ไม่ตรงกัน และคำที่ควรจะเป็นตามคลังคำ (ถ้ามี) ' +
+      'ถ้าไม่พบปัญหาเลยในส่วนที่ตรวจ ให้ตอบว่า "ไม่พบความไม่สอดคล้องกัน" เท่านั้น ' +
+      'ตอบเป็นภาษาไทย กระชับ เป็นข้อๆ ห้ามมีคำนำหรือคำลงท้าย';
 
     var reportParts = [];
     checkConsistencyBtn.disabled = true;
@@ -270,25 +270,25 @@
     try{
       for(var i = 0; i < batches.length; i++){
         progressText.textContent = batches.length > 1
-          ? ('เธเธณเธฅเธฑเธเธ•เธฃเธงเธเธชเธญเธเธเธงเธฒเธกเธชเธกเนเธณเน€เธชเธกเธญ เธชเนเธงเธเธ—เธตเน ' + (i + 1) + '/' + batches.length + '...')
-          : 'เธเธณเธฅเธฑเธเธ•เธฃเธงเธเธชเธญเธเธเธงเธฒเธกเธชเธกเนเธณเน€เธชเธกเธญเธเธญเธเธเธฅเธฑเธเธเธณเธ—เธฑเนเธเน€เธฅเนเธก...';
+          ? ('กำลังตรวจสอบความสม่ำเสมอ ส่วนที่ ' + (i + 1) + '/' + batches.length + '...')
+          : 'กำลังตรวจสอบความสม่ำเสมอของคลังคำทั้งเล่ม...';
         var result = await callAIWithRetry(sys, batches[i], key, modelInput.value, activeController ? activeController.signal : null, 2);
         if(result && result.trim()){
-          reportParts.push(batches.length > 1 ? ('โ€” เธชเนเธงเธเธ—เธตเน ' + (i + 1) + ' โ€”\n' + result.trim()) : result.trim());
+          reportParts.push(batches.length > 1 ? ('— ส่วนที่ ' + (i + 1) + ' —\n' + result.trim()) : result.trim());
         }
       }
       var fullReport = reportParts.join('\n\n').trim();
-      if(!fullReport) fullReport = 'เนเธกเนเธเธเธเธงเธฒเธกเนเธกเนเธชเธญเธ”เธเธฅเนเธญเธเธเธฑเธ';
+      if(!fullReport) fullReport = 'ไม่พบความไม่สอดคล้องกัน';
 
       if(currentActionTokens > 0) {
-        fullReport += '\n\n---\n(เนเธเนเนเธเธ—เธฑเนเธเธซเธกเธ” ' + currentActionTokens.toLocaleString() + ' tokens, เธเธฃเธฐเธกเธฒเธ“ $' + currentActionCost.toFixed(4) + ')';
+        fullReport += '\n\n---\n(ใช้ไปทั้งหมด ' + currentActionTokens.toLocaleString() + ' tokens, ประมาณ $' + currentActionCost.toFixed(4) + ')';
       }
 
-      diffTitleEl.textContent = 'เธฃเธฒเธขเธเธฒเธเธเธงเธฒเธกเธชเธกเนเธณเน€เธชเธกเธญเธเธญเธเธเธฅเธฑเธเธเธณ โ€” ' + (activeBook ? activeBook.title : proj.name);
+      diffTitleEl.textContent = 'รายงานความสม่ำเสมอของคลังคำ — ' + (activeBook ? activeBook.title : proj.name);
       diffBody.textContent = fullReport;
       diffOverlay.classList.add('show');
     }catch(err){
-      await showAlertDialog('เธ•เธฃเธงเธเธชเธญเธเนเธกเนเธชเธณเน€เธฃเนเธ', 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: ' + (err.message || ''));
+      await showAlertDialog('ตรวจสอบไม่สำเร็จ', 'เกิดข้อผิดพลาด: ' + (err.message || ''));
     }finally{
       checkConsistencyBtn.disabled = false;
       progressText.textContent = '';

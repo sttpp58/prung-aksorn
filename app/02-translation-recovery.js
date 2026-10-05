@@ -15,7 +15,7 @@
     box.style.borderRadius='10px';
     box.style.background='var(--panel-bg, transparent)';
     var title=document.createElement('div');
-    title.textContent='เธเธเธเธฒเธเนเธเธฅเธ—เธตเนเธ•เนเธญเธเธ•เธฃเธงเธเธชเธญเธ';
+    title.textContent='พบงานแปลที่ต้องตรวจสอบ';
     title.style.fontWeight='600';
     title.style.marginBottom='8px';
     box.appendChild(title);
@@ -33,7 +33,7 @@
       label.style.overflow='hidden';
       label.style.textOverflow='ellipsis';
       label.style.whiteSpace='nowrap';
-      label.textContent=(job.label||('Job '+job.jobId))+' โ€” '+job.completedChunks+'/'+job.totalChunks+' ('+job.status+')'+(job.reason?' โ€” '+job.reason:'');
+      label.textContent=(job.label||('Job '+job.jobId))+' — '+job.completedChunks+'/'+job.totalChunks+' ('+job.status+')'+(job.reason?' — '+job.reason:'');
       row.appendChild(label);
 
       var actions=document.createElement('div');
@@ -50,10 +50,10 @@
           btn.textContent='Retry';
           btn.addEventListener('click',function(){retryBatchTranslationJob(job.jobId);});
         }else if(job.jobType==='batch'){
-          btn.textContent='เธเธนเนเธเธทเธ';
+          btn.textContent='กู้คืน';
           btn.addEventListener('click',function(){prepareBatchTranslationRecovery(job.jobId);});
         }else{
-          btn.textContent='เธเธนเนเธเธทเธ';
+          btn.textContent='กู้คืน';
           btn.addEventListener('click',function(){prepareTranslationRecovery(job.jobId);});
         }
         actions.appendChild(btn);
@@ -62,8 +62,8 @@
       var dismissBtn=document.createElement('button');
       dismissBtn.type='button';
       dismissBtn.className='secondary-btn';
-      dismissBtn.textContent='เธเนเธญเธ';
-      dismissBtn.title='เธเนเธญเธเธฃเธฒเธขเธเธฒเธฃเธเธตเนเธเธฒเธเธซเธเนเธฒเธเธญ เนเธ”เธขเนเธกเนเธฅเธ Translation Job';
+      dismissBtn.textContent='ซ่อน';
+      dismissBtn.title='ซ่อนรายการนี้จากหน้าจอ โดยไม่ลบ Translation Job';
       dismissBtn.addEventListener('click',function(){dismissTranslationRecoveryJob(job);});
       actions.appendChild(dismissBtn);
 
@@ -72,7 +72,7 @@
     });
 
     var note=document.createElement('div');
-    note.textContent='เธฃเธฐเธเธเธเธฐเนเธกเนเน€เธฃเธดเนเธก API เธญเธฑเธ•เนเธเธกเธฑเธ•เธด เธ•เนเธญเธเธเธ”เธเธนเนเธเธทเธเนเธฅเธฐเน€เธฃเธดเนเธกเธเธฒเธเธ”เนเธงเธขเธ•เธเน€เธญเธ โ€ข เธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธเนเธญเธเธเธฐเธเธฅเธฑเธเธกเธฒเน€เธกเธทเนเธญเธชเธ–เธฒเธเธฐ Job เน€เธเธฅเธตเนเธขเธ';
+    note.textContent='ระบบจะไม่เริ่ม API อัตโนมัติ ต้องกดกู้คืนและเริ่มงานด้วยตนเอง • รายการที่ซ่อนจะกลับมาเมื่อสถานะ Job เปลี่ยน';
     note.style.marginTop='8px';
     note.style.fontSize='0.9em';
     note.style.opacity='0.75';
@@ -101,7 +101,7 @@
           totalChunks:Number(job.totalChunks||0),
           revision:Number.isInteger(job.revision)?job.revision:0,
           updatedAt:Number(job.updatedAt||0),
-          label:job.sourceSnapshot&&job.sourceSnapshot.title||('เธเธฒเธเนเธเธฅ '+job.jobId),
+          label:job.sourceSnapshot&&job.sourceSnapshot.title||('งานแปล '+job.jobId),
           recoverable:false,
           reason:''
         };
@@ -109,20 +109,20 @@
           PrungAksornStorageV2.validateTranslationJob(job);
           var proj=appData.projects.find(function(p){return p.id===job.projectId;});
           var book=proj&&(proj.books||[]).find(function(b){return b.id===job.bookId;});
-          if(!proj){base.reason='เนเธกเนเธเธ Project เธ•เนเธเธ—เธฒเธ';candidates.push(base);return;}
-          if(!book){base.reason='เนเธกเนเธเธ Book เธ•เนเธเธ—เธฒเธ';candidates.push(base);return;}
+          if(!proj){base.reason='ไม่พบ Project ต้นทาง';candidates.push(base);return;}
+          if(!book){base.reason='ไม่พบ Book ต้นทาง';candidates.push(base);return;}
           if(hasCompletedTranslationHistory(job)) return;
           if(job.jobType==='batch'){
-            if(typeof job.batchId!=='string'||!job.batchId){base.reason='Batch Job เนเธกเนเธกเธต batchId';candidates.push(base);return;}
-            if(!Number.isInteger(job.batchIndex)||job.batchIndex<0){base.reason='Batch Job เธกเธต batchIndex เนเธกเนเธ–เธนเธเธ•เนเธญเธ';candidates.push(base);return;}
+            if(typeof job.batchId!=='string'||!job.batchId){base.reason='Batch Job ไม่มี batchId';candidates.push(base);return;}
+            if(!Number.isInteger(job.batchIndex)||job.batchIndex<0){base.reason='Batch Job มี batchIndex ไม่ถูกต้อง';candidates.push(base);return;}
           }
-          if(!job.sourceSnapshot||typeof job.sourceSnapshot.text!=='string'||!job.sourceSnapshot.text||job.sourceSnapshot.normalized!==true){base.reason='เนเธกเนเธกเธต Recovery Source Snapshot เธ—เธตเนเธชเธกเธเธนเธฃเธ“เน';candidates.push(base);return;}
-          if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0){base.reason='Job เธกเธต chunkSize เนเธกเนเธ–เธนเธเธ•เนเธญเธ';candidates.push(base);return;}
-          if(!Number.isInteger(job.totalChunks)||job.totalChunks<0){base.reason='Job เธกเธต totalChunks เนเธกเนเธ–เธนเธเธ•เนเธญเธ';candidates.push(base);return;}
+          if(!job.sourceSnapshot||typeof job.sourceSnapshot.text!=='string'||!job.sourceSnapshot.text||job.sourceSnapshot.normalized!==true){base.reason='ไม่มี Recovery Source Snapshot ที่สมบูรณ์';candidates.push(base);return;}
+          if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0){base.reason='Job มี chunkSize ไม่ถูกต้อง';candidates.push(base);return;}
+          if(!Number.isInteger(job.totalChunks)||job.totalChunks<0){base.reason='Job มี totalChunks ไม่ถูกต้อง';candidates.push(base);return;}
           base.recoverable=true;
           candidates.push(base);
         }catch(e){
-          base.reason='Job validation เนเธกเนเธเนเธฒเธ';
+          base.reason='Job validation ไม่ผ่าน';
           candidates.push(base);
           console.warn('Translation recovery candidate rejected:',job.jobId,e);
         }
@@ -148,49 +148,49 @@
     hideError();
     try{
       var job=await PrungAksornStorageV2.getTranslationJob(jobId);
-      if(!job)throw new Error('เนเธกเนเธเธ Translation Job เธเธตเนเนเธฅเนเธง');
+      if(!job)throw new Error('ไม่พบ Translation Job นี้แล้ว');
       PrungAksornStorageV2.validateTranslationJob(job);
-      if(job.jobType!=='batch')throw new Error('Job เธเธตเนเนเธกเนเนเธเน Batch Job');
+      if(job.jobType!=='batch')throw new Error('Job นี้ไม่ใช่ Batch Job');
       if(['pending','running','paused'].indexOf(job.status)<0){
-        if(job.status==='failed')throw new Error('Job เธเธตเนเธญเธขเธนเนเนเธเธชเธ–เธฒเธเธฐ failed เนเธซเนเนเธเน โ€Retryโ€ เนเธ—เธเธเธฒเธฃเธเธนเนเธเธทเธ');
-        throw new Error('Job เธเธตเนเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธเธนเนเธเธทเธเธเธฒเธเธชเธ–เธฒเธเธฐ '+job.status+' เนเธ”เน');
+        if(job.status==='failed')throw new Error('Job นี้อยู่ในสถานะ failed ให้ใช้ “Retry” แทนการกู้คืน');
+        throw new Error('Job นี้ไม่สามารถกู้คืนจากสถานะ '+job.status+' ได้');
       }
-      if(typeof job.batchId!=='string'||!job.batchId)throw new Error('Batch Job เนเธกเนเธกเธต batchId');
-      if(!Number.isInteger(job.batchIndex)||job.batchIndex<0)throw new Error('Batch Job เธกเธต batchIndex เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
+      if(typeof job.batchId!=='string'||!job.batchId)throw new Error('Batch Job ไม่มี batchId');
+      if(!Number.isInteger(job.batchIndex)||job.batchIndex<0)throw new Error('Batch Job มี batchIndex ไม่ถูกต้อง');
 
       var proj=appData.projects.find(function(p){return p.id===job.projectId;});
-      if(!proj)throw new Error('เนเธกเนเธเธ Project เธ•เนเธเธ—เธฒเธเธเธญเธ Job');
+      if(!proj)throw new Error('ไม่พบ Project ต้นทางของ Job');
       var book=(proj.books||[]).find(function(b){return b.id===job.bookId;});
-      if(!book)throw new Error('เนเธกเนเธเธ Book เธ•เนเธเธ—เธฒเธเธเธญเธ Job');
+      if(!book)throw new Error('ไม่พบ Book ต้นทางของ Job');
 
       var snapshot=job.sourceSnapshot;
-      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true)throw new Error('เนเธกเนเธเธ Recovery Source Snapshot เธ—เธตเนเธชเธกเธเธนเธฃเธ“เน');
-      if(typeof snapshot.originalText!=='string')throw new Error('Original Source Snapshot เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
-      if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0)throw new Error('Job เธกเธต chunkSize เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
-      if(!Number.isInteger(job.totalChunks)||job.totalChunks<0)throw new Error('Job เธกเธต totalChunks เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
-      if(!Number.isInteger(job.completedChunks)||job.completedChunks<0||job.completedChunks>job.totalChunks)throw new Error('Checkpoint เธเธญเธ Job เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
-      if(!Array.isArray(job.partialResults)||job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults เนเธกเนเธชเธญเธ”เธเธฅเนเธญเธเธเธฑเธ');
-      if(job.partialResults.some(function(x,idx){return !x||x.chunkIndex!==idx||typeof x.text!=='string';}))throw new Error('partialResults เธเธญเธ Job เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
+      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true)throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
+      if(typeof snapshot.originalText!=='string')throw new Error('Original Source Snapshot ไม่ถูกต้อง');
+      if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0)throw new Error('Job มี chunkSize ไม่ถูกต้อง');
+      if(!Number.isInteger(job.totalChunks)||job.totalChunks<0)throw new Error('Job มี totalChunks ไม่ถูกต้อง');
+      if(!Number.isInteger(job.completedChunks)||job.completedChunks<0||job.completedChunks>job.totalChunks)throw new Error('Checkpoint ของ Job ไม่ถูกต้อง');
+      if(!Array.isArray(job.partialResults)||job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
+      if(job.partialResults.some(function(x,idx){return !x||x.chunkIndex!==idx||typeof x.text!=='string';}))throw new Error('partialResults ของ Job ไม่ถูกต้อง');
       if(job.completedChunks>0){
         var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
-        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail เนเธกเนเธ•เธฃเธเธเธฑเธ Checkpoint เธฅเนเธฒเธชเธธเธ”');
+        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
       }else if(String(job.previousTail||'')){
-        throw new Error('previousTail เธ•เนเธญเธเธงเนเธฒเธเน€เธกเธทเนเธญเธขเธฑเธเนเธกเนเธกเธต Chunk เธ—เธตเน checkpoint');
+        throw new Error('previousTail ต้องว่างเมื่อยังไม่มี Chunk ที่ checkpoint');
       }
 
-      if(providerSel.value!==job.provider)throw new Error('Provider เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ '+job.provider+' เธเนเธญเธเธเธนเนเธเธทเธ');
-      if(modelInput.value!==job.model)throw new Error('Model เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ '+job.model+' เธเนเธญเธเธเธนเนเธเธทเธ');
-      if(!document.getElementById('apiKey').value.trim())throw new Error('เธเธฃเธธเธ“เธฒเนเธชเน API Key เธเนเธญเธเธเธนเนเธเธทเธเธเธฒเธ');
+      if(providerSel.value!==job.provider)throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อนกู้คืน');
+      if(modelInput.value!==job.model)throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อนกู้คืน');
+      if(!document.getElementById('apiKey').value.trim())throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
 
       var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
-      if(chunks.length!==job.totalChunks)throw new Error('เธเธณเธเธงเธ Chunk เธ—เธตเนเธชเธฃเนเธฒเธเนเธซเธกเนเนเธกเนเธ•เธฃเธเธเธฑเธ Job: '+chunks.length+' != '+job.totalChunks);
+      if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
 
       advanceAppContextGeneration();
       appData.currentProjectId=proj.id;
       proj.currentBookId=book.id;
       chapterTitle.value=snapshot.title||chapterTitle.value||'';
       inputText.value=snapshot.originalText;
-      inCount.textContent=countWords(inputText.value)+' เธเธณ';
+      inCount.textContent=countWords(inputText.value)+' คำ';
       updateChunkInfo();
       setOutput(job.partialResults.map(function(x){return x.text;}).join('\n\n'));
 
@@ -218,15 +218,15 @@
       };
       activeTranslationJobId=null;
       if(resumeBtn){
-        resumeBtn.textContent='เธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธเธฒเธเธเธธเธ”เธเธนเนเธเธทเธ';
+        resumeBtn.textContent='ดำเนินการต่อจากจุดกู้คืน';
         resumeBtn.classList.add('show');
       }
       renderProjects();
       renderBottomHistory();
       clearTranslationRecoveryUI();
-      showError('เน€เธ•เธฃเธตเธขเธกเธเธนเนเธเธทเธ Batch Item '+(job.batchIndex+1)+' เนเธฅเนเธง เธเธ” โ€เธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธเธฒเธเธเธธเธ”เธเธนเนเธเธทเธโ€ เน€เธเธทเนเธญเน€เธฃเธดเนเธก API');
+      showError('เตรียมกู้คืน Batch Item '+(job.batchIndex+1)+' แล้ว กด “ดำเนินการต่อจากจุดกู้คืน” เพื่อเริ่ม API');
     }catch(e){
-      showError('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เน€เธ•เธฃเธตเธขเธก Batch Recovery Job เนเธ”เน: '+(e.message||e));
+      showError('ไม่สามารถเตรียม Batch Recovery Job ได้: '+(e.message||e));
     }
   }
 
@@ -240,28 +240,28 @@
     var activeRetryCount=Number(state.retryCount||0);
     try{
       job=await PrungAksornStorageV2.getTranslationJob(state.jobId);
-      if(!job)throw new Error('เนเธกเนเธเธ Translation Job เธเธตเนเนเธฅเนเธง');
+      if(!job)throw new Error('ไม่พบ Translation Job นี้แล้ว');
       PrungAksornStorageV2.validateTranslationJob(job);
-      if(job.jobType!=='batch')throw new Error('Job เธเธตเนเนเธกเนเนเธเน Batch Job');
-      if(['pending','running','paused'].indexOf(job.status)<0)throw new Error('Job เธเธตเนเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธเธนเนเธเธทเธเธเธฒเธเธชเธ–เธฒเธเธฐ '+job.status+' เนเธ”เน');
-      if(job.batchId!==state.batchId||job.batchIndex!==state.batchIndex)throw new Error('Batch identity เธเธญเธ Job เน€เธเธฅเธตเนเธขเธเนเธเธฅเธเนเธ');
-      if(job.projectId!==state.projectId||job.bookId!==state.bookId||job.chapterId!==state.chapterId)throw new Error('Source reference เธเธญเธ Job เน€เธเธฅเธตเนเธขเธเนเธเธฅเธเนเธ');
-      if(providerSel.value!==job.provider)throw new Error('Provider เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ '+job.provider+' เธเนเธญเธเธเธนเนเธเธทเธ');
-      if(modelInput.value!==job.model)throw new Error('Model เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ '+job.model+' เธเนเธญเธเธเธนเนเธเธทเธ');
+      if(job.jobType!=='batch')throw new Error('Job นี้ไม่ใช่ Batch Job');
+      if(['pending','running','paused'].indexOf(job.status)<0)throw new Error('Job นี้ไม่สามารถกู้คืนจากสถานะ '+job.status+' ได้');
+      if(job.batchId!==state.batchId||job.batchIndex!==state.batchIndex)throw new Error('Batch identity ของ Job เปลี่ยนแปลงไป');
+      if(job.projectId!==state.projectId||job.bookId!==state.bookId||job.chapterId!==state.chapterId)throw new Error('Source reference ของ Job เปลี่ยนแปลงไป');
+      if(providerSel.value!==job.provider)throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อนกู้คืน');
+      if(modelInput.value!==job.model)throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อนกู้คืน');
       var key=document.getElementById('apiKey').value.trim();
-      if(!key)throw new Error('เธเธฃเธธเธ“เธฒเนเธชเน API Key เธเนเธญเธเธเธนเนเธเธทเธเธเธฒเธ');
+      if(!key)throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
 
       recoveryContext=captureAppContext(state.proj,state.book);
       var snapshot=job.sourceSnapshot;
-      if(!snapshot||snapshot.text!==state.sourceSnapshotText||snapshot.normalized!==true)throw new Error('Recovery Source Snapshot เธเธญเธ Job เน€เธเธฅเธตเนเธขเธเนเธเธฅเธเนเธ');
-      if(typeof snapshot.originalText!=='string')throw new Error('Original Source Snapshot เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
+      if(!snapshot||snapshot.text!==state.sourceSnapshotText||snapshot.normalized!==true)throw new Error('Recovery Source Snapshot ของ Job เปลี่ยนแปลงไป');
+      if(typeof snapshot.originalText!=='string')throw new Error('Original Source Snapshot ไม่ถูกต้อง');
       var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
-      if(chunks.length!==job.totalChunks)throw new Error('เธเธณเธเธงเธ Chunk เธ—เธตเนเธชเธฃเนเธฒเธเนเธซเธกเนเนเธกเนเธ•เธฃเธเธเธฑเธ Job: '+chunks.length+' != '+job.totalChunks);
-      if(job.completedChunks!==state.completedChunks)throw new Error('Checkpoint เธเธญเธ Job เน€เธเธฅเธตเนเธขเธเนเธเธฅเธเนเธ เธเธฃเธธเธ“เธฒเน€เธ•เธฃเธตเธขเธก Recovery เนเธซเธกเน');
-      if(job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults เนเธกเนเธชเธญเธ”เธเธฅเนเธญเธเธเธฑเธ');
+      if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+      if(job.completedChunks!==state.completedChunks)throw new Error('Checkpoint ของ Job เปลี่ยนแปลงไป กรุณาเตรียม Recovery ใหม่');
+      if(job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
       if(job.completedChunks>0){
         var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
-        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail เนเธกเนเธ•เธฃเธเธเธฑเธ Checkpoint เธฅเนเธฒเธชเธธเธ”');
+        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
       }
       activeRetryCount=Number(job.retryCount||0);
       var recoverySettingsSnapshot=normalizeTranslationSettingsSnapshot(job.settingsSnapshot,job.provider,job.model,job.chunkSize);
@@ -286,7 +286,7 @@
         resetActionStats();
         cancelBtn.classList.add('show');
         if(isAppContextCurrent(recoveryContext)){
-          progressText.textContent='เธเธณเธฅเธฑเธเธเธนเนเธเธทเธ Batch Item '+(job.batchIndex+1)+' เธเธฒเธเธเธธเธ” '+job.completedChunks+'/'+job.totalChunks;
+          progressText.textContent='กำลังกู้คืน Batch Item '+(job.batchIndex+1)+' จากจุด '+job.completedChunks+'/'+job.totalChunks;
           setOutput(results.join('\n\n'));
         }
 
@@ -296,7 +296,7 @@
             cancelError.name='AbortError';
             throw cancelError;
           }
-          if(isAppContextCurrent(recoveryContext)) progressText.textContent='เธเธณเธฅเธฑเธเธเธนเนเธเธทเธ Batch Item โ€” เธชเนเธงเธเธ—เธตเน '+(i+1)+'/'+chunks.length;
+          if(isAppContextCurrent(recoveryContext)) progressText.textContent='กำลังกู้คืน Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
           var sys=buildTranslatePromptWithSettings(state.proj,previousTail,chunks[i],recoverySettingsSnapshot);
           var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
           var partTrim=part.trim();
@@ -334,13 +334,13 @@
         refreshTranslationRecoveryUI();
         if(resumeBtn){
           resumeBtn.classList.remove('show');
-          resumeBtn.textContent='เธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญ';
+          resumeBtn.textContent='ดำเนินการต่อ';
         }
       }
       if(isAppContextCurrent(recoveryContext)){
-        progressText.textContent='Batch Recovery เธชเธณเน€เธฃเนเธ';
+        progressText.textContent='Batch Recovery สำเร็จ';
         setTimeout(function(){
-          if(progressText.textContent==='Batch Recovery เธชเธณเน€เธฃเนเธ')progressText.textContent='';
+          if(progressText.textContent==='Batch Recovery สำเร็จ')progressText.textContent='';
         },4000);
       }
     }catch(err){
@@ -351,7 +351,7 @@
           }else{
             await PrungAksornStorageV2.failTranslationJob(job.jobId,{
               code:'BATCH_RECOVERY_FAILED',
-              message:String(err.message||'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”'),
+              message:String(err.message||'เกิดข้อผิดพลาด'),
               chunkIndex:typeof i==='number'?i:null,
               retryCount:activeRetryCount,
               timestamp:Date.now()
@@ -364,14 +364,14 @@
       activeTranslationJobId=null;
       pendingBatchResume=null;
       if(err.name!=='AbortError' && (!recoveryContext || isAppContextCurrent(recoveryContext))){
-        showError('Batch Recovery เนเธกเนเธชเธณเน€เธฃเนเธ: '+(err.message||err));
+        showError('Batch Recovery ไม่สำเร็จ: '+(err.message||err));
       }
     }finally{
       setTranslationSettingsLocked(false);
       setAiBusy(false);
       if(!recoveryContext || isAppContextCurrent(recoveryContext)){
         cancelBtn.classList.remove('show');
-        if(progressText.textContent!=='Batch Recovery เธชเธณเน€เธฃเนเธ')progressText.textContent='';
+        if(progressText.textContent!=='Batch Recovery สำเร็จ')progressText.textContent='';
       }
     }
   }
@@ -386,37 +386,37 @@
     var retryCount=0;
     try{
       job=await PrungAksornStorageV2.getTranslationJob(jobId);
-      if(!job) throw new Error('เนเธกเนเธเธ Translation Job เธเธตเนเนเธฅเนเธง');
+      if(!job) throw new Error('ไม่พบ Translation Job นี้แล้ว');
       PrungAksornStorageV2.validateTranslationJob(job);
-      if(job.jobType!=='batch') throw new Error('Job เธเธตเนเนเธกเนเนเธเน Batch Job');
-      if(job.status!=='failed') throw new Error('Retry เนเธ”เนเน€เธเธเธฒเธฐ Job เธ—เธตเนเธญเธขเธนเนเนเธเธชเธ–เธฒเธเธฐ failed');
-      if(typeof job.batchId!=='string'||!job.batchId) throw new Error('Batch Job เนเธกเนเธกเธต batchId');
-      if(!Number.isInteger(job.batchIndex)||job.batchIndex<0) throw new Error('Batch Job เธกเธต batchIndex เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
+      if(job.jobType!=='batch') throw new Error('Job นี้ไม่ใช่ Batch Job');
+      if(job.status!=='failed') throw new Error('Retry ได้เฉพาะ Job ที่อยู่ในสถานะ failed');
+      if(typeof job.batchId!=='string'||!job.batchId) throw new Error('Batch Job ไม่มี batchId');
+      if(!Number.isInteger(job.batchIndex)||job.batchIndex<0) throw new Error('Batch Job มี batchIndex ไม่ถูกต้อง');
       var proj=appData.projects.find(function(p){return p.id===job.projectId;});
-      if(!proj) throw new Error('เนเธกเนเธเธ Project เธ•เนเธเธ—เธฒเธเธเธญเธ Job');
+      if(!proj) throw new Error('ไม่พบ Project ต้นทางของ Job');
       var book=(proj.books||[]).find(function(b){return b.id===job.bookId;});
-      if(!book) throw new Error('เนเธกเนเธเธ Book เธ•เนเธเธ—เธฒเธเธเธญเธ Job');
+      if(!book) throw new Error('ไม่พบ Book ต้นทางของ Job');
       retryContext=captureAppContext(proj,book);
       var snapshot=job.sourceSnapshot;
-      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true) throw new Error('เนเธกเนเธเธ Recovery Source Snapshot เธ—เธตเนเธชเธกเธเธนเธฃเธ“เน');
-      if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0) throw new Error('Job เธกเธต chunkSize เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
-      if(!Number.isInteger(job.totalChunks)||job.totalChunks<0) throw new Error('Job เธกเธต totalChunks เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
-      if(!Number.isInteger(job.completedChunks)||job.completedChunks<0||job.completedChunks>job.totalChunks) throw new Error('Checkpoint เธเธญเธ Job เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
-      if(!Array.isArray(job.partialResults)||job.partialResults.length!==job.completedChunks) throw new Error('Checkpoint/partialResults เนเธกเนเธชเธญเธ”เธเธฅเนเธญเธเธเธฑเธ');
-      if(job.partialResults.some(function(x,idx){return !x||x.chunkIndex!==idx||typeof x.text!=='string';})) throw new Error('partialResults เธเธญเธ Job เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
+      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true) throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
+      if(!Number.isInteger(job.chunkSize)||job.chunkSize<=0) throw new Error('Job มี chunkSize ไม่ถูกต้อง');
+      if(!Number.isInteger(job.totalChunks)||job.totalChunks<0) throw new Error('Job มี totalChunks ไม่ถูกต้อง');
+      if(!Number.isInteger(job.completedChunks)||job.completedChunks<0||job.completedChunks>job.totalChunks) throw new Error('Checkpoint ของ Job ไม่ถูกต้อง');
+      if(!Array.isArray(job.partialResults)||job.partialResults.length!==job.completedChunks) throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
+      if(job.partialResults.some(function(x,idx){return !x||x.chunkIndex!==idx||typeof x.text!=='string';})) throw new Error('partialResults ของ Job ไม่ถูกต้อง');
       if(job.completedChunks>0){
         var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
-        if(expectedTail!==String(job.previousTail||'')) throw new Error('previousTail เนเธกเนเธ•เธฃเธเธเธฑเธ Checkpoint เธฅเนเธฒเธชเธธเธ”');
+        if(expectedTail!==String(job.previousTail||'')) throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
       }else if(String(job.previousTail||'')) {
-        throw new Error('previousTail เธ•เนเธญเธเธงเนเธฒเธเน€เธกเธทเนเธญเธขเธฑเธเนเธกเนเธกเธต Chunk เธ—เธตเน checkpoint');
+        throw new Error('previousTail ต้องว่างเมื่อยังไม่มี Chunk ที่ checkpoint');
       }
-      if(providerSel.value!==job.provider) throw new Error('Provider เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ '+job.provider+' เธเนเธญเธ Retry');
-      if(modelInput.value!==job.model) throw new Error('Model เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ '+job.model+' เธเนเธญเธ Retry');
+      if(providerSel.value!==job.provider) throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อน Retry');
+      if(modelInput.value!==job.model) throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อน Retry');
       var key=document.getElementById('apiKey').value.trim();
-      if(!key) throw new Error('เธเธฃเธธเธ“เธฒเนเธชเน API Key เธเนเธญเธ Retry');
+      if(!key) throw new Error('กรุณาใส่ API Key ก่อน Retry');
 
       var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
-      if(chunks.length!==job.totalChunks) throw new Error('เธเธณเธเธงเธ Chunk เธ—เธตเนเธชเธฃเนเธฒเธเนเธซเธกเนเนเธกเนเธ•เธฃเธเธเธฑเธ Job: '+chunks.length+' != '+job.totalChunks);
+      if(chunks.length!==job.totalChunks) throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
 
       retryCount=Number(job.retryCount||0)+1;
       var retrySettingsSnapshot=normalizeTranslationSettingsSnapshot(job.settingsSnapshot,job.provider,job.model,job.chunkSize);
@@ -430,7 +430,7 @@
       setTranslationSettingsLocked(true);
       resetActionStats();
       cancelBtn.classList.add('show');
-      if(isAppContextCurrent(retryContext)) progressText.textContent='เธเธณเธฅเธฑเธ Retry Batch Item '+(job.batchIndex+1)+' เธเธฒเธเธเธธเธ” '+job.completedChunks+'/'+job.totalChunks;
+      if(isAppContextCurrent(retryContext)) progressText.textContent='กำลัง Retry Batch Item '+(job.batchIndex+1)+' จากจุด '+job.completedChunks+'/'+job.totalChunks;
 
       var results=job.partialResults.map(function(x){return x.text;});
       var previousTail=String(job.previousTail||'');
@@ -442,7 +442,7 @@
           cancelError.name='AbortError';
           throw cancelError;
         }
-        if(isAppContextCurrent(retryContext)) progressText.textContent='เธเธณเธฅเธฑเธ Retry Batch Item โ€” เธชเนเธงเธเธ—เธตเน '+(i+1)+'/'+chunks.length;
+        if(isAppContextCurrent(retryContext)) progressText.textContent='กำลัง Retry Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
         var sys=buildTranslatePromptWithSettings(proj,previousTail,chunks[i],retrySettingsSnapshot);
         var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
         var partTrim=part.trim();
@@ -477,9 +477,9 @@
       commitChange();
       if(isAppContextCurrent(retryContext)) refreshTranslationRecoveryUI();
       if(isAppContextCurrent(retryContext)){
-        progressText.textContent='Retry Batch Item เธชเธณเน€เธฃเนเธ';
+        progressText.textContent='Retry Batch Item สำเร็จ';
         setTimeout(function(){
-          if(progressText.textContent==='Retry Batch Item เธชเธณเน€เธฃเนเธ') progressText.textContent='';
+          if(progressText.textContent==='Retry Batch Item สำเร็จ') progressText.textContent='';
         },4000);
       }
     }catch(err){
@@ -490,7 +490,7 @@
           }else{
             await PrungAksornStorageV2.failTranslationJob(job.jobId,{
               code:'BATCH_RETRY_FAILED',
-              message:String(err.message||'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”'),
+              message:String(err.message||'เกิดข้อผิดพลาด'),
               chunkIndex:typeof i==='number'?i:null,
               retryCount:retryCount,
               timestamp:Date.now()
@@ -501,13 +501,13 @@
         }
       }
       activeTranslationJobId=null;
-      if(err.name!=='AbortError' && (!retryContext || isAppContextCurrent(retryContext))) showError('Retry เนเธกเนเธชเธณเน€เธฃเนเธ: '+(err.message||err));
+      if(err.name!=='AbortError' && (!retryContext || isAppContextCurrent(retryContext))) showError('Retry ไม่สำเร็จ: '+(err.message||err));
     }finally{
       setTranslationSettingsLocked(false);
       setAiBusy(false);
       if(!retryContext || isAppContextCurrent(retryContext)){
         cancelBtn.classList.remove('show');
-        if(progressText.textContent!=='Retry Batch Item เธชเธณเน€เธฃเนเธ') progressText.textContent='';
+        if(progressText.textContent!=='Retry Batch Item สำเร็จ') progressText.textContent='';
       }
     }
   }
@@ -517,34 +517,34 @@
     hideError();
     try{
       var job=await PrungAksornStorageV2.getTranslationJob(jobId);
-      if(!job)throw new Error('เนเธกเนเธเธ Translation Job เธเธตเนเนเธฅเนเธง');
+      if(!job)throw new Error('ไม่พบ Translation Job นี้แล้ว');
       PrungAksornStorageV2.validateTranslationJob(job);
-      if(job.jobType==='batch')throw new Error('Batch Job เธ•เนเธญเธเนเธเน Batch Recovery เนเธ”เธขเน€เธเธเธฒเธฐ');
+      if(job.jobType==='batch')throw new Error('Batch Job ต้องใช้ Batch Recovery โดยเฉพาะ');
       pendingBatchResume=null;
-      if(['pending','running','paused','failed'].indexOf(job.status)<0)throw new Error('Job เธเธตเนเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธเธนเนเธเธทเธเธเธฒเธเธชเธ–เธฒเธเธฐ '+job.status+' เนเธ”เน');
+      if(['pending','running','paused','failed'].indexOf(job.status)<0)throw new Error('Job นี้ไม่สามารถกู้คืนจากสถานะ '+job.status+' ได้');
       var proj=appData.projects.find(function(p){return p.id===job.projectId;});
-      if(!proj)throw new Error('เนเธกเนเธเธ Project เธ•เนเธเธ—เธฒเธเธเธญเธ Job');
+      if(!proj)throw new Error('ไม่พบ Project ต้นทางของ Job');
       var book=(proj.books||[]).find(function(b){return b.id===job.bookId;});
-      if(!book)throw new Error('เนเธกเนเธเธ Book เธ•เนเธเธ—เธฒเธเธเธญเธ Job');
+      if(!book)throw new Error('ไม่พบ Book ต้นทางของ Job');
       var snapshot=job.sourceSnapshot;
-      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true)throw new Error('เนเธกเนเธเธ Recovery Source Snapshot เธ—เธตเนเธชเธกเธเธนเธฃเธ“เน');
+      if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true)throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
       var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
-      if(chunks.length!==job.totalChunks)throw new Error('เธเธณเธเธงเธ Chunk เธ—เธตเนเธชเธฃเนเธฒเธเนเธซเธกเนเนเธกเนเธ•เธฃเธเธเธฑเธ Job: '+chunks.length+' != '+job.totalChunks);
-      if(job.completedChunks>chunks.length)throw new Error('Checkpoint เธเธญเธ Job เน€เธเธดเธเธเธณเธเธงเธ Chunk เธ—เธตเนเธเธนเนเธเธทเธเนเธ”เน');
-      if(job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults เนเธกเนเธชเธญเธ”เธเธฅเนเธญเธเธเธฑเธ');
+      if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+      if(job.completedChunks>chunks.length)throw new Error('Checkpoint ของ Job เกินจำนวน Chunk ที่กู้คืนได้');
+      if(job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
       if(job.completedChunks>0){
         var expectedTail=getTail(job.partialResults[job.completedChunks-1].text,300);
-        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail เนเธกเนเธ•เธฃเธเธเธฑเธ Checkpoint เธฅเนเธฒเธชเธธเธ”');
+        if(expectedTail!==String(job.previousTail||''))throw new Error('previousTail ไม่ตรงกับ Checkpoint ล่าสุด');
       }
-      if(providerSel.value!==job.provider)throw new Error('Provider เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ '+job.provider+' เธเนเธญเธเธเธนเนเธเธทเธ');
-      if(modelInput.value!==job.model)throw new Error('Model เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ '+job.model+' เธเนเธญเธเธเธนเนเธเธทเธ');
-      if(!document.getElementById('apiKey').value.trim())throw new Error('เธเธฃเธธเธ“เธฒเนเธชเน API Key เธเนเธญเธเธเธนเนเธเธทเธเธเธฒเธ');
+      if(providerSel.value!==job.provider)throw new Error('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.provider+' ก่อนกู้คืน');
+      if(modelInput.value!==job.model)throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อนกู้คืน');
+      if(!document.getElementById('apiKey').value.trim())throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
       advanceAppContextGeneration();
       appData.currentProjectId=proj.id;
       proj.currentBookId=book.id;
       chapterTitle.value=snapshot.title||chapterTitle.value||'';
       inputText.value=snapshot.originalText;
-      inCount.textContent=countWords(inputText.value)+' เธเธณ';
+      inCount.textContent=countWords(inputText.value)+' คำ';
       updateChunkInfo();
       setOutput(job.partialResults.map(function(x){return x.text;}).join('\n\n'));
       pendingResume={
@@ -564,16 +564,16 @@
       };
       activeTranslationJobId=null;
       if(resumeBtn){
-        resumeBtn.textContent='เธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธเธฒเธเธเธธเธ”เธเธนเนเธเธทเธ';
+        resumeBtn.textContent='ดำเนินการต่อจากจุดกู้คืน';
         resumeBtn.classList.add('show');
       }
       renderProjects();
       renderBottomHistory();
       clearTranslationRecoveryUI();
-      showError('เน€เธ•เธฃเธตเธขเธกเธเธนเนเธเธทเธ Job '+job.jobId+' เนเธฅเนเธง เธเธ” โ€เธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเธเธฒเธเธเธธเธ”เธเธนเนเธเธทเธโ€ เน€เธเธทเนเธญเน€เธฃเธดเนเธก API');
+      showError('เตรียมกู้คืน Job '+job.jobId+' แล้ว กด “ดำเนินการต่อจากจุดกู้คืน” เพื่อเริ่ม API');
     }catch(e){
-      showError('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เน€เธ•เธฃเธตเธขเธก Recovery Job เนเธ”เน: '+(e.message||e));
+      showError('ไม่สามารถเตรียม Recovery Job ได้: '+(e.message||e));
     }
   }
 
-  /* เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธเธฒเธ IndexedDB V2 เนเธฅเธฐเธ—เธณ migration V1 -> V2 เน€เธกเธทเนเธญเธเธณเน€เธเนเธ */
+  /* โหลดข้อมูลจาก IndexedDB V2 และทำ migration V1 -> V2 เมื่อจำเป็น */

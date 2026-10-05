@@ -44,7 +44,7 @@
       appDialogMessage.style.display = 'none';
       appDialogInput.style.display = 'block';
       appDialogInput.value = defaultValue || '';
-      appDialogConfirmBtn.textContent = 'เธ•เธเธฅเธ';
+      appDialogConfirmBtn.textContent = 'ตกลง';
       appDialogConfirmBtn.classList.remove('danger');
       appDialogCancelBtn.style.display = 'inline-block';
       appDialogOverlay.classList.add('show');
@@ -60,7 +60,7 @@
       appDialogMessage.textContent = message;
       appDialogMessage.style.display = 'block';
       appDialogInput.style.display = 'none';
-      appDialogConfirmBtn.textContent = confirmLabel || (danger ? 'เธฅเธ' : 'เธ•เธเธฅเธ');
+      appDialogConfirmBtn.textContent = confirmLabel || (danger ? 'ลบ' : 'ตกลง');
       appDialogConfirmBtn.classList.toggle('danger', !!danger);
       appDialogCancelBtn.style.display = 'inline-block';
       appDialogOverlay.classList.add('show');
@@ -76,7 +76,7 @@
       appDialogMessage.textContent = message;
       appDialogMessage.style.display = 'block';
       appDialogInput.style.display = 'none';
-      appDialogConfirmBtn.textContent = 'เธ•เธเธฅเธ';
+      appDialogConfirmBtn.textContent = 'ตกลง';
       appDialogConfirmBtn.classList.remove('danger');
       appDialogCancelBtn.style.display = 'none';
       appDialogOverlay.classList.add('show');
@@ -88,11 +88,11 @@
   var diffBody = document.getElementById('diffBody');
   var diffTitleEl = document.getElementById('diffTitle');
   function openDiff(oldText, newText, titleText){
-    diffTitleEl.textContent = titleText || 'เน€เธ—เธตเธขเธเธเธงเธฒเธกเธ•เนเธฒเธ';
+    diffTitleEl.textContent = titleText || 'เทียบความต่าง';
     diffBody.innerHTML = '';
     var result = diffTexts(oldText, newText);
     if(!result){
-      diffBody.textContent = 'เธเนเธญเธเธงเธฒเธกเธขเธฒเธงเน€เธเธดเธเนเธเธชเธณเธซเธฃเธฑเธเน€เธ—เธตเธขเธเธเธงเธฒเธกเธ•เนเธฒเธเนเธเธเธฅเธฐเน€เธญเธตเธขเธ” เธฅเธญเธเน€เธ—เธตเธขเธเธ—เธตเธฅเธฐเธชเนเธงเธเธ—เธตเนเธชเธฑเนเธเธเธงเนเธฒเธเธตเน';
+      diffBody.textContent = 'ข้อความยาวเกินไปสำหรับเทียบความต่างแบบละเอียด ลองเทียบทีละส่วนที่สั้นกว่านี้';
     } else {
       diffBody.appendChild(renderDiffHtml(result));
     }
@@ -164,16 +164,16 @@
     if(priorRatios.length >= 2){
       var avg = priorRatios.reduce(function(a, b){ return a + b; }, 0) / priorRatios.length;
       if(ratio < avg * 0.4){
-        reasons.push('เธชเธฑเนเธเธเธดเธ”เธเธเธ•เธดเน€เธกเธทเนเธญเน€เธ—เธตเธขเธเธเธฑเธเธชเนเธงเธเธเนเธญเธเธซเธเนเธฒเนเธเน€เธฃเธทเนเธญเธเน€เธ”เธตเธขเธงเธเธฑเธ (เธเธเธ•เธด ~' + Math.round(avg * 100) + '% เธเธญเธเธ•เนเธเธเธเธฑเธ เนเธ•เนเธชเนเธงเธเธเธตเนเนเธ”เน ' + Math.round(ratio * 100) + '%)');
+        reasons.push('สั้นผิดปกติเมื่อเทียบกับส่วนก่อนหน้าในเรื่องเดียวกัน (ปกติ ~' + Math.round(avg * 100) + '% ของต้นฉบับ แต่ส่วนนี้ได้ ' + Math.round(ratio * 100) + '%)');
       }
     }
 
     if(ratio < 0.15){
-      reasons.push('เธเธณเนเธเธฅเธชเธฑเนเธเธเธงเนเธฒเธ•เนเธเธเธเธฑเธเธกเธฒเธ (เธเธฃเธฐเธกเธฒเธ“ ' + Math.round(ratio * 100) + '% เธเธญเธเธเธงเธฒเธกเธขเธฒเธงเธ•เนเธเธเธเธฑเธ)');
+      reasons.push('คำแปลสั้นกว่าต้นฉบับมาก (ประมาณ ' + Math.round(ratio * 100) + '% ของความยาวต้นฉบับ)');
     }
 
     if(srcParas >= 3 && outParas < srcParas * 0.5){
-      reasons.push('เธเธณเธเธงเธเธขเนเธญเธซเธเนเธฒเธฅเธ”เธฅเธเธกเธฒเธ (เธ•เนเธเธเธเธฑเธ ' + srcParas + ' เธขเนเธญเธซเธเนเธฒ เน€เธซเธฅเธทเธญเธเธณเนเธเธฅ ' + outParas + ' เธขเนเธญเธซเธเนเธฒ)');
+      reasons.push('จำนวนย่อหน้าลดลงมาก (ต้นฉบับ ' + srcParas + ' ย่อหน้า เหลือคำแปล ' + outParas + ' ย่อหน้า)');
     }
 
     return { ratio: ratio, suspicious: reasons.length > 0, reasons: reasons };
@@ -190,22 +190,22 @@
 
   function describeGeminiFinishReason(reason){
     switch(reason){
-      case 'SAFETY': return 'เธ–เธนเธเธเธฅเนเธญเธเน€เธเธฃเธฒเธฐเน€เธเนเธฒเธเนเธฒเธขเน€เธเธทเนเธญเธซเธฒเธ—เธตเนเธฅเธฐเน€เธกเธดเธ”เธเนเธขเธเธฒเธขเธเธงเธฒเธกเธเธฅเธญเธ”เธ เธฑเธขเธเธญเธ Gemini';
-      case 'RECITATION': return 'เธ–เธนเธเธเธฅเนเธญเธเน€เธเธฃเธฒเธฐเธฃเธฐเธเธเธ•เธฃเธงเธเธเธเธงเนเธฒเธเธฅเนเธฒเธขเน€เธเธทเนเธญเธซเธฒเธ—เธตเนเธกเธตเธฅเธดเธเธชเธดเธ—เธเธดเนเธกเธฒเธเน€เธเธดเธเนเธ';
-      case 'PROHIBITED_CONTENT': return 'เธ–เธนเธเธเธฅเนเธญเธเน€เธเธฃเธฒเธฐเน€เธเนเธฒเธเนเธฒเธขเน€เธเธทเนเธญเธซเธฒเธ•เนเธญเธเธซเนเธฒเธกเธ•เธฒเธกเธเนเธขเธเธฒเธขเธเธญเธ Google';
-      case 'SPII': return 'เธ–เธนเธเธเธฅเนเธญเธเน€เธเธฃเธฒเธฐเธฃเธฐเธเธเธ•เธฃเธงเธเธเธเธเนเธญเธกเธนเธฅเธชเนเธงเธเธเธธเธเธเธฅเธ—เธตเนเธฅเธฐเน€เธญเธตเธขเธ”เธญเนเธญเธ';
-      case 'MAX_TOKENS': return 'เธเธณเธ•เธญเธเธ–เธนเธเธ•เธฑเธ”เธเธฅเธฒเธเธเธฑเธเน€เธเธฃเธฒเธฐเธขเธฒเธงเน€เธเธดเธเธเธตเธ”เธเธณเธเธฑเธ”เธเธณเธ•เธญเธเธเธญเธเนเธกเน€เธ”เธฅเธเธตเน';
-      case 'OTHER': return 'เธ–เธนเธเธเธฅเนเธญเธเนเธ”เธข Gemini เนเธ”เธขเนเธกเนเธฃเธฐเธเธธเธชเธฒเน€เธซเธ•เธธเธ—เธตเนเธเธฑเธ”เน€เธเธ';
-      default: return 'เนเธกเนเธ—เธฃเธฒเธเธชเธฒเน€เธซเธ•เธธเธเธฑเธ”เน€เธเธ (finishReason: ' + (reason || 'เนเธกเนเธฃเธฐเธเธธ') + ')';
+      case 'SAFETY': return 'ถูกบล็อกเพราะเข้าข่ายเนื้อหาที่ละเมิดนโยบายความปลอดภัยของ Gemini';
+      case 'RECITATION': return 'ถูกบล็อกเพราะระบบตรวจพบว่าคล้ายเนื้อหาที่มีลิขสิทธิ์มากเกินไป';
+      case 'PROHIBITED_CONTENT': return 'ถูกบล็อกเพราะเข้าข่ายเนื้อหาต้องห้ามตามนโยบายของ Google';
+      case 'SPII': return 'ถูกบล็อกเพราะระบบตรวจพบข้อมูลส่วนบุคคลที่ละเอียดอ่อน';
+      case 'MAX_TOKENS': return 'คำตอบถูกตัดกลางคันเพราะยาวเกินขีดจำกัดคำตอบของโมเดลนี้';
+      case 'OTHER': return 'ถูกบล็อกโดย Gemini โดยไม่ระบุสาเหตุที่ชัดเจน';
+      default: return 'ไม่ทราบสาเหตุชัดเจน (finishReason: ' + (reason || 'ไม่ระบุ') + ')';
     }
   }
 
   function describeGeminiBlockReason(reason){
     switch(reason){
-      case 'SAFETY': return 'เธเนเธขเธเธฒเธขเธเธงเธฒเธกเธเธฅเธญเธ”เธ เธฑเธขเธเธญเธ Google';
-      case 'BLOCKLIST': return 'เธเธณเธ•เนเธญเธเธซเนเธฒเธกเนเธเธฃเธฐเธเธ';
-      case 'PROHIBITED_CONTENT': return 'เน€เธเธทเนเธญเธซเธฒเธ•เนเธญเธเธซเนเธฒเธก';
-      default: return reason || 'เนเธกเนเธฃเธฐเธเธธ';
+      case 'SAFETY': return 'นโยบายความปลอดภัยของ Google';
+      case 'BLOCKLIST': return 'คำต้องห้ามในระบบ';
+      case 'PROHIBITED_CONTENT': return 'เนื้อหาต้องห้าม';
+      default: return reason || 'ไม่ระบุ';
     }
   }
 
@@ -220,7 +220,7 @@
   }
 
   document.getElementById('costMeter').addEventListener('click', async function(){
-    var ok = await showConfirmDialog('เธฃเธตเน€เธเนเธ•เธชเธ–เธดเธ•เธดเธเนเธฒเนเธเนเธเนเธฒเธข', 'เธ•เนเธญเธเธเธฒเธฃเธฃเธตเน€เธเนเธ•เธขเธญเธ”เธเนเธฒเนเธเนเธเนเธฒเธขเนเธฅเธฐเธเธณเธเธงเธ Token เธชเธฐเธชเธกเธเธฅเธฑเธเน€เธเนเธเธจเธนเธเธขเนเธซเธฃเธทเธญเนเธกเน?');
+    var ok = await showConfirmDialog('รีเซ็ตสถิติค่าใช้จ่าย', 'ต้องการรีเซ็ตยอดค่าใช้จ่ายและจำนวน Token สะสมกลับเป็นศูนย์หรือไม่?');
     if(ok) {
       if(appData.settings) {
         appData.settings.apiStats = { tokens: 0, cost: 0 };
@@ -271,7 +271,7 @@
         if(err.name === 'AbortError') throw err;
         lastErr = err;
         if(!isRetryableError(err) || attempt === maxRetries) throw err;
-        progressText.textContent = 'เน€เธเธญเธเธฑเธเธซเธฒเธเธฑเนเธงเธเธฃเธฒเธง (' + (err.message || '') + ') เธเธณเธฅเธฑเธเธฅเธญเธเนเธซเธกเน (' + (attempt + 1) + '/' + maxRetries + ')...';
+        progressText.textContent = 'เจอปัญหาชั่วคราว (' + (err.message || '') + ') กำลังลองใหม่ (' + (attempt + 1) + '/' + maxRetries + ')...';
         await sleep(1000 * Math.pow(2, attempt));
       }
     }

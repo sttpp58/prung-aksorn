@@ -364,17 +364,26 @@ function main() {
   const tqgIntegration = readText('tqg-integration.js');
   const manifestText = readText('manifest.json');
   const app = readText('app.js');
+  const appModuleFiles = fs.readdirSync(path.join(ROOT, 'app'))
+    .filter((file) => /^\d\d-.*\.js$/.test(file))
+    .sort()
+    .map((file) => `app/${file}`);
+  const appModules = appModuleFiles.map((file) => readText(file));
+  const appRuntime = `${appModules.join('\n')}\n${app}`;
   const styles = readText('styles.css');
 
   parseJavaScript(storage, 'storage-v2.js');
   parseJavaScript(app, 'app.js');
+  for (let index = 0; index < appModules.length; index += 1) {
+    parseJavaScript(appModules[index], appModuleFiles[index]);
+  }
   parseJavaScript(tqgUi, 'tqg-ui.js');
   parseJavaScript(tqgIntegration, 'tqg-integration.js');
 
   assert(/TQG-07-2026-09-30/.test(tqgUi), 'TQG Quality UI module version is present');
   assert(!/[\u{1F000}-\u{1FAFF}]/u.test(tqgUi), 'TQG Quality UI module contains no emoji');
   assert(/TQG-08-2026-09-30/.test(tqgIntegration), 'TQG Integration module version is present');
-  assert(/TQGQualityUI/.test(app), 'app.js references TQG Quality UI');
+  assert(/TQGQualityUI/.test(appRuntime), 'application runtime references TQG Quality UI');
 
   assertCspContract(indexHtml);
 
@@ -394,7 +403,7 @@ function main() {
     /<script\b[^>]*\bsrc=["'](?:\.\/)?storage-v2\.js["'][^>]*>/i.test(indexHtml),
     'index.html loads storage-v2.js'
   );
-  indexHtml = app;
+  indexHtml = appRuntime;
   assert(
     /function\s+flushPendingSaveOnLifecycle\s*\(/.test(indexHtml) &&
       /addEventListener\(['"]visibilitychange['"]/.test(indexHtml) &&
@@ -500,7 +509,7 @@ function main() {
   );
 
   const bookDeleteStart = indexHtml.indexOf("bdel.addEventListener('click', async function(e){");
-  const bookDeleteHandler = indexHtml.slice(bookDeleteStart, bookDeleteStart + 1000);
+  const bookDeleteHandler = indexHtml.slice(bookDeleteStart, bookDeleteStart + 1200);
   assert(
     bookDeleteStart >= 0 &&
       bookDeleteHandler.includes('var wasActiveBook = proj.currentBookId === book.id;') &&
@@ -587,12 +596,12 @@ function main() {
     'callGemini'
   ]) {
     assert(
-      new RegExp(`function\\s+${functionName}\\s*\\(`).test(app),
-      `core function remains present in app.js: ${functionName}`
+      new RegExp(`function\\s+${functionName}\\s*\\(`).test(appRuntime),
+      `core function remains present in application runtime: ${functionName}`
     );
   }
 
-  assertAllRevisionCallSites(app);
+  assertAllRevisionCallSites(appRuntime);
 
   assert(
     /['"]\.\/storage-v2\.js['"]/.test(sw),
@@ -666,13 +675,13 @@ function main() {
     'repairCurrentTQGQuality'
   ];
   for (const name of relevantAsyncNames) {
-    const start = indexHtml.indexOf('async function ' + name + '(');
+    const start = appRuntime.indexOf('async function ' + name + '(');
     assert(start >= 0, name + ' remains present for async-isolation audit');
   }
 
-  const singleTranslationStart = indexHtml.indexOf('async function runTranslation(');
-  const singleTranslationEnd = indexHtml.indexOf('\n  var batchInProgress', singleTranslationStart);
-  const singleTranslationBody = indexHtml.slice(singleTranslationStart, singleTranslationEnd);
+  const singleTranslationStart = appRuntime.indexOf('async function runTranslation(');
+  const singleTranslationEnd = appRuntime.indexOf('\n  var batchInProgress', singleTranslationStart);
+  const singleTranslationBody = appRuntime.slice(singleTranslationStart, singleTranslationEnd);
   assert(
     singleTranslationStart >= 0 &&
       singleTranslationEnd > singleTranslationStart &&
@@ -683,9 +692,9 @@ function main() {
     'single translation gates stale success/error/recovery UI'
   );
 
-  const recoveryStart = indexHtml.indexOf('async function runBatchTranslationRecovery(');
-  const recoveryEnd = indexHtml.indexOf('\n  async function retryBatchTranslationJob', recoveryStart);
-  const recoveryBody = indexHtml.slice(recoveryStart, recoveryEnd);
+  const recoveryStart = appRuntime.indexOf('async function runBatchTranslationRecovery(');
+  const recoveryEnd = appRuntime.indexOf('\n  async function retryBatchTranslationJob', recoveryStart);
+  const recoveryBody = appRuntime.slice(recoveryStart, recoveryEnd);
   assert(
     recoveryBody.includes('var recoveryContext=null;') &&
       recoveryBody.includes('captureAppContext(state.proj,state.book)') &&
@@ -695,9 +704,9 @@ function main() {
     'Batch Recovery gates stale UI and retains explicit context'
   );
 
-  const retryStart = indexHtml.indexOf('async function retryBatchTranslationJob(');
-  const retryEnd = indexHtml.indexOf('\n  async function prepareTranslationRecovery', retryStart);
-  const retryBody = indexHtml.slice(retryStart, retryEnd);
+  const retryStart = appRuntime.indexOf('async function retryBatchTranslationJob(');
+  const retryEnd = appRuntime.indexOf('\n  async function prepareTranslationRecovery', retryStart);
+  const retryBody = appRuntime.slice(retryStart, retryEnd);
   assert(
     retryBody.includes('var retryContext=null;') &&
       retryBody.includes('captureAppContext(proj,book)') &&
@@ -706,9 +715,9 @@ function main() {
     'Batch Retry gates stale UI and retains explicit context'
   );
 
-  const inspectorStart = indexHtml.indexOf('async function inspectCurrentTQGQuality(');
-  const inspectorEnd = indexHtml.indexOf('\n  async function repairCurrentTQGQuality', inspectorStart);
-  const inspectorBody = indexHtml.slice(inspectorStart, inspectorEnd);
+  const inspectorStart = appRuntime.indexOf('async function inspectCurrentTQGQuality(');
+  const inspectorEnd = appRuntime.indexOf('\n  async function repairCurrentTQGQuality', inspectorStart);
+  const inspectorBody = appRuntime.slice(inspectorStart, inspectorEnd);
   assert(
     inspectorBody.includes('var inspectionContext = captureAppContext') &&
       inspectorBody.includes('if(!isAppContextCurrent(inspectionContext)') &&
@@ -717,9 +726,9 @@ function main() {
     'TQG Inspector rejects stale result/error/finally UI'
   );
 
-  const repairStart = indexHtml.indexOf('async function repairCurrentTQGQuality(');
-  const repairEnd = indexHtml.indexOf('\n  function setResultFocus', repairStart);
-  const repairBody = indexHtml.slice(repairStart, repairEnd);
+  const repairStart = appRuntime.indexOf('async function repairCurrentTQGQuality(');
+  const repairEnd = appRuntime.indexOf('\n  function setResultFocus', repairStart);
+  const repairBody = appRuntime.slice(repairStart, repairEnd);
   assert(
     repairBody.includes('var repairContext = captureAppContext') &&
       repairBody.includes('if(!isAppContextCurrent(repairContext)') &&
@@ -728,9 +737,9 @@ function main() {
     'TQG Repair rejects stale result/error/finally UI'
   );
 
-  const ingestImportStart = indexHtml.indexOf('async function importExternalChapter(');
-  const ingestImportEnd = indexHtml.indexOf('\n\n  // ดักฟังสัญญาณ', ingestImportStart);
-  const ingestImportBody = indexHtml.slice(ingestImportStart, ingestImportEnd);
+  const ingestImportStart = appRuntime.indexOf('async function importExternalChapter(');
+  const ingestImportEnd = appRuntime.indexOf('\n\n  // ดักฟังสัญญาณ', ingestImportStart);
+  const ingestImportBody = appRuntime.slice(ingestImportStart, ingestImportEnd);
   assert(
     ingestImportBody.includes('targetBook.chapterTitle = finalTitle;') &&
       ingestImportBody.includes('saveData();') &&
@@ -738,10 +747,10 @@ function main() {
     'background title translation never rebinds stale work through current editor debounce'
   );
 
-  const ingestValidatorStart = indexHtml.indexOf('function validatePrungIngestMessage(');
-  const ingestListenerStart = indexHtml.indexOf("  window.addEventListener('message'", ingestValidatorStart);
-  const ingestValidatorBody = indexHtml.slice(ingestValidatorStart, ingestListenerStart);
-  const ingestListenerBody = indexHtml.slice(ingestListenerStart);
+  const ingestValidatorStart = appRuntime.indexOf('function validatePrungIngestMessage(');
+  const ingestListenerStart = appRuntime.indexOf("  window.addEventListener('message'", ingestValidatorStart);
+  const ingestValidatorBody = appRuntime.slice(ingestValidatorStart, ingestListenerStart);
+  const ingestListenerBody = appRuntime.slice(ingestListenerStart);
   assert(
     ingestValidatorStart >= 0 &&
       ingestValidatorBody.includes('e.source !== window') &&
@@ -999,10 +1008,10 @@ function main() {
     'Production hardening closes the external ingestion Promise rejection boundary'
   );
 
-  const initHardeningStart = indexHtml.indexOf('(async function initApp(){');
-  const initHardeningBody = indexHtml.slice(initHardeningStart);
+  const initHardeningStart = app.indexOf('(async function(){');
+  const initHardeningBody = app.slice(initHardeningStart);
   assert(
-    initHardeningBody.includes('var loaded = await loadData();') &&
+    initHardeningBody.includes('var loaded=await loadData();') &&
       initHardeningBody.includes("if(!loaded) throw new Error('IndexedDB initialization failed.');") &&
       initHardeningBody.includes('})().catch(function(err){'),
     'Production hardening fail-closes application initialization errors'

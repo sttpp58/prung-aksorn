@@ -5,13 +5,13 @@
     return new Promise(function(resolve, reject){
       var reader = new FileReader();
       reader.onload = function(){ resolve(String(reader.result || '')); };
-      reader.onerror = function(){ reject(new Error('เธญเนเธฒเธเนเธเธฅเนเนเธกเนเธชเธณเน€เธฃเนเธ: ' + file.name)); };
+      reader.onerror = function(){ reject(new Error('อ่านไฟล์ไม่สำเร็จ: ' + file.name)); };
       reader.readAsText(file, 'UTF-8');
     });
   }
 
   function detectChapterSplits(text){
-    var pattern = /^[ \t]*(?:(?:เธเธ—เธ—เธตเน|เธ•เธญเธเธ—เธตเน)[ \t]*\d+|Chapter[ \t]*\d+|Ch\.[ \t]*\d+|็ฌฌ[ \t]*(?:\d+|[ใ€้ถไธ€ไบไธๅไบ”ๅ…ญไธๅ…ซไนๅ็พๅไธค]+)[ \t]*็ซ )[^\n]*$/gim;
+    var pattern = /^[ \t]*(?:(?:บทที่|ตอนที่)[ \t]*\d+|Chapter[ \t]*\d+|Ch\.[ \t]*\d+|第[ \t]*(?:\d+|[〇零一二三四五六七八九十百千两]+)[ \t]*章)[^\n]*$/gim;
     var matches = [];
     var m;
     while((m = pattern.exec(text)) !== null){
@@ -36,7 +36,7 @@
     var results = [];
     var previousTail = '';
     var activeBook = (proj.books || []).find(function(b){ return b.id === targetBookId; }) || null;
-    if(!activeBook) throw new Error('เนเธกเนเธเธ Book เธ•เนเธเธ—เธฒเธเธเธญเธ Batch');
+    if(!activeBook) throw new Error('ไม่พบ Book ต้นทางของ Batch');
     var translationJobId = makeId('tj');
     var translationChapterId = makeId('h');
     var jobCreated = false;
@@ -53,7 +53,7 @@
       activeTranslationJobRevision = batchJobRevision;
       activeTranslationJobId = translationJobId;
       for(var i = 0; i < chunks.length; i++){
-        // เธชเนเธ chunks[i] เน€เธเนเธฒเนเธเธ”เนเธงเธข Snapshot เธเธญเธ settings เน€เธเธทเนเธญเนเธกเนเนเธซเน global UI state เน€เธเธฅเธตเนเธขเธ prompt เธฃเธฐเธซเธงเนเธฒเธ Batch Job
+        // ส่ง chunks[i] เข้าไปด้วย Snapshot ของ settings เพื่อไม่ให้ global UI state เปลี่ยน prompt ระหว่าง Batch Job
         var sys = buildTranslatePromptWithSettings(proj, previousTail, chunks[i], batchSettingsSnapshot);
         var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2, batchProvider);
         var partTrim = part.trim();
@@ -80,7 +80,7 @@
       if(jobCreated && !translationJobCompleted){
         try{
           if(err.name === 'AbortError') await PrungAksornStorageV2.cancelTranslationJob(translationJobId,batchJobRevision);
-          else await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'BATCH_TRANSLATION_FAILED',message:String(err.message || 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”'),chunkIndex:typeof i === 'number' ? i : null,retryCount:0,timestamp:Date.now()},batchJobRevision);
+          else await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'BATCH_TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:typeof i === 'number' ? i : null,retryCount:0,timestamp:Date.now()},batchJobRevision);
         }catch(jobErr){
           console.warn('Batch translation job state checkpoint failed:', jobErr);
         }
@@ -92,11 +92,11 @@
   async function runBatchImport(files){
     var proj = getCurrentProject();
     var key = document.getElementById('apiKey').value.trim();
-    if(!proj){ showError('เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธซเธฃเธทเธญเธชเธฃเนเธฒเธเน€เธฃเธทเนเธญเธเธเธดเธขเธฒเธขเธเนเธญเธ'); return; }
-    if(!key){ showError('เธเธฃเธธเธ“เธฒเนเธชเน API Key เธเนเธญเธ'); return; }
+    if(!proj){ showError('กรุณาเลือกหรือสร้างเรื่องนิยายก่อน'); return; }
+    if(!key){ showError('กรุณาใส่ API Key ก่อน'); return; }
     if(batchInProgress || warnIfAiBusy()) return;
     var batchTargetBook = getActiveBook(proj);
-    if(!batchTargetBook){ showError('เนเธกเนเธเธเน€เธฅเนเธกเธ•เนเธเธ—เธฒเธเธเธญเธ Batch'); return; }
+    if(!batchTargetBook){ showError('ไม่พบเล่มต้นทางของ Batch'); return; }
     var batchTargetBookId = batchTargetBook.id;
 
     hideError();
@@ -116,7 +116,7 @@
     for(var idx = 0; idx < files.length; idx++){
       if(batchCancelled) break;
       var f = files[idx];
-      progressText.textContent = 'เธเธณเธฅเธฑเธเนเธเธฅเนเธเธฅเน ' + (idx + 1) + '/' + files.length + ': ' + f.name;
+      progressText.textContent = 'กำลังแปลไฟล์ ' + (idx + 1) + '/' + files.length + ': ' + f.name;
       try{
         activeController = new AbortController();
         var raw = await readFileAsText(f);
@@ -128,7 +128,7 @@
         commitChange();
       }catch(err){
         if(err.name === 'AbortError'){ batchCancelled = true; break; }
-        failed.push(f.name + ' (' + (err.message || 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”') + ')');
+        failed.push(f.name + ' (' + (err.message || 'เกิดข้อผิดพลาด') + ')');
       }
     }
 
@@ -138,12 +138,12 @@
     cancelBtn.classList.remove('show');
     progressText.textContent = '';
 
-    var summary = 'เธเธณเน€เธเนเธฒเน€เธชเธฃเนเธเธชเธดเนเธ: เธชเธณเน€เธฃเนเธ ' + succeeded.length + '/' + files.length + ' เนเธเธฅเน';
-    if(batchCancelled) summary += ' (เธขเธเน€เธฅเธดเธเธเนเธญเธเธเธฃเธ)';
-    if(currentActionTokens > 0) summary += '\n\n(เนเธเน API เนเธเธ—เธฑเนเธเธซเธกเธ” ' + currentActionTokens.toLocaleString() + ' tokens, เธเธฃเธฐเธกเธฒเธ“ $' + currentActionCost.toFixed(4) + ')';
-    if(failed.length) summary += '\n\nเธฅเนเธกเน€เธซเธฅเธง:\n- ' + failed.join('\n- ');
+    var summary = 'นำเข้าเสร็จสิ้น: สำเร็จ ' + succeeded.length + '/' + files.length + ' ไฟล์';
+    if(batchCancelled) summary += ' (ยกเลิกก่อนครบ)';
+    if(currentActionTokens > 0) summary += '\n\n(ใช้ API ไปทั้งหมด ' + currentActionTokens.toLocaleString() + ' tokens, ประมาณ $' + currentActionCost.toFixed(4) + ')';
+    if(failed.length) summary += '\n\nล้มเหลว:\n- ' + failed.join('\n- ');
     refreshTranslationRecoveryUI();
-    await showAlertDialog('เธชเธฃเธธเธเธเธฅเธเธฒเธฃเธเธณเน€เธเนเธฒ', summary);
+    await showAlertDialog('สรุปผลการนำเข้า', summary);
   }
 
   processBtn.addEventListener('click', async function(){
@@ -152,14 +152,14 @@
     var proj = getCurrentProject();
     var text = inputText.value.trim();
     var key = document.getElementById('apiKey').value.trim();
-    if(!proj || !text || !key){ showError('เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเน€เธฃเธทเนเธญเธ เนเธชเนเน€เธเธทเนเธญเธซเธฒ เนเธฅเธฐ API Key'); return; }
+    if(!proj || !text || !key){ showError('กรุณาเลือกเรื่อง ใส่เนื้อหา และ API Key'); return; }
 
     var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
     var normalizedText = normalizeOCR(text);
     var chunks = splitIntoChunks(normalizedText, maxLen);
     pendingResume = null;
     pendingBatchResume = null;
-    if(resumeBtn){ resumeBtn.classList.remove('show'); resumeBtn.textContent='เธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญ'; }
+    if(resumeBtn){ resumeBtn.classList.remove('show'); resumeBtn.textContent='ดำเนินการต่อ'; }
     await runTranslation(chunks, proj, key, modelInput.value, 0, [], text, makeId('h'), null, normalizedText);
   });
 
@@ -174,8 +174,8 @@
       }
       if(!pendingResume) return;
       var key = document.getElementById('apiKey').value.trim() || pendingResume.key;
-      if(pendingResume.provider && providerSel.value !== pendingResume.provider){ showError('Provider เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ ' + pendingResume.provider + ' เธเนเธญเธเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญ'); return; }
-      if(modelInput.value !== pendingResume.model){ showError('Model เธเธฑเธเธเธธเธเธฑเธเนเธกเนเธ•เธฃเธเธเธฑเธ Job: เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ ' + pendingResume.model + ' เธเนเธญเธเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญ'); return; }
+      if(pendingResume.provider && providerSel.value !== pendingResume.provider){ showError('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก ' + pendingResume.provider + ' ก่อนดำเนินการต่อ'); return; }
+      if(modelInput.value !== pendingResume.model){ showError('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก ' + pendingResume.model + ' ก่อนดำเนินการต่อ'); return; }
       await runTranslation(pendingResume.chunks, pendingResume.proj, key, pendingResume.model, pendingResume.startIndex, pendingResume.results, pendingResume.originalText, pendingResume.chapterId, pendingResume.jobId, pendingResume.sourceSnapshotText, pendingResume.settingsSnapshot);
     });
   }
@@ -188,7 +188,7 @@
     var repairContext = captureAppContext(getCurrentProject(), getActiveBook(getCurrentProject()));
     var repairSourceSnapshot = text;
     var repairModelSnapshot = modelInput.value;
-    if(!text || !key){ showError('เธเธฃเธธเธ“เธฒเนเธชเนเน€เธเธทเนเธญเธซเธฒเนเธฅเธฐ API Key'); return; }
+    if(!text || !key){ showError('กรุณาใส่เนื้อหาและ API Key'); return; }
 
     text = normalizeOCR(text);
     var chunks = splitIntoChunks(text, 1800);
@@ -197,13 +197,13 @@
     setAiBusy(true);
     resetActionStats();
     cancelBtn.classList.add('show');
-    progressText.textContent = 'เธเธณเธฅเธฑเธเธเนเธญเธก OCR เธ”เนเธงเธข AI...';
-    var sys = buildOCRRepairPrompt(text); //  เธชเนเธ text เน€เธเนเธฒเนเธเน€เธเธทเนเธญเนเธซเนเธฃเธฐเธเธเน€เธฅเธทเธญเธเนเธซเธกเธ”เธญเธฑเธ•เนเธเธกเธฑเธ•เธด
+    progressText.textContent = 'กำลังซ่อม OCR ด้วย AI...';
+    var sys = buildOCRRepairPrompt(text); //  ส่ง text เข้าไปเพื่อให้ระบบเลือกโหมดอัตโนมัติ
     var repairedParts = [];
 
     try {
       for(var i=0; i<chunks.length; i++){
-        if(isAppContextCurrent(repairContext)) progressText.textContent = chunks.length > 1 ? ('เธเธณเธฅเธฑเธเธเนเธญเธกเธชเนเธงเธเธ—เธตเน ' + (i+1) + '/' + chunks.length) : 'เธเธณเธฅเธฑเธเธเนเธญเธก OCR เธ”เนเธงเธข AI...';
+        if(isAppContextCurrent(repairContext)) progressText.textContent = chunks.length > 1 ? ('กำลังซ่อมส่วนที่ ' + (i+1) + '/' + chunks.length) : 'กำลังซ่อม OCR ด้วย AI...';
         var repaired = await callAIWithRetry(sys, chunks[i], key, repairModelSnapshot, activeController.signal, 2);
         if(!isAppContextCurrent(repairContext) || inputText.value.trim() !== repairSourceSnapshot) return;
         repairedParts.push(repaired.trim());
@@ -214,9 +214,9 @@
       saveDraftSoon();
 
       var statsStr = '';
-      if(currentActionTokens > 0) statsStr = ' (เนเธเนเนเธ ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
-      progressText.textContent = 'เธเนเธญเธก OCR เธ”เนเธงเธข AI เน€เธฃเธตเธขเธเธฃเนเธญเธข' + statsStr;
-      setTimeout(function(){ if(isAppContextCurrent(repairContext) && progressText.textContent.includes('เธเนเธญเธก OCR เธ”เนเธงเธข AI เน€เธฃเธตเธขเธเธฃเนเธญเธข')) progressText.textContent = ''; }, 4000);
+      if(currentActionTokens > 0) statsStr = ' (ใช้ไป ' + currentActionTokens.toLocaleString() + ' tokens, ~$' + currentActionCost.toFixed(4) + ')';
+      progressText.textContent = 'ซ่อม OCR ด้วย AI เรียบร้อย' + statsStr;
+      setTimeout(function(){ if(isAppContextCurrent(repairContext) && progressText.textContent.includes('ซ่อม OCR ด้วย AI เรียบร้อย')) progressText.textContent = ''; }, 4000);
     } catch(err){
       if(err.name !== 'AbortError' && isAppContextCurrent(repairContext)) showError(err.message);
     } finally {
@@ -232,10 +232,10 @@
 
   copyBtn.addEventListener('click', function(){
     navigator.clipboard.writeText(output.textContent).then(function(){
-      copyBtn.textContent = 'เธเธฑเธ”เธฅเธญเธเนเธฅเนเธง';
-      setTimeout(function(){ copyBtn.textContent = 'เธเธฑเธ”เธฅเธญเธ'; }, 1500);
+      copyBtn.textContent = 'คัดลอกแล้ว';
+      setTimeout(function(){ copyBtn.textContent = 'คัดลอก'; }, 1500);
     }).catch(function(err){
       console.error('Clipboard copy failed:', err);
-      showError('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธเธฑเธ”เธฅเธญเธเธเนเธญเธเธงเธฒเธกเนเธเธขเธฑเธเธเธฅเธดเธเธเธญเธฃเนเธ”เนเธ”เน');
+      showError('ไม่สามารถคัดลอกข้อความไปยังคลิปบอร์ดได้');
     });
   });

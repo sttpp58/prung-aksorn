@@ -7,7 +7,7 @@
     if(appData.projects.length === 0){
       var empty = document.createElement('p');
       empty.className = 'sidebar-empty';
-      empty.textContent = 'เธขเธฑเธเนเธกเนเธกเธตเน€เธฃเธทเนเธญเธเธเธดเธขเธฒเธข เธเธ” "+ เน€เธฃเธทเนเธญเธเนเธซเธกเน" เน€เธเธทเนเธญเน€เธฃเธดเนเธกเธ•เนเธ';
+      empty.textContent = 'ยังไม่มีเรื่องนิยาย กด "+ เรื่องใหม่" เพื่อเริ่มต้น';
       projectList.appendChild(empty);
     }
     appData.projects.forEach(function(proj){
@@ -24,11 +24,11 @@
 
       var renameProjBtn = document.createElement('button');
       renameProjBtn.className = 'icon-btn';
-      renameProjBtn.title = 'เน€เธเธฅเธตเนเธขเธเธเธทเนเธญเน€เธฃเธทเนเธญเธ';
-      renameProjBtn.textContent = 'โ';
+      renameProjBtn.title = 'เปลี่ยนชื่อเรื่อง';
+      renameProjBtn.textContent = '✎';
       renameProjBtn.addEventListener('click', async function(e){
         e.stopPropagation();
-        var newName = await showPromptDialog('เน€เธเธฅเธตเนเธขเธเธเธทเนเธญเน€เธฃเธทเนเธญเธเธเธดเธขเธฒเธข', proj.name);
+        var newName = await showPromptDialog('เปลี่ยนชื่อเรื่องนิยาย', proj.name);
         if(newName && newName.trim()){
           proj.name = newName.trim();
           commitChange();
@@ -39,8 +39,8 @@
 
       var glossBtn = document.createElement('button');
       glossBtn.className = 'icon-btn';
-      glossBtn.title = 'เธเธฅเธฑเธเธเธณ & เธเธฃเธดเธเธ—';
-      glossBtn.textContent = 'โ';
+      glossBtn.title = 'คลังคำ & บริบท';
+      glossBtn.textContent = '⚙';
       glossBtn.addEventListener('click', function(e){
         e.stopPropagation();
         gp.classList.toggle('open');
@@ -49,11 +49,11 @@
 
       var delBtn = document.createElement('button');
       delBtn.className = 'icon-btn';
-      delBtn.title = 'เธฅเธเน€เธฃเธทเนเธญเธเธเธตเน';
-      delBtn.textContent = 'โ•';
+      delBtn.title = 'ลบเรื่องนี้';
+      delBtn.textContent = '✕';
       delBtn.addEventListener('click', async function(e){
         e.stopPropagation();
-        var ok = await showConfirmDialog('เธฅเธเน€เธฃเธทเนเธญเธเธเธดเธขเธฒเธข', 'เธฅเธเน€เธฃเธทเนเธญเธ "' + proj.name + '" เธเธฃเนเธญเธกเธเธฃเธฐเธงเธฑเธ•เธดเธ—เธฑเนเธเธซเธกเธ”? เธเธฒเธฃเธฅเธเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธขเนเธญเธเธเธฅเธฑเธเนเธ”เน', true);
+        var ok = await showConfirmDialog('ลบเรื่องนิยาย', 'ลบเรื่อง "' + proj.name + '" พร้อมประวัติทั้งหมด? การลบไม่สามารถย้อนกลับได้', true);
         if(ok){
           var wasCurrentProject = appData.currentProjectId === proj.id;
           if(wasCurrentProject) advanceAppContextGeneration();
@@ -82,7 +82,7 @@
       gp.className = 'glossary-panel';
       var gpTextarea = document.createElement('textarea');
       gpTextarea.rows = 3;
-      gpTextarea.placeholder = 'เธ•เนเธเธเธเธฑเธ = เธเธณเนเธเธฅ';
+      gpTextarea.placeholder = 'ต้นฉบับ = คำแปล';
       gpTextarea.value = proj.glossary || '';
       gpTextarea.addEventListener('input', function(){
         proj.glossary = gpTextarea.value;
@@ -93,7 +93,7 @@
       var aiGlossBtn = document.createElement('button');
       aiGlossBtn.className = 'ai-glossary-btn';
       aiGlossBtn.type = 'button';
-      aiGlossBtn.innerHTML = '<svg class="ic" viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M10 2.2l1.5 5.3L17 9l-5.5 1.5L10 15.8l-1.5-5.3L3 9l5.5-1.5L10 2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> เนเธซเน AI เนเธเธฐเธเธณเธเธฅเธฑเธเธเธณเธเธฒเธเธเนเธญเธเธงเธฒเธก';
+      aiGlossBtn.innerHTML = '<svg class="ic" viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M10 2.2l1.5 5.3L17 9l-5.5 1.5L10 15.8l-1.5-5.3L3 9l5.5-1.5L10 2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> ให้ AI แนะนำคลังคำจากข้อความ';
       aiGlossBtn.addEventListener('click', function(e){
         e.stopPropagation();
         runAiGlossaryExtract(proj, gpTextarea);
@@ -102,7 +102,7 @@
 
       var contextTextarea = document.createElement('textarea');
       contextTextarea.rows = 3;
-      contextTextarea.placeholder = 'เธเธฃเธดเธเธ—เธเธญเธเน€เธฃเธทเนเธญเธ';
+      contextTextarea.placeholder = 'บริบทของเรื่อง';
       contextTextarea.style.marginTop = '8px';
       contextTextarea.value = proj.context || '';
       contextTextarea.addEventListener('input', function(){
@@ -135,7 +135,7 @@
           var breadBtn = document.createElement('button');
           breadBtn.className = 'icon-btn';
           breadBtn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
-          breadBtn.title = 'เธญเนเธฒเธเน€เธฅเนเธกเธเธตเนเธ•เนเธญเน€เธเธทเนเธญเธ (เนเธซเธกเธ”เธเธฑเธเธญเนเธฒเธ)';
+          breadBtn.title = 'อ่านเล่มนี้ต่อเนื่อง (โหมดนักอ่าน)';
           breadBtn.addEventListener('click', function(e){
             e.stopPropagation();
             openReaderMode(proj, book.id);
@@ -144,11 +144,11 @@
 
           var brename = document.createElement('button');
           brename.className = 'icon-btn';
-          brename.textContent = 'โ';
-          brename.title = 'เน€เธเธฅเธตเนเธขเธเธเธทเนเธญเน€เธฅเนเธก';
+          brename.textContent = '✎';
+          brename.title = 'เปลี่ยนชื่อเล่ม';
           brename.addEventListener('click', async function(e){
             e.stopPropagation();
-            var newTitle = await showPromptDialog('เน€เธเธฅเธตเนเธขเธเธเธทเนเธญเน€เธฅเนเธก/เนเธเธฅเน€เธ”เธญเธฃเน', book.title);
+            var newTitle = await showPromptDialog('เปลี่ยนชื่อเล่ม/โฟลเดอร์', book.title);
             if(newTitle && newTitle.trim()){
               book.title = newTitle.trim();
               commitChange();
@@ -158,12 +158,12 @@
 
           var bdel = document.createElement('button');
           bdel.className = 'icon-btn';
-          bdel.textContent = 'โ•';
-          bdel.title = 'เธฅเธเน€เธฅเนเธกเธเธตเน';
+          bdel.textContent = '✕';
+          bdel.title = 'ลบเล่มนี้';
           bdel.addEventListener('click', async function(e){
             e.stopPropagation();
-            if(proj.books.length <= 1){ await showAlertDialog('เธ—เธณเนเธกเนเนเธ”เน', 'เธ•เนเธญเธเธกเธตเธญเธขเนเธฒเธเธเนเธญเธข 1 เน€เธฅเนเธกเนเธเน€เธฃเธทเนเธญเธเธเธตเน'); return; }
-            var ok = await showConfirmDialog('เธฅเธเน€เธฅเนเธก', 'เธ•เนเธญเธเธเธฒเธฃเธฅเธเน€เธฅเนเธก "' + book.title + '" เธเธฃเนเธญเธกเธเธฃเธฐเธงเธฑเธ•เธดเนเธเน€เธฅเนเธกเธซเธฃเธทเธญเนเธกเน? เธเธฒเธฃเธฅเธเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธขเนเธญเธเธเธฅเธฑเธเนเธ”เน', true);
+            if(proj.books.length <= 1){ await showAlertDialog('ทำไม่ได้', 'ต้องมีอย่างน้อย 1 เล่มในเรื่องนี้'); return; }
+            var ok = await showConfirmDialog('ลบเล่ม', 'ต้องการลบเล่ม "' + book.title + '" พร้อมประวัติในเล่มหรือไม่? การลบไม่สามารถย้อนกลับได้', true);
             if(ok){
               var wasActiveBook = proj.currentBookId === book.id;
               flushPendingDraftSave();
@@ -183,7 +183,7 @@
             hist.className = 'history-list open';
             var histLabel = document.createElement('div');
             histLabel.className = 'history-list-label';
-            histLabel.textContent = 'เธ•เธญเธเธ—เธตเนเนเธเธฅเนเธฅเนเธง';
+            histLabel.textContent = 'ตอนที่แปลแล้ว';
             hist.appendChild(histLabel);
 
             var bookHistory = book.history || [];
@@ -191,7 +191,7 @@
             if(bookHistory.length === 0){
               var hEmpty = document.createElement('div');
               hEmpty.className = 'history-empty';
-              hEmpty.textContent = 'เธขเธฑเธเนเธกเนเธกเธตเธ•เธญเธเธ—เธตเนเนเธเธฅเนเธเน€เธฅเนเธกเธเธตเน';
+              hEmpty.textContent = 'ยังไม่มีตอนที่แปลในเล่มนี้';
               hist.appendChild(hEmpty);
             } else {
               var startIdx = Math.max(0, bookHistory.length - SIDEBAR_HISTORY_LIMIT);
@@ -203,7 +203,7 @@
 
                 var eb = document.createElement('button');
                 eb.className = 'history-entry';
-                eb.textContent = (entry.label || ('เนเธเธฅ' + (idx + 1))) + ' ยท ' + fmtTime(entry.ts);
+                eb.textContent = (entry.label || ('แปล' + (idx + 1))) + ' · ' + fmtTime(entry.ts);
                 eb.addEventListener('click', function(ev){
                   ev.stopPropagation();
                   viewHistoryEntry(proj, entry, idx);
@@ -212,18 +212,18 @@
 
                 var erename = document.createElement('button');
                 erename.className = 'icon-btn';
-                erename.title = 'เน€เธเธฅเธตเนเธขเธเธเธทเนเธญเธ•เธญเธเธเธตเน';
-                erename.textContent = 'โ';
+                erename.title = 'เปลี่ยนชื่อตอนนี้';
+                erename.textContent = '✎';
                 erename.addEventListener('click', async function(ev){
                   ev.stopPropagation();
-                  var currentLabel = entry.label || ('เนเธเธฅ' + (idx + 1));
-                  var newLabel = await showPromptDialog('เธ•เธฑเนเธเธเธทเนเธญเธ•เธญเธเนเธเธฅเธเธตเน', currentLabel);
+                  var currentLabel = entry.label || ('แปล' + (idx + 1));
+                  var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
                   if(newLabel && newLabel.trim()){
                     entry.label = newLabel.trim();
                     commitChange();
                     if(viewingHistoryId === entry.id){
-                      historyViewLabel.textContent = 'เธ”เธนเธเธฃเธฐเธงเธฑเธ•เธด: ' + entry.label;
-                      historyViewLabelBottom.textContent = 'เธเธฃเธฐเธงเธฑเธ•เธด: ' + entry.label;
+                      historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+                      historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
                     }
                   }
                 });
@@ -232,13 +232,13 @@
                 if(entry.parentId){
                   var ediff = document.createElement('button');
                   ediff.className = 'icon-btn diff-btn';
-                  ediff.title = 'เน€เธ—เธตเธขเธเธเธงเธฒเธกเธ•เนเธฒเธเธเธฑเธเธ•เนเธเธเธเธฑเธเธ—เธตเนเนเธเนเธกเธฒเธเธฒเธ';
-                  ediff.textContent = 'ฮ”';
+                  ediff.title = 'เทียบความต่างกับต้นฉบับที่แก้มาจาก';
+                  ediff.textContent = 'Δ';
                   ediff.addEventListener('click', async function(ev){
                     ev.stopPropagation();
                     var parentEntry = findEntryById(proj, entry.parentId);
-                    if(!parentEntry){ await showAlertDialog('เนเธกเนเธเธเธ•เนเธเธ—เธฒเธ', 'เนเธกเนเธเธเธเธเธฑเธเธ•เนเธเธ—เธฒเธเธ—เธตเนเนเธเนเน€เธ—เธตเธขเธ (เธญเธฒเธเธ–เธนเธเธฅเธเนเธเนเธฅเนเธง)'); return; }
-                    openDiff(parentEntry.output, entry.output, 'เน€เธ—เธตเธขเธ "' + (parentEntry.label || 'เธ•เนเธเธ—เธฒเธ') + '" เธเธฑเธ "' + (entry.label || 'เธเธเธฑเธเนเธเนเนเธ') + '"');
+                    if(!parentEntry){ await showAlertDialog('ไม่พบต้นทาง', 'ไม่พบฉบับต้นทางที่ใช้เทียบ (อาจถูกลบไปแล้ว)'); return; }
+                    openDiff(parentEntry.output, entry.output, 'เทียบ "' + (parentEntry.label || 'ต้นทาง') + '" กับ "' + (entry.label || 'ฉบับแก้ไข') + '"');
                   });
                   erow.appendChild(ediff);
                 }
@@ -252,7 +252,7 @@
                 viewAllLink.style.display = 'block';
                 viewAllLink.style.marginTop = '6px';
                 viewAllLink.type = 'button';
-                viewAllLink.textContent = 'เธ”เธนเธ—เธฑเนเธเธซเธกเธ” (' + bookHistory.length + ' เธ•เธญเธ) เธ—เธตเนเนเธเธเธ”เนเธฒเธเธฅเนเธฒเธ โ“';
+                viewAllLink.textContent = 'ดูทั้งหมด (' + bookHistory.length + ' ตอน) ที่แผงด้านล่าง ↓';
                 viewAllLink.addEventListener('click', function(ev){
                   ev.stopPropagation();
                   var panel = document.getElementById('projectHistoryBottom');
@@ -269,10 +269,10 @@
         addBookBtn.className = 'utility-btn';
         addBookBtn.style.marginTop = '4px';
         addBookBtn.style.fontSize = '11px';
-        addBookBtn.textContent = '+ เน€เธเธดเนเธกเน€เธฅเนเธก/เนเธเธฅเน€เธ”เธญเธฃเน';
+        addBookBtn.textContent = '+ เพิ่มเล่ม/โฟลเดอร์';
         addBookBtn.addEventListener('click', async function(e){
           e.stopPropagation();
-          var bname = await showPromptDialog('เธ•เธฑเนเธเธเธทเนเธญเน€เธฅเนเธก/เนเธเธฅเน€เธ”เธญเธฃเนเนเธซเธกเน', 'เน€เธฅเนเธกเธ—เธตเน ' + (proj.books.length + 1));
+          var bname = await showPromptDialog('ตั้งชื่อเล่ม/โฟลเดอร์ใหม่', 'เล่มที่ ' + (proj.books.length + 1));
           if(bname && bname.trim()){
             var newBook = { id: makeId('b'), title: bname.trim(), history: [], draft: '', chapterTitle: '' };
             flushPendingDraftSave();
@@ -304,10 +304,10 @@
   }
 
   document.getElementById('addProjBtn').addEventListener('click', async function(){
-    var name = await showPromptDialog('เธ•เธฑเนเธเธเธทเนเธญเน€เธฃเธทเนเธญเธเธเธดเธขเธฒเธข', '');
+    var name = await showPromptDialog('ตั้งชื่อเรื่องนิยาย', '');
     if(!name || !name.trim()) return;
     var proj = { id: makeId('p'), name: name.trim(), glossary: '', context: '', books: [] };
-    var defaultBook = { id: makeId('b'), title: 'เน€เธฅเนเธก 1', history: [], draft: '', chapterTitle: '' };
+    var defaultBook = { id: makeId('b'), title: 'เล่ม 1', history: [], draft: '', chapterTitle: '' };
     advanceAppContextGeneration();
     proj.books.push(defaultBook);
     proj.currentBookId = defaultBook.id;

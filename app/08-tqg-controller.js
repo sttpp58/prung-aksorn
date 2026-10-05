@@ -40,7 +40,7 @@
 
   function createTQGAITransport(){
     var key = document.getElementById('apiKey').value.trim();
-    if(!key) throw new Error('เธเธฃเธธเธ“เธฒเนเธชเน API Key เธเนเธญเธเนเธเน TQG AI Inspector/Repair');
+    if(!key) throw new Error('กรุณาใส่ API Key ก่อนใช้ TQG AI Inspector/Repair');
     return function(request){
       return callAIWithRetry(
         request.systemPrompt,
@@ -91,7 +91,7 @@
     if(!tqgQualityState || !tqgQualityState.analysis) return;
     if(!isTQGQualityContextCurrent()){
       resetTQGQualityPanel();
-      showQualityWarning('เธเธฅเธ•เธฃเธงเธ TQG เน€เธ”เธดเธกเนเธกเนเธ•เธฃเธเธเธฑเธเธเนเธญเธเธงเธฒเธกเธเธฑเธเธเธธเธเธฑเธ เธเธฃเธธเธ“เธฒเนเธเธฅเนเธซเนเน€เธชเธฃเนเธเธเนเธญเธเธ•เธฃเธงเธเธเนเธณ');
+      showQualityWarning('ผลตรวจ TQG เดิมไม่ตรงกับข้อความปัจจุบัน กรุณาแปลให้เสร็จก่อนตรวจซ้ำ');
       return;
     }
     if(warnIfAiBusy()) return;
@@ -100,7 +100,7 @@
       setAiBusy(true);
       resetActionStats();
       cancelBtn.classList.add('show');
-      progressText.textContent = 'เธเธณเธฅเธฑเธเธ•เธฃเธงเธเธเธธเธ“เธ เธฒเธ TQG เธ”เนเธงเธข AI Inspector...';
+      progressText.textContent = 'กำลังตรวจคุณภาพ TQG ด้วย AI Inspector...';
       var inspectionContext = captureAppContext(getCurrentProject(), getActiveBook(getCurrentProject()));
       var inspectionSourceText = tqgQualityState.sourceText;
       var inspectionTargetText = tqgQualityState.targetText;
@@ -123,7 +123,7 @@
       tqgQualityState.repair = null;
       renderTQGQualityPanel();
     }catch(err){
-      if(err.name !== 'AbortError' && isAppContextCurrent(inspectionContext)) showError('TQG Inspector เนเธกเนเธชเธณเน€เธฃเนเธ: ' + (err.message || err));
+      if(err.name !== 'AbortError' && isAppContextCurrent(inspectionContext)) showError('TQG Inspector ไม่สำเร็จ: ' + (err.message || err));
     }finally{
       setAiBusy(false);
       if(isAppContextCurrent(inspectionContext)){
@@ -137,7 +137,7 @@
     if(!tqgQualityState || !tqgQualityState.analysis || !tqgQualityState.inspection) return;
     if(!isTQGQualityContextCurrent()){
       resetTQGQualityPanel();
-      showQualityWarning('เธเธฅเธ•เธฃเธงเธ TQG เน€เธ”เธดเธกเนเธกเนเธ•เธฃเธเธเธฑเธเธเนเธญเธเธงเธฒเธกเธเธฑเธเธเธธเธเธฑเธ เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธเธฅเธฅเธฑเธเธเนเนเธซเธกเนเธเนเธญเธเธเนเธญเธก');
+      showQualityWarning('ผลตรวจ TQG เดิมไม่ตรงกับข้อความปัจจุบัน กรุณาตรวจผลลัพธ์ใหม่ก่อนซ่อม');
       return;
     }
     if(warnIfAiBusy()) return;
@@ -146,7 +146,7 @@
       setAiBusy(true);
       resetActionStats();
       cancelBtn.classList.add('show');
-      progressText.textContent = 'เธเธณเธฅเธฑเธเธเนเธญเธกเน€เธเธเธฒเธฐเธเนเธงเธเธ—เธตเน TQG เธขเธทเธเธขเธฑเธ...';
+      progressText.textContent = 'กำลังซ่อมเฉพาะช่วงที่ TQG ยืนยัน...';
       var repairContext = captureAppContext(getCurrentProject(), getActiveBook(getCurrentProject()));
       var repairSourceText = tqgQualityState.sourceText;
       var repairTargetText = tqgQualityState.targetText;
@@ -175,7 +175,7 @@
       if(result.status === 'ACCEPTED' && result.accepted === true){
         tqgQualityState.targetText = result.output;
         output.textContent = result.output;
-        outCount.textContent = countWords(result.output) + ' เธเธณ';
+        outCount.textContent = countWords(result.output) + ' คำ';
         spread.classList.toggle('has-result', !!result.output.trim());
         copyBtn.disabled = false;
         downloadBtn.disabled = false;
@@ -184,7 +184,7 @@
       }
       renderTQGQualityPanel();
     }catch(err){
-      if(err.name !== 'AbortError' && isAppContextCurrent(repairContext)) showError('TQG Repair เนเธกเนเธชเธณเน€เธฃเนเธ: ' + (err.message || err));
+      if(err.name !== 'AbortError' && isAppContextCurrent(repairContext)) showError('TQG Repair ไม่สำเร็จ: ' + (err.message || err));
     }finally{
       setAiBusy(false);
       if(isAppContextCurrent(repairContext)){

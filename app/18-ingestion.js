@@ -1,14 +1,14 @@
-/* ---------------- External Auto-Ingestion Receiver (เธเธฃเนเธญเธกเนเธเธฅเธเธทเนเธญเธ•เธญเธเน€เธเนเธเนเธ—เธข) ---------------- */
+/* ---------------- External Auto-Ingestion Receiver (พร้อมแปลชื่อตอนเป็นไทย) ---------------- */
   async function importExternalChapter(title, content, autoStart) {
     if (!content) return;
     var proj = getCurrentProject();
     if (!proj) {
-      showError('เธเธฃเธธเธ“เธฒเธชเธฃเนเธฒเธเธซเธฃเธทเธญเน€เธฅเธทเธญเธเน€เธฃเธทเนเธญเธเธเธดเธขเธฒเธขเธเนเธญเธเธฃเธฑเธเธเนเธญเธกเธนเธฅเธเธฒเธเน€เธงเนเธ');
+      showError('กรุณาสร้างหรือเลือกเรื่องนิยายก่อนรับข้อมูลจากเว็บ');
       return;
     }
     var ingestBook = getActiveBook(proj);
     if(!ingestBook){
-      showError('เนเธกเนเธเธเน€เธฅเนเธกเธ•เนเธเธ—เธฒเธเธเธญเธเธเนเธญเธกเธนเธฅเธ—เธตเนเธเธณเน€เธเนเธฒ');
+      showError('ไม่พบเล่มต้นทางของข้อมูลที่นำเข้า');
       return;
     }
     advanceAppContextGeneration();
@@ -16,43 +16,43 @@
     hideError();
     hideGlossaryEnforce();
 
-    // 1. Stage 1: เธเธฅเธตเธเธเนเธญเธเธงเธฒเธกเธเธทเนเธญเธ•เธญเธเธ”เนเธงเธเธ”เนเธงเธข Regex
+    // 1. Stage 1: คลีนข้อความชื่อตอนด่วนด้วย Regex
     var cleanTitle = (title || '').trim();
-    // เนเธขเธเธเธณเธ—เธตเนเธ•เธดเธ”เธเธฑเธ เน€เธเนเธ "GodChapter 3391" -> "Chapter 3391"
+    // แยกคำที่ติดกัน เช่น "GodChapter 3391" -> "Chapter 3391"
     cleanTitle = cleanTitle.replace(/([a-zA-Z])(Chapter\s*\d+)/i, '$1 $2');
 
-    var chapMatch = cleanTitle.match(/(?:Chapter|เธ•เธญเธเธ—เธตเน|เธเธ—เธ—เธตเน)\s*(\d+)[:\s-]*(.*)/i);
+    var chapMatch = cleanTitle.match(/(?:Chapter|ตอนที่|บทที่)\s*(\d+)[:\s-]*(.*)/i);
     var chapNum = chapMatch ? chapMatch[1] : '';
     var rawSubtitle = chapMatch ? chapMatch[2].trim() : cleanTitle;
 
-    // เธ•เธฑเนเธเธเนเธฒเธเธทเนเธญเธ•เธญเธเน€เธเธทเนเธญเธเธ•เนเธเธ—เธฑเธเธ—เธต (เน€เธเนเธ "เธเธ—เธ—เธตเน 3391: Natural Spirit")
+    // ตั้งค่าชื่อตอนเบื้องต้นทันที (เช่น "บทที่ 3391: Natural Spirit")
     if (chapNum) {
-      chapterTitle.value = 'เธเธ—เธ—เธตเน ' + chapNum + (rawSubtitle ? ': ' + rawSubtitle : '');
+      chapterTitle.value = 'บทที่ ' + chapNum + (rawSubtitle ? ': ' + rawSubtitle : '');
     } else {
-      chapterTitle.value = cleanTitle || 'เธ•เธญเธเนเธซเธกเน';
+      chapterTitle.value = cleanTitle || 'ตอนใหม่';
     }
 
     inputText.value = normalizeOCR(content.trim());
-    inCount.textContent = countWords(inputText.value) + ' เธเธณ';
+    inCount.textContent = countWords(inputText.value) + ' คำ';
     updateChunkInfo();
     highlightSuspicious(inputText.value);
     saveDraftSoon();
     switchMobileTab('source');
 
-    progressText.textContent = ' เธเธณเน€เธเนเธฒเน€เธเธทเนเธญเธซเธฒเน€เธฃเธตเธขเธเธฃเนเธญเธข เธเธณเธฅเธฑเธเน€เธ•เธฃเธตเธขเธกเนเธเธฅ...';
+    progressText.textContent = ' นำเข้าเนื้อหาเรียบร้อย กำลังเตรียมแปล...';
 
-    // 2. Stage 2: เธชเธฑเนเธเนเธเธฅเธเธทเนเธญเธ•เธญเธเน€เธเนเธเธ เธฒเธฉเธฒเนเธ—เธขเธ”เนเธงเธข AI เนเธเธเน€เธเธทเนเธญเธเธซเธฅเธฑเธ (Background Parallel Task)
+    // 2. Stage 2: สั่งแปลชื่อตอนเป็นภาษาไทยด้วย AI แบบเบื้องหลัง (Background Parallel Task)
     var key = document.getElementById('apiKey').value.trim();
     if (key && rawSubtitle && /[a-zA-Z]/.test(rawSubtitle)) {
       (async function translateTitleBackground() {
         try {
           var filterRes = filterRelevantGlossary(proj.glossary, rawSubtitle);
-          var glossHint = filterRes.text ? (' เธขเธถเธ”เธ•เธฒเธกเธเธฅเธฑเธเธเธณ: ' + filterRes.text) : '';
-          var sysTitle = "เธเธธเธ“เธเธทเธญเธเธฑเธเนเธเธฅเธเธดเธขเธฒเธข เนเธเธฅเธเธทเนเธญเธ•เธญเธเธ เธฒเธฉเธฒเธญเธฑเธเธเธคเธฉเธ•เนเธญเนเธเธเธตเนเน€เธเนเธเธเธทเนเธญเธ•เธญเธเธ เธฒเธฉเธฒเนเธ—เธขเธ—เธตเนเธชเธฅเธฐเธชเธฅเธงเธข เธเธฃเธฐเธเธฑเธ เน€เธซเธกเธฒเธฐเธเธฑเธเธเธดเธขเธฒเธขเนเธเธเธ•เธฒเธเธต/เธเธณเธฅเธฑเธเธ เธฒเธขเนเธ" +
-                         glossHint + " เธ•เธญเธเน€เธเธเธฒเธฐเธเธทเนเธญเธ•เธญเธเธ เธฒเธฉเธฒเนเธ—เธขเน€เธ—เนเธฒเธเธฑเนเธ เธซเนเธฒเธกเนเธชเนเน€เธเธฃเธทเนเธญเธเธซเธกเธฒเธขเธเธณเธเธนเธ” เธซเนเธฒเธกเธกเธตเธเธณเธเธณ";
+          var glossHint = filterRes.text ? (' ยึดตามคลังคำ: ' + filterRes.text) : '';
+          var sysTitle = "คุณคือนักแปลนิยาย แปลชื่อตอนภาษาอังกฤษต่อไปนี้เป็นชื่อตอนภาษาไทยที่สละสลวย กระชับ เหมาะกับนิยายแฟนตาซี/กำลังภายใน" +
+                         glossHint + " ตอบเฉพาะชื่อตอนภาษาไทยเท่านั้น ห้ามใส่เครื่องหมายคำพูด ห้ามมีคำนำ";
           var translatedSub = await callAIWithRetry(sysTitle, rawSubtitle, key, modelInput.value, null, 1);
           if (translatedSub && translatedSub.trim()) {
-            var finalTitle = chapNum ? ('เธเธ—เธ—เธตเน ' + chapNum + ': ' + translatedSub.trim()) : translatedSub.trim();
+            var finalTitle = chapNum ? ('บทที่ ' + chapNum + ': ' + translatedSub.trim()) : translatedSub.trim();
             var targetProj = appData.projects.find(function(p){ return p.id === ingestContext.projectId; }) || null;
             var targetBook = targetProj && (targetProj.books || []).find(function(b){ return b.id === ingestContext.bookId; }) || null;
             if(!targetBook || !isAppContextCurrent(ingestContext)) return;
@@ -61,12 +61,12 @@
             saveData();
           }
         } catch(e) {
-          console.warn('เนเธเธฅเธเธทเนเธญเธ•เธญเธเนเธกเนเธชเธณเน€เธฃเนเธ เนเธเนเธเธทเนเธญเน€เธ”เธดเธก:', e);
+          console.warn('แปลชื่อตอนไม่สำเร็จ ใช้ชื่อเดิม:', e);
         }
       })();
     }
 
-    // 3. เธชเธฑเนเธเน€เธฃเธดเนเธกเนเธเธฅเน€เธเธทเนเธญเธซเธฒเธ—เธฑเธเธ—เธต
+    // 3. สั่งเริ่มแปลเนื้อหาทันที
     if (autoStart && !aiBusy) {
       setTimeout(function() {
         if(!isAppContextCurrent(ingestContext) || aiBusy) return;
@@ -75,7 +75,7 @@
     }
   }
 
-  // เธ”เธฑเธเธเธฑเธเธชเธฑเธเธเธฒเธ“เธ—เธตเนเธชเนเธเธกเธฒเธเธฒเธ Tampermonkey
+  // ดักฟังสัญญาณที่ส่งมาจาก Tampermonkey
   function validatePrungIngestMessage(e) {
     if (!e || e.source !== window || e.origin !== window.location.origin) return null;
     var data = e.data;
@@ -102,4 +102,4 @@
     }
   });
 
-  /* เน€เธฃเธดเนเธกเธ•เนเธเธฃเธฐเธเธเนเธเธ Asynchronous */
+  /* เริ่มต้นระบบแบบ Asynchronous */

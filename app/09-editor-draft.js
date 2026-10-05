@@ -14,7 +14,7 @@
     var level = document.querySelector('#levelSeg button.active');
     var genre = document.querySelector('#genreChips .chip.active');
     var style = document.querySelector('#styleSeg button.active');
-    document.getElementById('translationSummary').textContent = [source, level, genre, style].filter(Boolean).map(function(el){ return el.textContent.trim(); }).join(' ยท ');
+    document.getElementById('translationSummary').textContent = [source, level, genre, style].filter(Boolean).map(function(el){ return el.textContent.trim(); }).join(' · ');
   }
 
   function updateChunkInfo() {
@@ -28,16 +28,16 @@
     var chars = text.length;
     var chunks = splitIntoChunks(text, maxLen);
 
-    var str = 'ยท ' + chars.toLocaleString() + ' เธญเธฑเธเธเธฃเธฐ';
+    var str = '· ' + chars.toLocaleString() + ' อักขระ';
     if (chunks.length > 1) {
-      str += ' (เธเธดเธงเธชเนเธ AI ' + chunks.length + ' เธชเนเธงเธ)';
+      str += ' (คิวส่ง AI ' + chunks.length + ' ส่วน)';
     }
     infoSpan.textContent = str;
   }
 
   function setOutput(text){
     output.textContent = text || '';
-    outCount.textContent = countWords(output.textContent) + ' เธเธณ';
+    outCount.textContent = countWords(output.textContent) + ' คำ';
     var hasOutput = !!output.textContent.trim();
     spread.classList.toggle('has-result', hasOutput);
     if(!hasOutput) stamp.classList.remove('show');
@@ -62,14 +62,14 @@
     historyViewBannerBottom.classList.remove('show');
     chapterTitle.value = activeBook.chapterTitle || '';
     inputText.value = activeBook.draft || '';
-    inCount.textContent = countWords(inputText.value) + ' เธเธณ';
+    inCount.textContent = countWords(inputText.value) + ' คำ';
     updateChunkInfo();
     highlightSuspicious(inputText.value);
     stamp.classList.remove('show');
     hideGlossaryEnforce();
     setOutput('');
     output.contentEditable = 'false';
-    editOutputBtn.textContent = 'เนเธเนเนเธเธเธฅเธฅเธฑเธเธเน';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
     setResultFocus(false);
     switchMobileTab('source');
     renderBottomHistory();
@@ -97,7 +97,7 @@
     var activeBook = getActiveBook(proj);
     if(!activeBook) return;
     if(saveStatusText){
-      saveStatusText.textContent = 'โฏ เธเธณเธฅเธฑเธเธเธฑเธเธ—เธถเธ';
+      saveStatusText.textContent = '⋯ กำลังบันทึก';
       saveStatusText.classList.add('saving');
     }
     clearTimeout(draftSaveTimer);
@@ -132,18 +132,18 @@
     document.body.classList.add('history-mode');
     chapterTitle.value = entry.label || '';
     inputText.value = entry.input;
-    inCount.textContent = countWords(entry.input) + ' เธเธณ';
+    inCount.textContent = countWords(entry.input) + ' คำ';
     updateChunkInfo();
     highlightSuspicious('');
     setOutput(entry.output);
     output.contentEditable = 'false';
-    editOutputBtn.textContent = 'เนเธเนเนเธเธเธฅเธฅเธฑเธเธเน';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
     setResultFocus(true);
     stamp.classList.remove('show');
     requestAnimationFrame(function(){ stamp.classList.add('show'); });
-    var label = entry.label || ('เนเธเธฅ' + (idx + 1));
-    historyViewLabel.textContent = 'เธ”เธนเธเธฃเธฐเธงเธฑเธ•เธด: ' + label;
-    historyViewLabelBottom.textContent = 'เธเธฃเธฐเธงเธฑเธ•เธด: ' + label;
+    var label = entry.label || ('แปล' + (idx + 1));
+    historyViewLabel.textContent = 'ดูประวัติ: ' + label;
+    historyViewLabelBottom.textContent = 'ประวัติ: ' + label;
     historyViewBanner.classList.add('show');
     historyViewBannerBottom.classList.add('show');
     switchMobileTab('output');
@@ -167,12 +167,12 @@
     var historyList = getActiveHistoryList(proj);
     var entry = historyList.find(function(h){ return h.id === viewingHistoryId; });
     if(!entry) return;
-    var newLabel = await showPromptDialog('เธ•เธฑเนเธเธเธทเนเธญเธ•เธญเธเนเธเธฅเธเธตเน', entry.label || '');
+    var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', entry.label || '');
     if(newLabel && newLabel.trim()){
       entry.label = newLabel.trim();
       commitChange();
-      historyViewLabel.textContent = 'เธ”เธนเธเธฃเธฐเธงเธฑเธ•เธด: ' + entry.label;
-      historyViewLabelBottom.textContent = 'เธเธฃเธฐเธงเธฑเธ•เธด: ' + entry.label;
+      historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+      historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
     }
   });
 
@@ -183,7 +183,7 @@
     var historyList = getActiveHistoryList(proj);
     var entry = historyList.find(function(h){ return h.id === viewingHistoryId; });
     if(!entry) return;
-    var ok = await showConfirmDialog('เธฅเธเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเนเธเธฅ', 'เธ•เนเธญเธเธเธฒเธฃเธฅเธ "' + (entry.label || 'เธ•เธญเธเธเธตเน') + '" เธซเธฃเธทเธญเนเธกเน? เธเธฒเธฃเธฅเธเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธขเนเธญเธเธเธฅเธฑเธเนเธ”เน', true);
+    var ok = await showConfirmDialog('ลบประวัติการแปล', 'ต้องการลบ "' + (entry.label || 'ตอนนี้') + '" หรือไม่? การลบไม่สามารถย้อนกลับได้', true);
     if(ok){
       var filtered = historyList.filter(function(h){ return h.id !== entry.id; });
       if(activeBook) activeBook.history = filtered;

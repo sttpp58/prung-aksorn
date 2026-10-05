@@ -16,7 +16,7 @@ function setReaderFontSize(size, persist) {
     readerContent.style.fontSize = readerFontSize + 'px';
     readerFontValue.textContent = readerFontSize;
 
-    // เธเธฑเธเธ—เธถเธเธฅเธ IndexedDB เน€เธกเธทเนเธญเธกเธตเธเธฒเธฃเธเธฃเธฑเธเธเธเธฒเธ”เธเธญเธเธ•เน
+    // บันทึกลง IndexedDB เมื่อมีการปรับขนาดฟอนต์
     if (persist && appData.settings) {
       appData.settings.readerFontSize = readerFontSize;
       saveData();
@@ -50,7 +50,7 @@ function setReaderFontSize(size, persist) {
 
   if(!ttsSupported && readerTtsBtn){
     readerTtsBtn.disabled = true;
-    readerTtsBtn.title = 'เน€เธเธฃเธฒเธงเนเน€เธเธญเธฃเนเธเธตเนเนเธกเนเธฃเธญเธเธฃเธฑเธเธเธฒเธฃเธญเนเธฒเธเธญเธญเธเน€เธชเธตเธขเธ';
+    readerTtsBtn.title = 'เบราว์เซอร์นี้ไม่รองรับการอ่านออกเสียง';
   }
 
   function populateTtsVoices(){
@@ -73,8 +73,8 @@ function setReaderFontSize(size, persist) {
       });
       ttsVoiceSelect.appendChild(group);
     }
-    addOptGroup('เน€เธชเธตเธขเธเนเธ—เธข', thVoices);
-    addOptGroup('เน€เธชเธตเธขเธเธญเธทเนเธเน', otherVoices);
+    addOptGroup('เสียงไทย', thVoices);
+    addOptGroup('เสียงอื่นๆ', otherVoices);
 
     var savedURI = appData.settings && appData.settings.ttsVoiceURI;
     if(savedURI && voices.some(function(v){ return v.voiceURI === savedURI; })){
@@ -132,7 +132,7 @@ function setReaderFontSize(size, persist) {
 
   function updatePlayPauseIcon(){
     ttsPlayPauseBtn.innerHTML = (ttsState === 'playing') ? ttsPauseIconSvg : ttsPlayIconSvg;
-    ttsPlayPauseBtn.title = (ttsState === 'playing') ? 'เธซเธขเธธเธ”เธเธฑเนเธงเธเธฃเธฒเธง' : 'เน€เธฅเนเธ';
+    ttsPlayPauseBtn.title = (ttsState === 'playing') ? 'หยุดชั่วคราว' : 'เล่น';
   }
 
   function speakIndex(idx){
@@ -162,32 +162,32 @@ function setReaderFontSize(size, persist) {
     };
     utt.onerror = function(e){
       if(e.error === 'interrupted' || e.error === 'canceled') return;
-      ttsStatusText.textContent = 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธญเนเธฒเธเธญเธญเธเน€เธชเธตเธขเธ';
+      ttsStatusText.textContent = 'เกิดข้อผิดพลาดในการอ่านออกเสียง';
       stopTts();
     };
 
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utt);
-    ttsStatusText.textContent = 'เธเธณเธฅเธฑเธเธญเนเธฒเธ ' + (idx + 1) + '/' + ttsQueue.length;
+    ttsStatusText.textContent = 'กำลังอ่าน ' + (idx + 1) + '/' + ttsQueue.length;
     updatePlayPauseIcon();
   }
 
   function playTts(){
     if(!ttsSupported){
-      showAlertDialog('เนเธกเนเธฃเธญเธเธฃเธฑเธ', 'เน€เธเธฃเธฒเธงเนเน€เธเธญเธฃเนเธเธตเนเนเธกเนเธฃเธญเธเธฃเธฑเธเธเธฒเธฃเธญเนเธฒเธเธญเธญเธเน€เธชเธตเธขเธ (Web Speech API)');
+      showAlertDialog('ไม่รองรับ', 'เบราว์เซอร์นี้ไม่รองรับการอ่านออกเสียง (Web Speech API)');
       return;
     }
     readerTtsBar.classList.add('show');
     if(ttsState === 'paused' && ttsIndex >= 0){
       ttsState = 'playing';
       window.speechSynthesis.resume();
-      ttsStatusText.textContent = 'เธเธณเธฅเธฑเธเธญเนเธฒเธ ' + (ttsIndex + 1) + '/' + ttsQueue.length;
+      ttsStatusText.textContent = 'กำลังอ่าน ' + (ttsIndex + 1) + '/' + ttsQueue.length;
       updatePlayPauseIcon();
     } else {
       var startEl = findStartElementFromScroll();
       var startIdx = buildTtsQueue(startEl);
       if(!ttsQueue.length){
-        ttsStatusText.textContent = 'เนเธกเนเธกเธตเน€เธเธทเนเธญเธซเธฒเนเธซเนเธญเนเธฒเธ';
+        ttsStatusText.textContent = 'ไม่มีเนื้อหาให้อ่าน';
         return;
       }
       ttsState = 'playing';
@@ -199,7 +199,7 @@ function setReaderFontSize(size, persist) {
     if(!ttsSupported) return;
     ttsState = 'paused';
     window.speechSynthesis.pause();
-    ttsStatusText.textContent = 'เธซเธขเธธเธ”เธเธฑเนเธงเธเธฃเธฒเธง';
+    ttsStatusText.textContent = 'หยุดชั่วคราว';
     updatePlayPauseIcon();
   }
 
@@ -285,6 +285,6 @@ function setReaderFontSize(size, persist) {
   }, { passive: true });
 
 /* =============================================================
-     เธเธฑเธเธเนเธเธฑเธเธชเนเธเธเธเธฅเธฑเธเธเธณเธเธฒเธเธ—เธธเธเธ•เธญเธเนเธเน€เธฅเนเธก (Whole-Book Glossary Mining)
-     เนเธเนเน€เธ—เธเธเธดเธ Bilingual Alignment: เธญเนเธฒเธเธ•เนเธเธเธเธฑเธเธเธนเนเธเธฑเธเธเธณเนเธเธฅเธเธฃเธดเธ
+     ฟังก์ชันสแกนคลังคำจากทุกตอนในเล่ม (Whole-Book Glossary Mining)
+     ใช้เทคนิค Bilingual Alignment: อ่านต้นฉบับคู่กับคำแปลจริง
      ============================================================= */

@@ -50,13 +50,13 @@
   chapterTitle.addEventListener('input', saveDraftSoon);
 
   inputText.addEventListener('input', function(){
-    inCount.textContent = countWords(inputText.value) + ' เธเธณ';
+    inCount.textContent = countWords(inputText.value) + ' คำ';
     updateChunkInfo();
     highlightSuspicious(inputText.value);
     saveDraftSoon();
   });
 
-  var chapterHeadingRegex = /^[ \t]*(?:(?:เธ•เธญเธเธ—เธตเน|เธ•เธญเธ—เธตเน|เธ•เธญเธ|เธเธ—เธ—เธตเน|เธเธ—|chapter|ch\.|episode|ep\.|็ฌฌ)[ \t]*[0-9ใ€้ถไธ€ไบไธๅไบ”ๅ…ญไธๅ…ซไนๅ็พๅไธค]+(?:[ \t]*็ซ )?|(?:เธเธ—เธเธณ|เธเธ—เธณ|เธเธ—เธชเนเธเธ—เนเธฒเธข|prologue|epilogue|็•ชๅค–)).*$/i;
+  var chapterHeadingRegex = /^[ \t]*(?:(?:ตอนที่|ตอที่|ตอน|บทที่|บท|chapter|ch\.|episode|ep\.|第)[ \t]*[0-9〇零一二三四五六七八九十百千两]+(?:[ \t]*章)?|(?:บทนำ|บทำ|บทส่งท้าย|prologue|epilogue|番外)).*$/i;
 
   inputText.addEventListener('paste', function(e) {
     e.preventDefault();
@@ -96,30 +96,30 @@
 
     if (extracted) {
       chapterTitle.dispatchEvent(new Event('input'));
-      progressText.textContent = 'เธเนเธญเธกเธเธญเธเธ•เน & เธ”เธถเธเธเธทเนเธญเธ•เธญเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธดเน€เธฃเธตเธขเธเธฃเนเธญเธข';
+      progressText.textContent = 'ซ่อมฟอนต์ & ดึงชื่อตอนอัตโนมัติเรียบร้อย';
     } else {
-      progressText.textContent = 'เธเธฅเธตเธเธญเธฑเธเธฉเธฃเธเธขเธฐเธเธฒเธ OCR เนเธซเนเน€เธฃเธตเธขเธเธฃเนเธญเธข';
+      progressText.textContent = 'คลีนอักษรขยะจาก OCR ให้เรียบร้อย';
     }
     setTimeout(function(){ progressText.textContent = ''; }, 2500);
   });
 
   clearBtn.addEventListener('click', async function(){
     if (inputText.value.trim() !== '' || output.textContent.trim() !== '') {
-      var ok = await showConfirmDialog('เธฅเนเธฒเธเธเนเธญเธเธงเธฒเธก', 'เธ•เนเธญเธเธเธฒเธฃเธฅเนเธฒเธเธเนเธญเธเธงเธฒเธกเนเธฅเธฐเธเธฅเธฅเธฑเธเธเนเธ—เธฑเนเธเธซเธกเธ” เน€เธเธทเนเธญเน€เธ•เธฃเธตเธขเธกเนเธเธฅเน€เธเธทเนเธญเธซเธฒเนเธซเธกเนเนเธเนเธซเธฃเธทเธญเนเธกเน?\n\n(เธซเธฒเธเธขเธฑเธเนเธกเนเนเธ”เนเธเธฑเธเธ—เธถเธเธเธเธฑเธเนเธเนเนเธ เธเนเธญเธกเธนเธฅเธ—เธตเนเธขเธฑเธเนเธกเนเธเธฑเธเธ—เธถเธเธเธฐเธซเธฒเธขเนเธ)', true);
+      var ok = await showConfirmDialog('ล้างข้อความ', 'ต้องการล้างข้อความและผลลัพธ์ทั้งหมด เพื่อเตรียมแปลเนื้อหาใหม่ใช่หรือไม่?\n\n(หากยังไม่ได้บันทึกฉบับแก้ไข ข้อมูลที่ยังไม่บันทึกจะหายไป)', true);
       if(!ok) return;
     }
 
     advanceAppContextGeneration();
     chapterTitle.value = '';
     inputText.value = '';
-    inCount.textContent = '0 เธเธณ';
+    inCount.textContent = '0 คำ';
     updateChunkInfo();
     highlightSuspicious('');
 
     hideGlossaryEnforce();
     setOutput('');
     output.contentEditable = 'false';
-    editOutputBtn.textContent = 'เนเธเนเนเธเธเธฅเธฅเธฑเธเธเน';
+    editOutputBtn.textContent = 'แก้ไขผลลัพธ์';
     stamp.classList.remove('show');
 
     if(viewingHistoryId){
@@ -134,13 +134,13 @@
   });
 
   output.addEventListener('input', function(){
-    outCount.textContent = countWords(output.textContent) + ' เธเธณ';
+    outCount.textContent = countWords(output.textContent) + ' คำ';
     saveRevisionBtn.disabled = !output.textContent.trim();
   });
   editOutputBtn.addEventListener('click', function(){
     var editing = output.contentEditable === 'true';
     output.contentEditable = editing ? 'false' : 'true';
-    editOutputBtn.textContent = editing ? 'เนเธเนเนเธเธเธฅเธฅเธฑเธเธเน' : 'เน€เธชเธฃเนเธเธชเธดเนเธ';
+    editOutputBtn.textContent = editing ? 'แก้ไขผลลัพธ์' : 'เสร็จสิ้น';
     if(!editing) output.focus();
   });
 
@@ -148,7 +148,7 @@
     var proj = getCurrentProject();
     var revised = output.textContent.trim();
     if(!proj || !revised) return;
-    var label = await showPromptDialog('เธ•เธฑเนเธเธเธทเนเธญเธเธเธฑเธเนเธเนเนเธ', (chapterTitle.value || 'เธเธเธฑเธเนเธเนเนเธ'));
+    var label = await showPromptDialog('ตั้งชื่อฉบับแก้ไข', (chapterTitle.value || 'ฉบับแก้ไข'));
     if(!label) return;
     var newEntry = {
       id: makeId('h'), ts: Date.now(), label: label.trim(),
@@ -162,7 +162,7 @@
 
     viewingHistoryId = newEntry.id;
     commitChange();
-    progressText.textContent = 'เธเธฑเธเธ—เธถเธเน€เธฃเธตเธขเธเธฃเนเธญเธข';
+    progressText.textContent = 'บันทึกเรียบร้อย';
     setTimeout(function(){ progressText.textContent = ''; }, 1500);
   });
 
@@ -184,21 +184,21 @@
     try{
       rawText = await readFileAsText(file);
     }catch(err){
-      showError('เธญเนเธฒเธเนเธเธฅเนเนเธกเนเธชเธณเน€เธฃเนเธ: ' + (err.message || ''));
+      showError('อ่านไฟล์ไม่สำเร็จ: ' + (err.message || ''));
       return;
     }
 
     var segments = detectChapterSplits(rawText);
     if(segments){
       var wantSplit = await showConfirmDialog(
-        'เธเธเธซเธฅเธฒเธขเธ•เธญเธเนเธเนเธเธฅเนเธเธตเน',
-        'เธ•เธฃเธงเธเธเธเธฃเธนเธเนเธเธเธซเธฑเธงเธเนเธญเธ•เธญเธเนเธเนเธเธฅเนเธ—เธฑเนเธเธซเธกเธ” ' + segments.length + ' เธ•เธญเธ (เน€เธเนเธ "' + segments[0].label + '") เธ•เนเธญเธเธเธฒเธฃเนเธเนเธเนเธฅเธฐเนเธเธฅเธ—เธตเธฅเธฐเธ•เธญเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธดเธซเธฃเธทเธญเนเธกเน?\n\nเธเธ” "เธขเธเน€เธฅเธดเธ" เน€เธเธทเนเธญเธเธณเน€เธเนเธฒเธ—เธฑเนเธเนเธเธฅเนเน€เธเนเธเธเนเธญเธเน€เธ”เธตเธขเธงเนเธเธเน€เธ”เธดเธกเนเธ—เธ'
+        'พบหลายตอนในไฟล์นี้',
+        'ตรวจพบรูปแบบหัวข้อตอนในไฟล์ทั้งหมด ' + segments.length + ' ตอน (เช่น "' + segments[0].label + '") ต้องการแบ่งและแปลทีละตอนอัตโนมัติหรือไม่?\n\nกด "ยกเลิก" เพื่อนำเข้าทั้งไฟล์เป็นก้อนเดียวแบบเดิมแทน'
       );
       if(wantSplit){
         var proj = getCurrentProject();
         var key = document.getElementById('apiKey').value.trim();
-        if(!proj){ showError('เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธซเธฃเธทเธญเธชเธฃเนเธฒเธเน€เธฃเธทเนเธญเธเธเธดเธขเธฒเธขเธเนเธญเธ'); return; }
-        if(!key){ showError('เธเธฃเธธเธ“เธฒเนเธชเน API Key เธเนเธญเธ'); return; }
+        if(!proj){ showError('กรุณาเลือกหรือสร้างเรื่องนิยายก่อน'); return; }
+        if(!key){ showError('กรุณาใส่ API Key ก่อน'); return; }
         var virtualFiles = segments.map(function(seg){
           return { name: safeFilename(seg.label) + '.txt', __virtualText: seg.text };
         });
@@ -208,7 +208,7 @@
     }
 
     inputText.value = rawText;
-    inCount.textContent = countWords(inputText.value) + ' เธเธณ';
+    inCount.textContent = countWords(inputText.value) + ' คำ';
     updateChunkInfo();
     highlightSuspicious(inputText.value);
     saveDraftSoon();
@@ -217,7 +217,7 @@
   document.getElementById('exportBackupBtn').addEventListener('click', async function(){
     try{
       var flushed = await flushSaveData();
-      if(!flushed){ await showAlertDialog('เธชเธณเธฃเธญเธเธเนเธญเธกเธนเธฅเนเธกเนเธชเธณเน€เธฃเนเธ', 'เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธเธฑเธเธ—เธถเธเธเนเธญเธกเธนเธฅเธฅเนเธฒเธชเธธเธ”เธฅเธเธเธฒเธเธเนเธญเธกเธนเธฅเนเธ”เน'); return; }
+      if(!flushed){ await showAlertDialog('สำรองข้อมูลไม่สำเร็จ', 'ไม่สามารถบันทึกข้อมูลล่าสุดลงฐานข้อมูลได้'); return; }
       var payload = await storageV2.exportBackup();
       var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
       var a = document.createElement('a');
@@ -227,7 +227,7 @@
       setTimeout(function(){ URL.revokeObjectURL(a.href); }, 0);
     }catch(err){
       console.error('Backup export failed:', err);
-      await showAlertDialog('เธชเธณเธฃเธญเธเธเนเธญเธกเธนเธฅเนเธกเนเธชเธณเน€เธฃเนเธ', 'เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธชเธฃเนเธฒเธเนเธเธฅเนเธชเธณเธฃเธญเธเธเนเธญเธกเธนเธฅเธ—เธตเนเธกเธตเธเธงเธฒเธกเธชเธกเธเธนเธฃเธ“เนเนเธ”เน');
+      await showAlertDialog('สำรองข้อมูลไม่สำเร็จ', 'ไม่สามารถสร้างไฟล์สำรองข้อมูลที่มีความสมบูรณ์ได้');
     }
   });
 
@@ -241,24 +241,24 @@
         var rawParsed = JSON.parse(String(reader.result || ''));
         var format = storageV2.detectBackupFormat(rawParsed);
         if(format === 'unknown'){
-          throw new Error('เนเธกเนเธฃเธนเนเธเธฑเธเธฃเธนเธเนเธเธเนเธเธฅเนเธชเธณเธฃเธญเธเธเธตเน เธฃเธฐเธเธเธฃเธญเธเธฃเธฑเธ Backup V2 เนเธฅเธฐ Backup เธฃเธธเนเธเน€เธเนเธฒเธเนเธญเธ V2 เน€เธ—เนเธฒเธเธฑเนเธ');
+          throw new Error('ไม่รู้จักรูปแบบไฟล์สำรองนี้ ระบบรองรับ Backup V2 และ Backup รุ่นเก่าก่อน V2 เท่านั้น');
         }
 
         var checked = await storageV2.validateBackup(rawParsed);
         var r = checked.report;
         var summary;
         if(format === 'legacy'){
-          summary = 'เธเธเนเธเธฅเน Backup เธฃเธธเนเธเน€เธเนเธฒ\n\n' +
-            'เธฃเธฐเธเธเธเธฐเธ—เธณเธเธฒเธฃเนเธเธฅเธ Legacy โ’ V2 Normalized เธเนเธญเธเธเธนเนเธเธทเธ\n' +
+          summary = 'พบไฟล์ Backup รุ่นเก่า\n\n' +
+            'ระบบจะทำการแปลง Legacy → V2 Normalized ก่อนกู้คืน\n' +
             'Projects: '+r.projects+'\nBooks: '+r.books+'\nChapters: '+r.chapters+'\nGlossary: '+r.glossary+'\nRevisions: '+r.revisions+'\n\n' +
-            'SHA-256: VALID (เธเธณเธเธงเธ“เนเธซเธกเนเธเธฒเธเธเนเธญเธกเธนเธฅ V2 เธ—เธตเนเนเธเธฅเธเนเธฅเนเธง)\n' +
-            'Schema เธเธฅเธฒเธขเธ—เธฒเธ: 2 (supported)\n\n' +
-            'เธฃเธฐเธเธเธเธฐเนเธกเนเธชเธฃเนเธฒเธเธซเธฃเธทเธญเธเธนเนเธเธทเธ Translation Jobs เนเธฅเธฐเธเธฐเธชเธฃเนเธฒเธ Safety Backup เธญเธฑเธ•เนเธเธกเธฑเธ•เธดเธเนเธญเธเนเธ—เธเธ—เธตเนเธเนเธญเธกเธนเธฅเธเธฑเธเธเธธเธเธฑเธ';
+            'SHA-256: VALID (คำนวณใหม่จากข้อมูล V2 ที่แปลงแล้ว)\n' +
+            'Schema ปลายทาง: 2 (supported)\n\n' +
+            'ระบบจะไม่สร้างหรือกู้คืน Translation Jobs และจะสร้าง Safety Backup อัตโนมัติก่อนแทนที่ข้อมูลปัจจุบัน';
         }else{
-          summary = 'Projects: '+r.projects+'\nBooks: '+r.books+'\nChapters: '+r.chapters+'\nGlossary: '+r.glossary+'\nRevisions: '+r.revisions+'\n\nSHA-256: VALID\nSchema: 2 (supported)\n\nเธเธฒเธฃเธเธนเนเธเธทเธเธเธฐเนเธ—เธเธ—เธตเนเธเนเธญเธกเธนเธฅเธเธฑเธเธเธธเธเธฑเธเธ—เธฑเนเธเธซเธกเธ” เนเธฅเธฐเธฃเธฐเธเธเธเธฐเธชเธฃเนเธฒเธ Safety Backup เธญเธฑเธ•เนเธเธกเธฑเธ•เธดเธเนเธญเธเธ”เธณเน€เธเธดเธเธเธฒเธฃ';
+          summary = 'Projects: '+r.projects+'\nBooks: '+r.books+'\nChapters: '+r.chapters+'\nGlossary: '+r.glossary+'\nRevisions: '+r.revisions+'\n\nSHA-256: VALID\nSchema: 2 (supported)\n\nการกู้คืนจะแทนที่ข้อมูลปัจจุบันทั้งหมด และระบบจะสร้าง Safety Backup อัตโนมัติก่อนดำเนินการ';
         }
 
-        if(await showConfirmDialog('เธขเธทเธเธขเธฑเธเธเธฒเธฃเธเธนเนเธเธทเธเธเนเธญเธกเธนเธฅ', summary, true, 'เธ•เธเธฅเธ')){
+        if(await showConfirmDialog('ยืนยันการกู้คืนข้อมูล', summary, true, 'ตกลง')){
           var result = await storageV2.restoreBackup(rawParsed);
           if(!result.success) throw new Error('Restore did not complete.');
           await loadData();
@@ -268,27 +268,27 @@
           updateActiveBanner();
           loadProjectDraft(getCurrentProject());
           await showAlertDialog(
-            'เธเธนเนเธเธทเธเธชเธณเน€เธฃเนเธ',
+            'กู้คืนสำเร็จ',
             format === 'legacy'
-              ? 'เธเธนเนเธเธทเธ Backup เธฃเธธเนเธเน€เธเนเธฒเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง เธฃเธฐเธเธเนเธ”เนเนเธเธฅเธเธเนเธญเธกเธนเธฅเน€เธเนเธ V2 เนเธฅเธฐเธ•เธฃเธงเธเธชเธญเธเธเธฒเธเธเนเธญเธกเธนเธฅเธซเธฅเธฑเธเธเธฒเธฃเธเธนเนเธเธทเธเธชเธณเน€เธฃเนเธ'
-              : 'เธเธนเนเธเธทเธเธเนเธญเธกเธนเธฅเนเธฅเธฐเธ•เธฃเธงเธเธชเธญเธเธเธฒเธเธเนเธญเธกเธนเธฅเธซเธฅเธฑเธเธเธฒเธฃเธเธนเนเธเธทเธเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง'
+              ? 'กู้คืน Backup รุ่นเก่าเรียบร้อยแล้ว ระบบได้แปลงข้อมูลเป็น V2 และตรวจสอบฐานข้อมูลหลังการกู้คืนสำเร็จ'
+              : 'กู้คืนข้อมูลและตรวจสอบฐานข้อมูลหลังการกู้คืนเรียบร้อยแล้ว'
           );
         }
       } catch(err) {
         console.error('Backup restore failed:', err);
-        var msg = String(err&&err.message || 'เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธเธนเนเธเธทเธเนเธเธฅเนเธชเธณเธฃเธญเธเนเธ”เน');
+        var msg = String(err&&err.message || 'ไม่สามารถกู้คืนไฟล์สำรองได้');
         if(msg.indexOf('rolled back safely')>=0){
-          await showAlertDialog('เธเธนเนเธเธทเธเนเธกเนเธชเธณเน€เธฃเนเธ', msg+'\n\nเธเนเธญเธกเธนเธฅเน€เธ”เธดเธกเธ–เธนเธเธเธณเธเธฅเธฑเธเธเธทเธเนเธฅเนเธง');
+          await showAlertDialog('กู้คืนไม่สำเร็จ', msg+'\n\nข้อมูลเดิมถูกนำกลับคืนแล้ว');
         }else if(msg.indexOf('rollback failed')>=0){
-          await showAlertDialog('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เธฃเนเธฒเธขเนเธฃเธ', msg+'\n\nเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธขเธทเธเธขเธฑเธเธชเธ–เธฒเธเธฐเธเนเธญเธกเธนเธฅเนเธ”เน');
+          await showAlertDialog('เกิดข้อผิดพลาดร้ายแรง', msg+'\n\nไม่สามารถยืนยันสถานะข้อมูลได้');
         }else{
-          await showAlertDialog('เนเธเธฅเนเธชเธณเธฃเธญเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ', msg);
+          await showAlertDialog('ไฟล์สำรองไม่ถูกต้อง', msg);
         }
       }
     };
     reader.onerror = function(){
       console.error('Backup file read failed:', reader.error || file.name);
-      showAlertDialog('เธญเนเธฒเธเนเธเธฅเนเธชเธณเธฃเธญเธเนเธกเนเธชเธณเน€เธฃเนเธ', 'เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธญเนเธฒเธเนเธเธฅเน Backup เธ—เธตเนเน€เธฅเธทเธญเธเนเธ”เน เธเธฃเธธเธ“เธฒเธฅเธญเธเนเธเธฅเนเธญเธทเนเธเธญเธตเธเธเธฃเธฑเนเธ').catch(function(dialogErr){
+      showAlertDialog('อ่านไฟล์สำรองไม่สำเร็จ', 'ไม่สามารถอ่านไฟล์ Backup ที่เลือกได้ กรุณาลองไฟล์อื่นอีกครั้ง').catch(function(dialogErr){
         console.error('Backup file read error dialog failed:', dialogErr);
       });
     };
@@ -299,41 +299,41 @@
     e.target.value = '';
   });
 
-/* ---------------- เธเธฑเธเธเนเธเธฑเธเธ—เธณเธเธงเธฒเธกเธชเธฐเธญเธฒเธ”เธญเธฑเธเธเธฃเธฐเธเธขเธฐ, เธชเธฃเธฐเน€เธเธตเนเธขเธ & เนเธเธฉเธ“เธฒเน€เธงเนเธ ---------------- */
+/* ---------------- ฟังก์ชันทำความสะอาดอักขระขยะ, สระเพี้ยน & โฆษณาเว็บ ---------------- */
   function normalizeOCR(text){
     if(!text) return '';
 
-    // 1. เนเธเธฅเธเธฃเธซเธฑเธช PUA เธเธทเนเธเธเธฒเธเน€เธ”เธดเธก 8 เธ•เธฑเธง
+    // 1. แปลงรหัส PUA พื้นฐานเดิม 8 ตัว
     var puaMap = {
-      '\uE200': 'เธ', '\uE201': 'เธ', '\uE202': 'เธ', '\uE203': 'เธ”',
-      '\uE204': 'เธ', '\uE205': 'เธ', '\uE206': 'เธก', '\uE207': 'เธฃ'
+      '\uE200': 'ก', '\uE201': 'ง', '\uE202': 'จ', '\uE203': 'ด',
+      '\uE204': 'ค', '\uE205': 'น', '\uE206': 'ม', '\uE207': 'ร'
     };
     text = text.replace(/[\uE200-\uE207]/g, function(m){ return puaMap[m] || m; });
 
-    // 2. เธฅเธเธเนเธญเธเธงเธฒเธกเธเธขเธฐ เนเธเธฉเธ“เธฒ เธเธธเนเธกเธเธณเธ—เธฒเธ เนเธฅเธฐ Video Player Artifacts เธเธฒเธเน€เธงเนเธเธเธดเธขเธฒเธข
+    // 2. ลบข้อความขยะ โฆษณา ปุ่มนำทาง และ Video Player Artifacts จากเว็บนิยาย
     text = text
-      // เธฅเธเธเธธเนเธก Previous/Next Chapter เนเธฅเธฐ Table of Contents
-      .replace(/^[ \t]*(?:[โ€น<ยซ]?[ \t]*(?:Previous|Next)[ \t]*Chapter[ \t]*[โ€บ>ยป]?|Table of Contents|Back to list)[ \t]*$/gim, '')
-      // เธฅเธเธเธทเนเธญ Ad Network เน€เธเนเธ Ezoic
+      // ลบปุ่ม Previous/Next Chapter และ Table of Contents
+      .replace(/^[ \t]*(?:[‹<«]?[ \t]*(?:Previous|Next)[ \t]*Chapter[ \t]*[›>»]?|Table of Contents|Back to list)[ \t]*$/gim, '')
+      // ลบชื่อ Ad Network เช่น Ezoic
       .replace(/^[ \t]*Ezoic[ \t]*$/gim, '')
-      // เธฅเธเธเธธเนเธกเนเธฅเธฐเธเนเธญเธเธงเธฒเธกเธเธฒเธ Video Player เนเธเธฉเธ“เธฒ (Play, Unmute, Fullscreen เธฏเธฅเธฏ)
-      .replace(/^[ \t]*(?:[ร—xX]|Play|Pause|Unmute|Mute|Fullscreen|Advertisement:\s*\d+:\d+|Now Playing|Play Video|Watch on|Video channel logo)[ \t]*$/gim, '')
-      // เธฅเธเนเธ–เธเธซเธฑเธงเธเนเธญเนเธฅเธฐเธเธณเธเธฃเธฃเธขเธฒเธขเธงเธดเธ”เธตเนเธญเนเธเธฉเธ“เธฒ (video of: ..., Daily Gospel เธฏเธฅเธฏ)
+      // ลบปุ่มและข้อความจาก Video Player โฆษณา (Play, Unmute, Fullscreen ฯลฯ)
+      .replace(/^[ \t]*(?:[×xX]|Play|Pause|Unmute|Mute|Fullscreen|Advertisement:\s*\d+:\d+|Now Playing|Play Video|Watch on|Video channel logo)[ \t]*$/gim, '')
+      // ลบแถบหัวข้อและคำบรรยายวิดีโอโฆษณา (video of: ..., Daily Gospel ฯลฯ)
       .replace(/^[ \t]*(?:video of:\s*.*|Watch on\s*.*|.*Play Video.*)$/gim, '')
       .replace(/^[ \t]*(?:Daily Gospel.*|Catholic Bible.*|Fiction vs Nonfiction.*|Web Wealth.*)$/gim, '');
 
-    // 3. เธฅเนเธฒเธเธญเธฑเธเธเธฃเธฐเธฅเนเธญเธเธซเธ, เธชเธฑเธเธฅเธฑเธเธฉเธ“เนเธชเนเธเธเน€เธเธตเนเธขเธ, เธชเธฃเธฐเนเธญ
+    // 3. ล้างอักขระล่องหน, สัญลักษณ์สแกนเพี้ยน, สระแอ
     return text
       .replace(/\r/g, '')
-      .replace(/[\u00AD\u200B-\u200D\u2060\uFEFF\u202A-\u202E]/g, '') // เธฅเธ zero-width, soft-hyphen, bidi
-      .replace(/[โ€โ€]/g, '"').replace(/[โ€โ€]/g, "'")
-      .replace(/[โ–กโ– โ—โ—โ€ปยค]/g, '')
-      .replace(/รขโฌล“/g, '"').replace(/รขโฌ /g, '"')
-      .replace(/เน€เน€/g, 'เน')
-      .replace(/\n{3,}/g, '\n\n'); // เธขเธธเธเธเธฃเธฃเธ—เธฑเธ”เธงเนเธฒเธเธ—เธตเนเน€เธเธดเธ”เธเธฒเธเธเธฒเธฃเธฅเธเธเธขเธฐ เนเธซเนเน€เธซเธฅเธทเธญเน€เธงเนเธเธงเธฃเธฃเธเธขเนเธญเธซเธเนเธฒเธเธเธ•เธด (2 เธเธฃเธฃเธ—เธฑเธ”)
+      .replace(/[\u00AD\u200B-\u200D\u2060\uFEFF\u202A-\u202E]/g, '') // ลบ zero-width, soft-hyphen, bidi
+      .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+      .replace(/[□■◆◇※¤]/g, '')
+      .replace(/â€œ/g, '"').replace(/â€ /g, '"')
+      .replace(/เเ/g, 'แ')
+      .replace(/\n{3,}/g, '\n\n'); // ยุบบรรทัดว่างที่เกิดจากการลบขยะ ให้เหลือเว้นวรรคย่อหน้าปกติ (2 บรรทัด)
   }
 
-  /* ---------------- เธฃเธฐเธเธเธ•เธฃเธงเธเธเธฑเธเธเนเธญเธเธงเธฒเธกเน€เธเธตเนเธขเธ & เธเธญเธเธ•เน PUA ---------------- */
+  /* ---------------- ระบบตรวจจับข้อความเพี้ยน & ฟอนต์ PUA ---------------- */
   function highlightSuspicious(text){
     var box = document.getElementById('suspiciousBox');
     if(!box) return;
@@ -341,8 +341,8 @@
 
     var lines = text.split('\n');
     var puaRegex = /[\uE000-\uF8FF]/g;
-    var danglingVowelRegex = /(?:^|\s)[เธฐเธฑเธดเธตเธถเธทเธธเธนเธบเนเนเนเนเนเน]/; // เธชเธฃเธฐเธซเธฃเธทเธญเธงเธฃเธฃเธ“เธขเธธเธเธ•เนเธฅเธญเธขเธ—เธตเนเนเธกเนเธกเธตเธเธขเธฑเธเธเธเธณเธซเธเนเธฒ
-    var symbolRegex = /[โ–กโ– โ—โ—โ€ปยค]/g;
+    var danglingVowelRegex = /(?:^|\s)[ะัิีึืฺุู็่้๊๋์]/; // สระหรือวรรณยุกต์ลอยที่ไม่มีพยัญชนำหน้า
+    var symbolRegex = /[□■◆◇※¤]/g;
     var tripleRepeatRegex = /(.)\1\1\1/;
 
     var totalPuaCount = 0;
@@ -361,11 +361,11 @@
         var reasons = [];
         if(puaMatches){
           totalPuaCount += puaMatches.length;
-          reasons.push('เธเธญเธเธ•เนเน€เธเธตเนเธขเธ/PUA ' + puaMatches.length + ' เธ•เธฑเธง');
+          reasons.push('ฟอนต์เพี้ยน/PUA ' + puaMatches.length + ' ตัว');
         }
-        if(hasDangling) reasons.push('เธเธขเธฑเธเธเธเธฐเธ•เนเธเธซเธฒเธข (เธชเธฃเธฐเธฅเธญเธข)');
-        if(hasSymbol) reasons.push('เธกเธตเธชเธฑเธเธฅเธฑเธเธฉเธ“เนเธเธขเธฐ');
-        if(hasRepeat) reasons.push('เธญเธฑเธเธฉเธฃเธเนเธณเธเธดเธ”เธเธเธ•เธด');
+        if(hasDangling) reasons.push('พยัญชนะต้นหาย (สระลอย)');
+        if(hasSymbol) reasons.push('มีสัญลักษณ์ขยะ');
+        if(hasRepeat) reasons.push('อักษรซ้ำผิดปกติ');
 
         badLines.push({
           lineNum: idx + 1,
@@ -380,8 +380,8 @@
       box.innerHTML = '';
 
       var header = document.createElement('div');
-      header.innerHTML = '<b style="color:var(--pen);">โ  เธเธเธเนเธญเธเธงเธฒเธกเธเธดเธ”เธเธเธ•เธด ' + badLines.length + ' เธเธฃเธฃเธ—เธฑเธ”</b> ' +
-        (totalPuaCount > 0 ? '<span style="font-size:12px;color:var(--ink-soft);">(เธ•เธฃเธงเธเธเธเธญเธฑเธเธฉเธฃเธเธญเธเธ•เนเธเนเธญเธ PUA เธฃเธงเธก ' + totalPuaCount.toLocaleString() + ' เธ•เธฑเธง)</span>' : '');
+      header.innerHTML = '<b style="color:var(--pen);">⚠ พบข้อความผิดปกติ ' + badLines.length + ' บรรทัด</b> ' +
+        (totalPuaCount > 0 ? '<span style="font-size:12px;color:var(--ink-soft);">(ตรวจพบอักษรฟอนต์ซ่อน PUA รวม ' + totalPuaCount.toLocaleString() + ' ตัว)</span>' : '');
       box.appendChild(header);
 
       var list = document.createElement('div');
@@ -391,7 +391,7 @@
       badLines.slice(0, 4).forEach(function(item){
         var row = document.createElement('div');
         row.style.marginBottom = '3px';
-        row.innerHTML = '<b>เธเธฃเธฃเธ—เธฑเธ” ' + item.lineNum + ':</b> <code>' + escapeHtml(item.preview) + '</code> <span style="color:var(--pen);font-size:11px;">โณ ' + item.reasons + '</span>';
+        row.innerHTML = '<b>บรรทัด ' + item.lineNum + ':</b> <code>' + escapeHtml(item.preview) + '</code> <span style="color:var(--pen);font-size:11px;">↳ ' + item.reasons + '</span>';
         list.appendChild(row);
       });
 
@@ -400,7 +400,7 @@
         more.style.marginTop = '4px';
         more.style.fontStyle = 'italic';
         more.style.color = 'var(--ink-soft)';
-        more.textContent = '...เนเธฅเธฐเธญเธตเธ ' + (badLines.length - 4) + ' เธเธฃเธฃเธ—เธฑเธ”เธ—เธตเนเธกเธตเธฅเธฑเธเธฉเธ“เธฐเน€เธ”เธตเธขเธงเธเธฑเธ';
+        more.textContent = '...และอีก ' + (badLines.length - 4) + ' บรรทัดที่มีลักษณะเดียวกัน';
         list.appendChild(more);
       }
 
@@ -413,43 +413,43 @@
   quickRepairBtn.addEventListener('click', function(){
     hideError();
     var text = inputText.value.trim();
-    if(!text){ showError('เธเธฃเธธเธ“เธฒเนเธชเนเธเนเธญเธเธงเธฒเธกเธ•เนเธเธเธเธฑเธเธเนเธญเธ'); return; }
+    if(!text){ showError('กรุณาใส่ข้อความต้นฉบับก่อน'); return; }
 
     inputText.value = normalizeOCR(text);
     highlightSuspicious(inputText.value);
     saveDraftSoon();
 
-    progressText.textContent = 'เธเนเธญเธกเธเนเธญเธเธงเธฒเธกเธฃเธงเธ”เน€เธฃเนเธงเน€เธชเธฃเนเธเธชเธดเนเธ';
+    progressText.textContent = 'ซ่อมข้อความรวดเร็วเสร็จสิ้น';
     setTimeout(function(){ progressText.textContent = ''; }, 2000);
   });
 
-/* ---------------- Prompt เธเนเธญเธก OCR 2 เธฃเธฐเธ”เธฑเธ (เธ เธฒเธฉเธฒเนเธ—เธข vs เธ เธฒเธฉเธฒเธ•เนเธฒเธเธเธฃเธฐเน€เธ—เธจ) ---------------- */
+/* ---------------- Prompt ซ่อม OCR 2 ระดับ (ภาษาไทย vs ภาษาต่างประเทศ) ---------------- */
   function buildOCRRepairPrompt(sampleText){
-    // เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเธเนเธญเธเธงเธฒเธกเน€เธเนเธเธ เธฒเธฉเธฒเนเธ—เธขเธซเธฃเธทเธญเธ เธฒเธฉเธฒเธ•เนเธฒเธเธเธฃเธฐเน€เธ—เธจ
+    // ตรวจสอบว่าข้อความเป็นภาษาไทยหรือภาษาต่างประเทศ
     var hasThai = /[\u0E00-\u0E7F]/.test(sampleText || '');
     var isThaiMode = (state.source === 'polish') || hasThai;
 
     if (isThaiMode) {
-      // ๐น เธฃเธฐเธ”เธฑเธเธ—เธตเน 1: เธเนเธญเธก OCR เธ เธฒเธฉเธฒเนเธ—เธข เนเธฅเธฐเธ–เธญเธ”เธฃเธซเธฑเธชเธเธญเธเธ•เน PUA
-      return `เธเธธเธ“เธเธทเธญเธฃเธฐเธเธเธ•เธฃเธงเธเธชเธญเธเนเธฅเธฐเธเนเธญเธกเนเธเธกเธเนเธญเธเธงเธฒเธกเธ เธฒเธฉเธฒเนเธ—เธข (Thai OCR & Font De-obfuscation Engine)
+      // 🇹 ระดับที่ 1: ซ่อม OCR ภาษาไทย และถอดรหัสฟอนต์ PUA
+      return `คุณคือระบบตรวจสอบและซ่อมแซมข้อความภาษาไทย (Thai OCR & Font De-obfuscation Engine)
 
-เธซเธเนเธฒเธ—เธตเนเธเธญเธเธเธธเธ“:
-1. เธญเนเธฒเธเธเธฃเธดเธเธ—เธเธญเธเธเธฃเธฐเนเธขเธเธ เธฒเธฉเธฒเนเธ—เธข เนเธฅเนเธงเธ–เธญเธ”เธฃเธซเธฑเธชเธ•เธฑเธงเธญเธฑเธเธฉเธฃ PUA เธ—เธตเนเน€เธเธตเนเธขเธ เธซเธฃเธทเธญเธ•เธฑเธงเธญเธฑเธเธฉเธฃเธ—เธตเนเธชเนเธเธเธเธดเธ” เนเธซเนเธเธฅเธฑเธเธกเธฒเน€เธเนเธเธเธณเธ เธฒเธฉเธฒเนเธ—เธขเธ—เธตเนเธ–เธนเธเธ•เนเธญเธเนเธฅเธฐเธชเธกเธเธนเธฃเธ“เน 100%
-2. เธเนเธญเธกเธเธณเธ—เธตเนเธชเธฃเธฐเธซเธฃเธทเธญเธงเธฃเธฃเธ“เธขเธธเธเธ•เนเธซเธฅเธธเธ”เธซเธฒเธขเธเธฒเธเธเธฒเธฃเธชเนเธเธ เนเธฅเธฐเนเธเนเธชเธฃเธฐเนเธญเน€เธเธตเนเธขเธ (เน€เน€ -> เน)
+หน้าที่ของคุณ:
+1. อ่านบริบทของประโยคภาษาไทย แล้วถอดรหัสตัวอักษร PUA ที่เพี้ยน หรือตัวอักษรที่สแกนผิด ให้กลับมาเป็นคำภาษาไทยที่ถูกต้องและสมบูรณ์ 100%
+2. ซ่อมคำที่สระหรือวรรณยุกต์หลุดหายจากการสแกน และแก้สระแอเพี้ยน (เเ -> แ)
 
-[เธเนเธญเธซเนเธฒเธกเน€เธ”เนเธ”เธเธฒเธ” - Strict Constraints]
-1. เธซเนเธฒเธกเธชเธฃเธธเธเธเธงเธฒเธก เธซเนเธฒเธกเธ•เธฑเธ”เธ—เธญเธเน€เธเธทเนเธญเธซเธฒ เนเธฅเธฐเธซเนเธฒเธกเนเธ•เนเธเน€เธฃเธทเนเธญเธเธ•เนเธญเน€เธ”เนเธ”เธเธฒเธ”!
-2. เธ•เนเธญเธเธเธเน€เธเธทเนเธญเธซเธฒเน€เธ”เธดเธก เธขเนเธญเธซเธเนเธฒเน€เธ”เธดเธก เธเธ—เธชเธเธ—เธเธฒ เนเธฅเธฐเน€เธเธฃเธทเนเธญเธเธซเธกเธฒเธขเธเธณเธเธนเธ”เนเธงเนเธเธฃเธเธ–เนเธงเธ 100%
-3. เธ•เธญเธเธเธฅเธฑเธเน€เธเธเธฒเธฐเธเนเธญเธเธงเธฒเธกเธ เธฒเธฉเธฒเนเธ—เธขเธ—เธตเนเธเนเธญเธกเน€เธชเธฃเนเธเนเธฅเนเธงเน€เธ—เนเธฒเธเธฑเนเธ เธซเนเธฒเธกเธกเธตเธเธณเธญเธเธดเธเธฒเธข เธเธณเธเธณ เธซเธฃเธทเธญเธเนเธญเธเธงเธฒเธกเน€เธเธดเธ”/เธเธดเธ”`;
+[ข้อห้ามเด็ดขาด - Strict Constraints]
+1. ห้ามสรุปความ ห้ามตัดทอนเนื้อหา และห้ามแต่งเรื่องต่อเด็ดขาด!
+2. ต้องคงเนื้อหาเดิม ย่อหน้าเดิม บทสนทนา และเครื่องหมายคำพูดไว้ครบถ้วน 100%
+3. ตอบกลับเฉพาะข้อความภาษาไทยที่ซ่อมเสร็จแล้วเท่านั้น ห้ามมีคำอธิบาย คำนำ หรือข้อความเปิด/ปิด`;
     } else {
-      //  เธฃเธฐเธ”เธฑเธเธ—เธตเน 2: เธเนเธญเธก OCR เธ เธฒเธฉเธฒเธ•เนเธเธเธเธฑเธเธ•เนเธฒเธเธเธฃเธฐเน€เธ—เธจ (เน€เธเนเธ เธ เธฒเธฉเธฒเธญเธฑเธเธเธคเธฉ) เนเธ”เธขเธซเนเธฒเธกเนเธเธฅ
+      //  ระดับที่ 2: ซ่อม OCR ภาษาต้นฉบับต่างประเทศ (เช่น ภาษาอังกฤษ) โดยห้ามแปล
       return `You are a professional Raw Text OCR Corrector and Typo Repair Engine.
 
 Your task is to fix optical character recognition (OCR) scan errors, broken typography, and line-break artifacts in the provided foreign text (e.g., English).
 
 [Tasks to perform]
 1. Rejoin hyphenated words split across line breaks (e.g., "trans- lation" -> "translation", "con- dition" -> "condition").
-2. Fix common OCR character confusions (e.g., "rn" mistyped as "m", "cl" as "d", "1" or "I" as "l", broken quotes like "รขโฌล“").
+2. Fix common OCR character confusions (e.g., "rn" mistyped as "m", "cl" as "d", "1" or "I" as "l", broken quotes like "â€œ").
 3. Fix obvious spelling mistakes caused by scanning artifacts while preserving novel terms, character names, and original tone.
 
 [STRICT CONSTRAINTS - CRITICAL]
@@ -469,7 +469,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     }
     function splitOversizedParagraph(para){
       var parts = [];
-      var sentences = para.split(/(?<=[.!?ใ€๏ผ๏ผ\n])\s*/).filter(Boolean);
+      var sentences = para.split(/(?<=[.!?。！？\n])\s*/).filter(Boolean);
       var buf = '';
       sentences.forEach(function(sen){
         if((buf + sen).length > maxLen){

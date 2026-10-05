@@ -6,7 +6,7 @@
   var storageV2 = window.PrungAksornStorageV2;
   if(!storageV2) throw new Error('IndexedDB V2 storage layer failed to load.');
 
-  var state = { source: 'translate', level: 'edit', genre: 'เธ—เธฑเนเธงเนเธ', style: 'เธชเธณเธเธงเธเธเธฑเธเธเธธเธเธฑเธ' };
+  var state = { source: 'translate', level: 'edit', genre: 'ทั่วไป', style: 'สำนวนปัจจุบัน' };
   var appData = { projects: [], currentProjectId: null };
   var storageReady = false;
   var expandedProjects = {};
@@ -17,7 +17,7 @@
   var draftSaveGeneration = 0;
   var outputFontSize = 15.5;
 
-  var defaultSettings = { provider:'openai', model:'gpt-4o-mini', chunkLen:'3000', source:'translate', level:'edit', genre:'เธ—เธฑเนเธงเนเธ', style:'เธชเธณเธเธงเธเธเธฑเธเธเธธเธเธฑเธ', outputFontSize:15.5, darkMode: false, ttsRate:'1', ttsVoiceURI:'' };
+  var defaultSettings = { provider:'openai', model:'gpt-4o-mini', chunkLen:'3000', source:'translate', level:'edit', genre:'ทั่วไป', style:'สำนวนปัจจุบัน', outputFontSize:15.5, darkMode: false, ttsRate:'1', ttsVoiceURI:'' };
 
   // API Pricing (USD per 1,000,000 tokens)
   var API_RATES = {
@@ -54,13 +54,13 @@
       spread.classList.remove('show-output');
       tabSourceBtn.classList.add('active');
       tabOutputBtn.classList.remove('active');
-      if(mobileTabToggleBtn) mobileTabToggleBtn.textContent = 'โก เธ”เธนเธเธฅเธฅเธฑเธเธเน';
+      if(mobileTabToggleBtn) mobileTabToggleBtn.textContent = '≡ ดูผลลัพธ์';
     }else{
       spread.classList.remove('show-source');
       spread.classList.add('show-output');
       tabSourceBtn.classList.remove('active');
       tabOutputBtn.classList.add('active');
-      if(mobileTabToggleBtn) mobileTabToggleBtn.textContent = 'โ–  เธ”เธนเธ•เนเธเธเธเธฑเธ';
+      if(mobileTabToggleBtn) mobileTabToggleBtn.textContent = '■ ดูต้นฉบับ';
     }
   }
   tabSourceBtn.addEventListener('click', function(){ switchMobileTab('source'); });
@@ -88,7 +88,7 @@
   function toggleZenMode(enable){
     var isZen = (typeof enable === 'boolean') ? enable : !document.body.classList.contains('zen-mode');
     document.body.classList.toggle('zen-mode', isZen);
-    zenToggleBtn.textContent = isZen ? 'โ– เธญเธญเธเธเธฒเธเนเธซเธกเธ”เธชเธกเธฒเธเธด' : 'โถ เนเธซเธกเธ”เธชเธกเธฒเธเธด';
+    zenToggleBtn.textContent = isZen ? '✖ ออกจากโหมดสมาธิ' : '⛶ โหมดสมาธิ';
   }
   zenToggleBtn.addEventListener('click', function(){ toggleZenMode(); });
   exitZenBtn.addEventListener('click', function(){ toggleZenMode(false); });
@@ -98,10 +98,10 @@
   var readerThemeIconWrapper = document.getElementById('readerThemeIconWrapper');
 
   function updateThemeButtons(isDark) {
-    themeToggleBtn.textContent = isDark ? 'โผ เนเธซเธกเธ”เธชเธงเนเธฒเธ' : 'โพ เนเธซเธกเธ”เธกเธทเธ”';
+    themeToggleBtn.textContent = isDark ? '☼ โหมดสว่าง' : '☾ โหมดมืด';
     if (readerThemeToggleBtn) {
-      readerThemeIconWrapper.textContent = isDark ? 'โผ' : 'โพ';
-      readerThemeToggleBtn.querySelector('.text-label').textContent = isDark ? 'เนเธซเธกเธ”เธชเธงเนเธฒเธ' : 'เนเธซเธกเธ”เธกเธทเธ”';
+      readerThemeIconWrapper.textContent = isDark ? '☼' : '☾';
+      readerThemeToggleBtn.querySelector('.text-label').textContent = isDark ? 'โหมดสว่าง' : 'โหมดมืด';
     }
   }
 
@@ -148,7 +148,7 @@
   var sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
   mobileSidebarToggle.addEventListener('click', function(){
     var isOpen = sidebar.classList.toggle('open');
-    sidebarToggleIcon.textContent = isOpen ? 'โ–ฒ' : 'โ–ผ';
+    sidebarToggleIcon.textContent = isOpen ? '▲' : '▼';
   });
 
   var toggleBottomHistoryBtn = document.getElementById('toggleBottomHistoryBtn');
@@ -269,7 +269,7 @@
 
     var activeBook = getActiveBook(proj);
     var bookSuffix = activeBook ? (' [' + activeBook.title + ']') : '';
-    titleEl.textContent = 'เธเธฃเธฐเธงเธฑเธ•เธดเน€เธฃเธทเนเธญเธ "' + proj.name + '"' + bookSuffix;
+    titleEl.textContent = 'ประวัติเรื่อง "' + proj.name + '"' + bookSuffix;
     container.innerHTML = '';
 
     var historyList = getActiveHistoryList(proj);
@@ -277,7 +277,7 @@
     if(!historyList || historyList.length === 0){
       var empty = document.createElement('div');
       empty.className = 'history-empty';
-      empty.textContent = 'เธขเธฑเธเนเธกเนเธกเธตเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเนเธเธฅเธชเธณเธซเธฃเธฑเธเน€เธฅเนเธกเธเธตเน';
+      empty.textContent = 'ยังไม่มีประวัติการแปลสำหรับเล่มนี้';
       container.appendChild(empty);
       return;
     }
@@ -288,7 +288,7 @@
 
       var title = document.createElement('div');
       title.className = 'bottom-history-title';
-      title.textContent = (entry.label || ('เนเธเธฅ' + (idx + 1))) + ' ยท ' + fmtTime(entry.ts);
+      title.textContent = (entry.label || ('แปล' + (idx + 1))) + ' · ' + fmtTime(entry.ts);
       title.addEventListener('click', function(){
         viewHistoryEntry(proj, entry, idx);
       });
@@ -299,18 +299,18 @@
 
       var renameBtn = document.createElement('button');
       renameBtn.className = 'icon-btn';
-      renameBtn.title = 'เน€เธเธฅเธตเนเธขเธเธเธทเนเธญ';
-      renameBtn.textContent = 'โ';
+      renameBtn.title = 'เปลี่ยนชื่อ';
+      renameBtn.textContent = '✎';
       renameBtn.addEventListener('click', async function(e){
         e.stopPropagation();
-        var currentLabel = entry.label || ('เนเธเธฅ' + (idx + 1));
-        var newLabel = await showPromptDialog('เธ•เธฑเนเธเธเธทเนเธญเธ•เธญเธเนเธเธฅเธเธตเน', currentLabel);
+        var currentLabel = entry.label || ('แปล' + (idx + 1));
+        var newLabel = await showPromptDialog('ตั้งชื่อตอนแปลนี้', currentLabel);
         if(newLabel && newLabel.trim()){
           entry.label = newLabel.trim();
           commitChange();
           if(viewingHistoryId === entry.id){
-            historyViewLabel.textContent = 'เธ”เธนเธเธฃเธฐเธงเธฑเธ•เธด: ' + entry.label;
-            historyViewLabelBottom.textContent = 'เธเธฃเธฐเธงเธฑเธ•เธด: ' + entry.label;
+            historyViewLabel.textContent = 'ดูประวัติ: ' + entry.label;
+            historyViewLabelBottom.textContent = 'ประวัติ: ' + entry.label;
           }
         }
       });
@@ -318,12 +318,12 @@
 
       var delBtn = document.createElement('button');
       delBtn.className = 'icon-btn';
-      delBtn.title = 'เธฅเธเธเธฃเธฐเธงเธฑเธ•เธด';
-      delBtn.textContent = 'โ•';
+      delBtn.title = 'ลบประวัติ';
+      delBtn.textContent = '✕';
       delBtn.addEventListener('click', async function(e){
         e.stopPropagation();
-        var itemLabel = entry.label || ('เนเธเธฅ' + (idx + 1));
-        var ok = await showConfirmDialog('เธฅเธเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเนเธเธฅ', 'เธ•เนเธญเธเธเธฒเธฃเธฅเธ "' + itemLabel + '" เธซเธฃเธทเธญเนเธกเน? เธเธฒเธฃเธฅเธเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธขเนเธญเธเธเธฅเธฑเธเนเธ”เน', true);
+        var itemLabel = entry.label || ('แปล' + (idx + 1));
+        var ok = await showConfirmDialog('ลบประวัติการแปล', 'ต้องการลบ "' + itemLabel + '" หรือไม่? การลบไม่สามารถย้อนกลับได้', true);
         if(ok){
           var currentHistory = getActiveHistoryList(proj);
           var filtered = currentHistory.filter(function(h){ return h.id !== entry.id; });
@@ -344,13 +344,13 @@
       if(entry.parentId){
         var diffBtnEl = document.createElement('button');
         diffBtnEl.className = 'icon-btn diff-btn';
-        diffBtnEl.title = 'เน€เธ—เธตเธขเธเธเธงเธฒเธกเธ•เนเธฒเธเธเธฑเธเธ•เนเธเธเธเธฑเธเธ—เธตเนเนเธเนเธกเธฒเธเธฒเธ';
-        diffBtnEl.textContent = 'ฮ”';
+        diffBtnEl.title = 'เทียบความต่างกับต้นฉบับที่แก้มาจาก';
+        diffBtnEl.textContent = 'Δ';
         diffBtnEl.addEventListener('click', async function(e){
           e.stopPropagation();
           var parentEntry = findEntryById(proj, entry.parentId);
-          if(!parentEntry){ await showAlertDialog('เนเธกเนเธเธเธ•เนเธเธ—เธฒเธ', 'เนเธกเนเธเธเธเธเธฑเธเธ•เนเธเธ—เธฒเธเธ—เธตเนเนเธเนเน€เธ—เธตเธขเธ (เธญเธฒเธเธ–เธนเธเธฅเธเนเธเนเธฅเนเธง)'); return; }
-          openDiff(parentEntry.output, entry.output, 'เน€เธ—เธตเธขเธ "' + (parentEntry.label || 'เธ•เนเธเธ—เธฒเธ') + '" เธเธฑเธ "' + (entry.label || 'เธเธเธฑเธเนเธเนเนเธ') + '"');
+          if(!parentEntry){ await showAlertDialog('ไม่พบต้นทาง', 'ไม่พบฉบับต้นทางที่ใช้เทียบ (อาจถูกลบไปแล้ว)'); return; }
+          openDiff(parentEntry.output, entry.output, 'เทียบ "' + (parentEntry.label || 'ต้นทาง') + '" กับ "' + (entry.label || 'ฉบับแก้ไข') + '"');
         });
         actions.appendChild(diffBtnEl);
       }
