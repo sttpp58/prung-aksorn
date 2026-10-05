@@ -3,13 +3,31 @@
 // ไม่แตะ/ไม่แคชการเรียก AI API (OpenAI, Gemini) หรือฟอนต์จาก Google เด็ดขาด
 // เพื่อไม่ให้คำแปลค้างหรือใช้คีย์/โควตาผิดพลาด
 
-const APP_RELEASE_VERSION = 'v8';
+const APP_RELEASE_VERSION = 'v9';
 const CACHE_NAME = `prung-aksorn-${APP_RELEASE_VERSION}`;
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './app/01-shell-context-history.js',
+  './app/02-translation-recovery.js',
+  './app/03-storage-settings.js',
+  './app/04-utils-prompts-diff.js',
+  './app/05-dialog-ai-core.js',
+  './app/06-projects.js',
+  './app/07-glossary.js',
+  './app/08-tqg-controller.js',
+  './app/09-editor-draft.js',
+  './app/10-ocr-chunking.js',
+  './app/11-ai-providers-recovery-state.js',
+  './app/12-translation-core.js',
+  './app/13-batch.js',
+  './app/14-export.js',
+  './app/15-reader-tts.js',
+  './app/16-book-tools.js',
+  './app/17-reader-mode.js',
+  './app/18-ingestion.js',
   './storage-v2.js',
   './tqg.js',
   './tqg-inspector.js',

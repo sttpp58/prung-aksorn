@@ -48,6 +48,11 @@ const integration = read('tqg-integration.js');
 const ui = read('tqg-ui.js');
 const indexHtml = read('index.html');
 const app = read('app.js');
+const appModuleFiles = fs.readdirSync(path.join(ROOT, 'app'))
+  .filter((file) => /^\d\d-.*\.js$/.test(file))
+  .sort()
+  .map((file) => `app/${file}`);
+const appRuntime = `${appModuleFiles.map((file) => read(file)).join('\\n')}\\n${app}`;
 const sw = read('sw.js');
 const workflow = read('.github/workflows/regression-gate.yml');
 const gitignore = read('.gitignore');
@@ -124,9 +129,9 @@ check(integration.includes('completed-output boundary'), 'Integration retains an
 check(ui.includes("version: 'TQG-07-2026-09-30'"), 'Quality UI version is locked');
 check(!/[\u{1F000}-\u{1FAFF}]/u.test(ui), 'Quality UI contains no emoji characters');
 
-check(app.includes('TQGIntegration'), 'application contains TQG integration boundary');
-check(app.includes('analyzeTQGCompletedOutput'), 'application uses the centralized completed-output TQG helper');
-check(app.includes("state.source !== 'translate'"), 'TQG integration remains translate-only');
+check(appRuntime.includes('TQGIntegration'), 'application runtime contains TQG integration boundary');
+check(appRuntime.includes('analyzeTQGCompletedOutput'), 'application runtime uses the centralized completed-output TQG helper');
+check(appRuntime.includes("state.source !== 'translate'"), 'TQG integration remains translate-only');
 check(sw.includes('./tqg.js') && sw.includes('./tqg-inspector.js') &&
   sw.includes('./tqg-repair.js') && sw.includes('./tqg-ui.js') &&
   sw.includes('./tqg-integration.js'),

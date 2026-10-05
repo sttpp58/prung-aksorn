@@ -737,6 +737,12 @@ function functionBody(source, functionName) {
 }
 const pageSource = read('index.html');
 const indexSource = read('app.js');
+const appRuntimeSource = fs.readdirSync(path.join(ROOT, 'app'))
+  .filter((file) => /^\d\d-.*\.js$/.test(file))
+  .sort()
+  .map((file) => read('app/' + file))
+  .concat(indexSource)
+  .join('\n');
 const swSource = read('sw.js');
 const tqgSource = read('tqg.js');
 const inspectorSource = read('tqg-inspector.js');
@@ -759,7 +765,7 @@ for (const functionName of [
   'runBatchTranslationRecovery',
   'retryBatchTranslationJob'
 ]) {
-  const body = functionBody(indexSource, functionName);
+  const body = functionBody(appRuntimeSource, functionName);
   check(body.length > 0, functionName + ' remains statically discoverable');
   const completion = body.lastIndexOf('completeTranslationJob(');
   const tqgCall = body.lastIndexOf('analyzeTQGCompletedOutput(');
@@ -769,8 +775,8 @@ for (const functionName of [
   );
 }
 check(
-  indexSource.indexOf('checkpointTranslationJob(') <
-    indexSource.indexOf('analyzeTQGCompletedOutput('),
+  appRuntimeSource.indexOf('checkpointTranslationJob(') <
+    appRuntimeSource.indexOf('analyzeTQGCompletedOutput('),
   'TQG is not introduced before the first checkpoint'
 );
 
@@ -823,11 +829,11 @@ check(
 );
 
 check(
-  /TQGIntegration\.analyzeCompletedOutput/.test(indexSource),
+  /TQGIntegration\.analyzeCompletedOutput/.test(appRuntimeSource),
   'production integration reaches deterministic TQG through the boundary module'
 );
 check(
-  /state\.source\s*!==\s*'translate'/.test(indexSource),
+  /state\.source\s*!==\s*'translate'/.test(appRuntimeSource),
   'production TQG actions remain translate-only'
 );
 

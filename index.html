@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!-- CSP: runtime JavaScript is externalized to the same-origin app entrypoint; script/style/network capabilities remain explicitly restricted. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.openai.com https://generativelanguage.googleapis.com; worker-src 'self' blob:; manifest-src 'self';">
-<meta name="app-release-version" content="v8">
+<meta name="app-release-version" content="v9">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ปรุงอักษร — ห้องทำงานนักแปล</title>
 <link rel="manifest" href="manifest.json">
@@ -374,6 +374,25 @@
 <script src="tqg-repair.js"></script>
 <script src="tqg-ui.js"></script>
 <script src="tqg-integration.js"></script>
+<!-- Ordered classic app modules: keep this order to preserve the original runtime execution semantics. -->
+<script src="app/01-shell-context-history.js"></script>
+<script src="app/02-translation-recovery.js"></script>
+<script src="app/03-storage-settings.js"></script>
+<script src="app/04-utils-prompts-diff.js"></script>
+<script src="app/05-dialog-ai-core.js"></script>
+<script src="app/06-projects.js"></script>
+<script src="app/07-glossary.js"></script>
+<script src="app/08-tqg-controller.js"></script>
+<script src="app/09-editor-draft.js"></script>
+<script src="app/10-ocr-chunking.js"></script>
+<script src="app/11-ai-providers-recovery-state.js"></script>
+<script src="app/12-translation-core.js"></script>
+<script src="app/13-batch.js"></script>
+<script src="app/14-export.js"></script>
+<script src="app/15-reader-tts.js"></script>
+<script src="app/16-book-tools.js"></script>
+<script src="app/17-reader-mode.js"></script>
+<script src="app/18-ingestion.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
