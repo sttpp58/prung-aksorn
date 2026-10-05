@@ -541,6 +541,16 @@
     align-items: center;
     gap: 12px;
   }
+
+  /* Translation recovery box: keep the dynamic flex item inside narrow viewports. */
+  #translationRecoveryBox{
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    box-sizing:border-box;
+    align-self:stretch;
+  }
+  #translationRecoveryBox > div{min-width:0;}
   
   .process-btn-primary {
     width: 100%;

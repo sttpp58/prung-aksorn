@@ -334,6 +334,10 @@ try {
   await waitForFunction(cdp, `document.getElementById('output').textContent.includes('Translated result from Book A')`, 8_000);
   check(await read(cdp, `document.getElementById('output').textContent.includes('Translated result from Book A')`), 'Book A translated result remains accessible through visible history UI');
 
+  await cdp.send('Emulation.setDeviceMetricsOverride', {width:390,height:844,deviceScaleFactor:1,mobile:true});
+  check(await read(cdp, `(()=>{const host=document.querySelector('.action-container'); const box=document.createElement('div'); box.id='translationRecoveryBox'; box.innerHTML='<div>พบงานแปลที่ต้องตรวจสอบ</div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">千零四十五章 書奇隔落 長標題สำหรับทดสอบมือถือ — 0/1 (failed) — ไม่พบ Project ต้นทาง</span><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><button type="button">ซ่อน</button></div></div><div style="margin-top:8px;font-size:.9em;opacity:.75">ระบบจะไม่เริ่ม API อัตโนมัติ ต้องกดกู้คืนและเริ่มงานด้วยตนเอง</div>'; host.appendChild(box); const dismiss=box.querySelector('button'); const boxRect=box.getBoundingClientRect(); const buttonRect=dismiss.getBoundingClientRect(); const fits=boxRect.left>=0 && boxRect.right<=window.innerWidth && document.documentElement.scrollWidth<=window.innerWidth && buttonRect.width>0 && buttonRect.left>=0 && buttonRect.right<=window.innerWidth; box.remove(); return fits;})()`), 'mobile recovery box keeps the dismiss button inside the viewport');
+  await cdp.send('Emulation.clearDeviceMetricsOverride');
+
   check(pageErrors.length === 0, 'browser reported no uncaught runtime/page errors during E2E scenario');
   console.log('');
   console.log('Browser E2E / Real User Scenario: PASS');
