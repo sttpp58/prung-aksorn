@@ -3030,14 +3030,14 @@
     renderCostMeter();
   }
 
-  async function callAIWithRetry(sys, text, key, model, signal, maxRetries, providerOverride){
+  async function callAIWithRetry(sys, text, key, model, signal, maxRetries, providerOverride, responseFormat){
     var requestProvider = providerOverride || providerSel.value;
     var lastErr;
     for(var attempt = 0; attempt <= maxRetries; attempt++){
       try{
         return await (requestProvider === 'openai'
-          ? callOpenAI(sys, text, key, model, signal)
-          : callGemini(sys, text, key, model, signal));
+          ? callOpenAI(sys, text, key, model, signal, responseFormat)
+          : callGemini(sys, text, key, model, signal, responseFormat));
       }catch(err){
         if(err.name === 'AbortError') throw err;
         lastErr = err;
@@ -3698,7 +3698,8 @@
         modelInput.value,
         activeController.signal,
         1,
-        providerSel.value
+        providerSel.value,
+        'json'
       );
     };
   }
@@ -4611,15 +4612,19 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
   function showError(msg){ errorBox.textContent = msg; errorBox.classList.add('show'); }
   function hideError(){ errorBox.classList.remove('show'); }
 
-  async function callOpenAI(sys, text, key, model, signal){
+  async function callOpenAI(sys, text, key, model, signal, responseFormat){
+    var body = {
+      model: model,
+      messages: [{role:'system', content:sys}, {role:'user', content:text}],
+      temperature: 0.1
+    };
+    if(responseFormat === 'json'){
+      body.response_format = { type: 'json_object' };
+    }
     var res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({
-        model: model,
-        messages: [{role:'system', content:sys}, {role:'user', content:text}],
-        temperature: 0.1
-      }),
+      body: JSON.stringify(body),
       signal: signal
     });
     if(!res.ok){
@@ -4636,8 +4641,15 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
   }
 
   /* เรียก Gemini โดยส่ง Key ผ่าน Header x-goog-api-key */
-  async function callGemini(sys, text, key, model, signal){
+  async function callGemini(sys, text, key, model, signal, responseFormat){
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
+    var generationConfig = {
+      temperature: 0.0,
+      topP: 0.1
+    };
+    if(responseFormat === 'json'){
+      generationConfig.responseMimeType = 'application/json';
+    }
     var res = await fetch(url, {
       method: 'POST',
       headers: { 
@@ -4647,10 +4659,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
       body: JSON.stringify({
         system_instruction: { parts: [{ text: sys }] },
         contents: [{ parts: [{ text: text }] }],
-        generationConfig: {
-          temperature: 0.0,
-          topP: 0.1
-        }
+        generationConfig: generationConfig
       }),
       signal: signal
     });
