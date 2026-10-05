@@ -120,6 +120,80 @@ function assertCspContract(indexHtml) {
   pass('CSP contract: fail-closed directives, trusted inline hashes, and explicit origins');
 }
 
+function readGitFileAtRef(ref, file) {
+  if (!ref || /^0+$/.test(ref)) return null;
+  const result = spawnSync('git', ['show', `${ref}:${file}`], {
+    cwd: ROOT,
+    encoding: 'utf8'
+  });
+  return result.status === 0 ? result.stdout : null;
+}
+
+function readChangedFilesSince(ref) {
+  if (!ref || /^0+$/.test(ref)) return [];
+  const result = spawnSync('git', ['diff', '--name-only', `${ref}...HEAD`], {
+    cwd: ROOT,
+    encoding: 'utf8'
+  });
+  if (result.status !== 0) {
+    fail(`Unable to determine changed files since ${ref}: ${result.stderr.trim()}`);
+  }
+  return result.stdout.split(/\r?\n/).map((file) => file.trim()).filter(Boolean);
+}
+
+function assertServiceWorkerReleaseGuard(indexHtml, sw, manifest) {
+  const releaseVersion = String(manifest['x-app-release-version'] || '');
+  assert(/^v\d+$/.test(releaseVersion), 'manifest declares a valid app release version');
+
+  const indexMatch = indexHtml.match(/<meta\s+name=["']app-release-version["']\s+content=["']([^"']+)["'][^>]*>/i);
+  assert(indexMatch, 'index.html declares app release version');
+  assert(indexMatch[1] === releaseVersion, 'index.html release version matches manifest');
+
+  const swMatch = sw.match(/const\s+APP_RELEASE_VERSION\s*=\s*["']([^"']+)["']/);
+  assert(swMatch, 'Service Worker declares app release version');
+  assert(swMatch[1] === releaseVersion, 'Service Worker release version matches manifest');
+
+  const cacheMatch = sw.match(/const\s+CACHE_NAME\s*=\s*`prung-aksorn-\$\{APP_RELEASE_VERSION\}`/);
+  assert(cacheMatch, 'Service Worker cache name is derived from release version');
+
+  const baseRef = process.env.SW_RELEASE_BASE_SHA;
+  const baseManifestText = readGitFileAtRef(baseRef, 'manifest.json');
+  if (!baseManifestText) {
+    return pass('Service Worker release bump guard: no versioned base manifest; current release version is established');
+  }
+
+  let baseManifest;
+  try {
+    baseManifest = JSON.parse(baseManifestText);
+  } catch (error) {
+    fail(`Base manifest.json is invalid JSON: ${error.message}`);
+  }
+  const baseVersion = String(baseManifest['x-app-release-version'] || '');
+  const appShellFiles = new Set([
+    'index.html',
+    'manifest.json',
+    'storage-v2.js',
+    'tqg.js',
+    'tqg-inspector.js',
+    'tqg-repair.js',
+    'tqg-ui.js',
+    'tqg-integration.js',
+    'icons/icon-192.png',
+    'icons/icon-512.png'
+  ]);
+  const changedAppShellFiles = readChangedFilesSince(baseRef).filter((file) => appShellFiles.has(file));
+
+  if (changedAppShellFiles.length === 0) {
+    return pass('Service Worker release bump guard: no app-shell changes require a version bump');
+  }
+
+  assert(
+    releaseVersion !== baseVersion,
+    `Service Worker release version bumped for app-shell changes: ${baseVersion || 'unversioned'} -> ${releaseVersion}`
+  );
+  pass(`Service Worker release bump guard covers changed app-shell files: ${changedAppShellFiles.join(', ')}`);
+}
+
 function extractCalls(source, functionName) {
   const token = `PrungAksornStorageV2.${functionName}(`;
   const calls = [];
@@ -517,10 +591,6 @@ function main() {
   assertAllRevisionCallSites(indexHtml);
 
   assert(
-    /const\s+CACHE_NAME\s*=\s*['"]prung-aksorn-v6['"]/.test(sw),
-    'Service Worker cache version is v6 for TQG integration assets'
-  );
-  assert(
     /['"]\.\/storage-v2\.js['"]/.test(sw),
     'Service Worker app shell includes storage-v2.js'
   );
@@ -548,6 +618,7 @@ function main() {
     fail(`manifest.json is invalid JSON: ${error.message}`);
   }
   assert(manifest && typeof manifest === 'object', 'manifest.json parses as an object');
+  assertServiceWorkerReleaseGuard(indexHtml, sw, manifest);
   assert(
     Array.isArray(manifest.icons) &&
       manifest.icons.some((icon) => icon && /(?:^|\/)icons\/icon-192\.png$/.test(String(icon.src || ''))),
