@@ -47,13 +47,14 @@ const repair = read('tqg-repair.js');
 const integration = read('tqg-integration.js');
 const ui = read('tqg-ui.js');
 const indexHtml = read('index.html');
+const app = read('app.js');
 const sw = read('sw.js');
 const workflow = read('.github/workflows/regression-gate.yml');
 const gitignore = read('.gitignore');
 
 for (const file of [
   'tqg.js', 'tqg-inspector.js', 'tqg-repair.js', 'tqg-integration.js',
-  'tqg-ui.js', 'scripts/tqg-regression.mjs', 'scripts/regression-gate.mjs'
+  'tqg-ui.js', 'app.js', 'scripts/tqg-regression.mjs', 'scripts/regression-gate.mjs'
 ]) {
   const source = read(file);
   const result = spawnSync(process.execPath, ['--check', path.join(ROOT, file)], {
@@ -123,9 +124,9 @@ check(integration.includes('completed-output boundary'), 'Integration retains an
 check(ui.includes("version: 'TQG-07-2026-09-30'"), 'Quality UI version is locked');
 check(!/[\u{1F000}-\u{1FAFF}]/u.test(ui), 'Quality UI contains no emoji characters');
 
-check(indexHtml.includes('TQGIntegration'), 'application contains TQG integration boundary');
-check(indexHtml.includes('analyzeTQGCompletedOutput'), 'application uses the centralized completed-output TQG helper');
-check(indexHtml.includes("state.source !== 'translate'"), 'TQG integration remains translate-only');
+check(app.includes('TQGIntegration'), 'application contains TQG integration boundary');
+check(app.includes('analyzeTQGCompletedOutput'), 'application uses the centralized completed-output TQG helper');
+check(app.includes("state.source !== 'translate'"), 'TQG integration remains translate-only');
 check(sw.includes('./tqg.js') && sw.includes('./tqg-inspector.js') &&
   sw.includes('./tqg-repair.js') && sw.includes('./tqg-ui.js') &&
   sw.includes('./tqg-integration.js'),

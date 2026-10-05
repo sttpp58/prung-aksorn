@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const source = fs.readFileSync('index.html', 'utf8');
+const source = fs.readFileSync('app.js', 'utf8');
 
 function extractFunction(sourceText, functionName) {
   const pattern = new RegExp('(?:async\\s+)?function\\s+' + functionName + '\\s*\\(');
