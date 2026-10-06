@@ -371,6 +371,26 @@ function main() {
   const appModules = appModuleFiles.map((file) => readText(file));
   const appRuntime = `${appModules.join('\n')}\n${app}`;
   const styles = readText('styles.css');
+  const modelPickerSource = readText('app/09-editor-draft.js');
+  const settingsSource = readText('app/03-storage-settings.js');
+
+  assert(pageHtml.includes('id="modelPicker"') &&
+    pageHtml.includes('id="modelPickerList"') &&
+    pageHtml.includes('id="modelPickerAddBtn"') &&
+    /<input type="hidden" id="model"/.test(pageHtml),
+    'Model settings use the dropdown picker while preserving the #model runtime field');
+  assert(modelPickerSource.includes('var AI_MODEL_OPTIONS =') &&
+    modelPickerSource.includes('function renderModelPicker()') &&
+    modelPickerSource.includes('function addCustomModel()') &&
+    modelPickerSource.includes('getCustomModelStore()[provider]'),
+    'Model picker supports provider-scoped built-in and custom models');
+  assert(settingsSource.includes('customModels: customModels') &&
+    settingsSource.includes('if(typeof renderModelPicker === 'function') renderModelPicker();'),
+    'Custom model choices persist through the existing settings payload');
+  assert(modelPickerSource.includes('modelInput.value = AI_MODEL_DEFAULTS[providerSel.value]'),
+    'Provider switching retains the existing default-model behavior');
+  assert(modelPickerSource.includes('if(modelInput.disabled) return;'),
+    'Model picker remains locked while AI work is busy');
 
   parseJavaScript(storage, 'storage-v2.js');
   parseJavaScript(app, 'app.js');

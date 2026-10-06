@@ -181,6 +181,66 @@
   .field select:focus, .field input:focus{ outline: none; border-color: var(--gold); }
   .settings-note{font-size:12px;color:var(--ink-soft);flex-basis:100%;margin-top:4px; line-height: 1.6;}
 
+  .model-field{min-width:215px;}
+  .model-picker{position:relative;width:215px;min-width:0;}
+  .model-picker-trigger{
+    width:100%;height:37px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 11px;border:1px solid var(--paper-line);border-radius:4px;
+    background:var(--paper);color:var(--ink);font:13px 'IBM Plex Mono',monospace;text-align:left;
+    cursor:pointer;transition:border-color .2s,box-shadow .2s,background .2s;
+  }
+  .model-picker-trigger:hover,.model-picker.open .model-picker-trigger{
+    border-color:var(--gold);background:var(--paper-deep);
+  }
+  .model-picker-trigger:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(140,111,46,.18);}
+  .model-picker-trigger:disabled{opacity:.55;cursor:not-allowed;}
+  .model-picker-value,.model-picker-option-name{
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;
+  }
+  .model-picker-chevron{font-size:16px;line-height:1;color:var(--ink-soft);flex:0 0 auto;transition:transform .2s;}
+  .model-picker.open .model-picker-chevron{transform:rotate(180deg);}
+  .model-picker-menu{
+    position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:60;display:none;
+    background:var(--paper-card);border:1px solid var(--paper-line);border-radius:6px;
+    box-shadow:0 16px 32px rgba(0,0,0,.22);overflow:hidden;
+  }
+  .model-picker.open .model-picker-menu{display:block;}
+  .model-picker-list{max-height:260px;overflow-y:auto;padding:6px;}
+  .model-picker-section-label{
+    padding:6px 9px 5px;color:var(--ink-faint);font:600 10px 'IBM Plex Mono',monospace;
+    letter-spacing:.8px;text-transform:uppercase;
+  }
+  .model-picker-option{
+    width:100%;display:flex;align-items:center;gap:8px;padding:8px 9px;border:0;border-radius:4px;
+    background:transparent;color:var(--ink);font:13px 'IBM Plex Mono',monospace;text-align:left;cursor:pointer;
+  }
+  .model-picker-option:hover{background:var(--paper-deep);}
+  .model-picker-option.active{background:var(--paper-deep);font-weight:600;}
+  .model-picker-custom-badge{
+    margin-left:auto;flex:0 0 auto;padding:2px 6px;border:1px solid var(--gold);border-radius:999px;
+    color:var(--gold);font:600 9px 'IBM Plex Mono',monospace;
+  }
+  .model-picker-add{border-top:1px dashed var(--paper-line);padding:7px;}
+  .model-picker-add-btn{
+    width:100%;padding:8px 10px;border:1px solid var(--paper-line);border-radius:4px;
+    background:var(--paper);color:var(--ink);font:600 12px 'Sarabun',sans-serif;cursor:pointer;
+  }
+  .model-picker-add-btn:hover{border-color:var(--gold);background:var(--paper-deep);}
+  .model-picker-add-form{display:flex;gap:6px;align-items:center;margin-top:7px;}
+  .model-picker-add-form[hidden]{display:none;}
+  .model-picker-add-form input{
+    flex:1;min-width:0;padding:8px 9px;border:1px solid var(--paper-line);border-radius:4px;
+    background:var(--paper);color:var(--ink);font:12px 'IBM Plex Mono',monospace;
+  }
+  .model-picker-add-form input:focus{outline:none;border-color:var(--gold);}
+  .model-picker-save-btn,.model-picker-cancel-btn{
+    flex:0 0 auto;height:34px;padding:0 10px;border:1px solid var(--paper-line);border-radius:4px;
+    background:var(--paper);color:var(--ink);font:600 11px 'Sarabun',sans-serif;cursor:pointer;
+  }
+  .model-picker-save-btn:hover{border-color:var(--gold);background:var(--paper-deep);}
+  .model-picker-cancel-btn{width:34px;padding:0;}
+  .model-picker-cancel-btn:hover{border-color:var(--ink);background:var(--paper-deep);}
+
   .app-layout{display:grid;grid-template-columns:270px 1fr;gap:28px;align-items:start;}
 
   .sidebar{border-right:1px dashed var(--paper-line);padding-right:20px; min-width:0;}
@@ -954,6 +1014,7 @@
     .translation-modal-card{padding:16px;max-height:92vh;}
     .controls{gap:14px;}
     .field select, .field input[type=text], .field input[type=password]{width:100%;min-width:0;}
+    .model-field,.model-picker{width:100%;min-width:0;}
 
     .main-col {
       min-width: 0;

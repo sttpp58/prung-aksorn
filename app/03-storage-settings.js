@@ -73,9 +73,13 @@
 
   function saveSettings(){
     var prevSettings = appData.settings || {};
+    var customModels = (prevSettings.customModels && typeof prevSettings.customModels === 'object')
+      ? prevSettings.customModels
+      : { openai: [], gemini: [] };
     appData.settings = {
       provider: providerSel.value,
       model: modelInput.value,
+      customModels: customModels,
       chunkLen: document.getElementById('chunkLen').value,
       source: state.source, level: state.level, genre: state.genre, style: state.style,
       outputFontSize: outputFontSize,
@@ -95,6 +99,7 @@
     document.getElementById('chunkLen').value = s.chunkLen;
     state.source = s.source; state.level = s.level; state.genre = s.genre; state.style = s.style;
     outputFontSize = Number(s.outputFontSize) || defaultSettings.outputFontSize;
+    if(typeof renderModelPicker === 'function') renderModelPicker();
 
     if(s.darkMode){
       document.documentElement.classList.add('dark-mode');

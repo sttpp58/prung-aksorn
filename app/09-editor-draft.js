@@ -220,11 +220,176 @@
 
   var providerSel = document.getElementById('provider');
   var modelInput = document.getElementById('model');
+  var modelPicker = document.getElementById('modelPicker');
+  var modelPickerTrigger = document.getElementById('modelPickerTrigger');
+  var modelPickerValue = document.getElementById('modelPickerValue');
+  var modelPickerList = document.getElementById('modelPickerList');
+  var modelPickerAddBtn = document.getElementById('modelPickerAddBtn');
+  var modelPickerAddForm = document.getElementById('modelPickerAddForm');
+  var modelPickerAddInput = document.getElementById('modelPickerAddInput');
+  var modelPickerSaveBtn = document.getElementById('modelPickerSaveBtn');
+  var modelPickerCancelBtn = document.getElementById('modelPickerCancelBtn');
+
+  var AI_MODEL_OPTIONS = {
+    openai: ['gpt-4o-mini','gpt-4o','gpt-5-mini','gpt-5','gpt-5.5'],
+    gemini: [
+      'gemini-flash-latest','gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.5-pro',
+      'gemini-3.1-pro','gemini-3.1-flash-lite','gemini-3.5-flash','gemini-3.5-flash-lite',
+      'gemini-3.6-flash','gemma-4-26b-a4b-it','gemma-4-31b-it','gemini-pro-latest'
+    ]
+  };
+  var AI_MODEL_DEFAULTS = { openai:'gpt-4o-mini', gemini:'gemini-flash-latest' };
+
+  function getCustomModelStore(){
+    if(!appData.settings || typeof appData.settings !== 'object') appData.settings = {};
+    if(!appData.settings.customModels || typeof appData.settings.customModels !== 'object'){
+      appData.settings.customModels = { openai: [], gemini: [] };
+    }
+    ['openai','gemini'].forEach(function(provider){
+      if(!Array.isArray(appData.settings.customModels[provider])) appData.settings.customModels[provider] = [];
+    });
+    return appData.settings.customModels;
+  }
+
+  function getModelOptions(provider){
+    var builtIn = Array.isArray(AI_MODEL_OPTIONS[provider]) ? AI_MODEL_OPTIONS[provider].slice() : [];
+    var custom = getCustomModelStore()[provider].filter(function(model){
+      return model && builtIn.indexOf(model) === -1;
+    });
+    return { builtIn: builtIn, custom: custom };
+  }
+
+  function setModelPickerValue(model, persist){
+    var next = String(model || '').trim();
+    if(!next) return;
+    modelInput.value = next;
+    if(modelPickerValue) modelPickerValue.textContent = next;
+    if(persist) saveSettings();
+  }
+
+  function closeModelPicker(){
+    if(!modelPicker) return;
+    modelPicker.classList.remove('open');
+    modelPickerTrigger.setAttribute('aria-expanded','false');
+  }
+
+  function openModelPicker(){
+    if(modelInput.disabled) return;
+    renderModelPicker();
+    modelPicker.classList.add('open');
+    modelPickerTrigger.setAttribute('aria-expanded','true');
+  }
+
+  function renderModelPicker(){
+    if(!modelPickerList || !modelPickerValue) return;
+    var provider = providerSel.value;
+    var current = String(modelInput.value || '').trim();
+    var options = getModelOptions(provider);
+    modelPickerValue.textContent = current || AI_MODEL_DEFAULTS[provider] || 'เลือกโมเดล';
+    modelPickerList.innerHTML = '';
+
+    function appendSectionLabel(label){
+      var section = document.createElement('div');
+      section.className = 'model-picker-section-label';
+      section.textContent = label;
+      modelPickerList.appendChild(section);
+    }
+
+    function appendOption(model, custom){
+      var option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'model-picker-option' + (model === current ? ' active' : '');
+      option.setAttribute('role','option');
+      option.setAttribute('aria-selected', model === current ? 'true' : 'false');
+      option.dataset.model = model;
+
+      var name = document.createElement('span');
+      name.className = 'model-picker-option-name';
+      name.textContent = model;
+      option.appendChild(name);
+
+      if(custom){
+        var badge = document.createElement('span');
+        badge.className = 'model-picker-custom-badge';
+        badge.textContent = 'เพิ่มเอง';
+        option.appendChild(badge);
+      }
+
+      option.addEventListener('click', function(){
+        setModelPickerValue(model, true);
+        closeModelPicker();
+      });
+      modelPickerList.appendChild(option);
+    }
+
+    appendSectionLabel('โมเดลแนะนำ');
+    options.builtIn.forEach(function(model){ appendOption(model, false); });
+
+    var allKnown = options.builtIn.concat(options.custom);
+    if(options.custom.length > 0 || (current && allKnown.indexOf(current) === -1)){
+      appendSectionLabel('โมเดลของฉัน');
+      options.custom.forEach(function(model){ appendOption(model, true); });
+      if(current && allKnown.indexOf(current) === -1) appendOption(current, true);
+    }
+  }
+
+  function closeModelPickerAddForm(){
+    if(!modelPickerAddForm) return;
+    modelPickerAddForm.hidden = true;
+    modelPickerAddInput.value = '';
+  }
+
+  function openModelPickerAddForm(){
+    if(modelInput.disabled) return;
+    modelPickerAddForm.hidden = false;
+    modelPickerAddInput.focus();
+  }
+
+  function addCustomModel(){
+    var next = String(modelPickerAddInput.value || '').trim();
+    if(!next) return;
+    var provider = providerSel.value;
+    var store = getCustomModelStore()[provider];
+    var builtIn = AI_MODEL_OPTIONS[provider] || [];
+    if(store.indexOf(next) === -1 && builtIn.indexOf(next) === -1) store.push(next);
+    setModelPickerValue(next, true);
+    renderModelPicker();
+    closeModelPickerAddForm();
+    closeModelPicker();
+  }
+
   providerSel.addEventListener('change', function(){
-    modelInput.value = providerSel.value === 'openai' ? 'gpt-4o-mini' : 'gemini-flash-latest';
+    modelInput.value = AI_MODEL_DEFAULTS[providerSel.value] || 'gpt-4o-mini';
+    renderModelPicker();
+    closeModelPickerAddForm();
     saveSettings();
   });
-  modelInput.addEventListener('change', saveSettings);
+  modelPickerTrigger.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(modelPicker.classList.contains('open')) closeModelPicker();
+    else openModelPicker();
+  });
+  modelPickerAddBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    openModelPickerAddForm();
+  });
+  modelPickerSaveBtn.addEventListener('click', addCustomModel);
+  modelPickerCancelBtn.addEventListener('click', function(){ closeModelPickerAddForm(); });
+  modelPickerAddInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); addCustomModel(); }
+    if(e.key === 'Escape'){ e.preventDefault(); closeModelPickerAddForm(); }
+  });
+  document.addEventListener('click', function(e){
+    if(modelPicker && !modelPicker.contains(e.target)) closeModelPicker();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && modelPicker && modelPicker.classList.contains('open')){
+      closeModelPicker();
+      closeModelPickerAddForm();
+    }
+  });
+
+  renderModelPicker();
   document.getElementById('chunkLen').addEventListener('change', function(){
     saveSettings();
     updateChunkInfo();
