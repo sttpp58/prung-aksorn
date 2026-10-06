@@ -220,11 +220,352 @@
 
   var providerSel = document.getElementById('provider');
   var modelInput = document.getElementById('model');
+  var modelPicker = document.getElementById('modelPicker');
+  var modelPickerTrigger = document.getElementById('modelPickerTrigger');
+  var modelPickerValue = document.getElementById('modelPickerValue');
+  var modelPickerList = document.getElementById('modelPickerList');
+  var modelPickerAddBtn = document.getElementById('modelPickerAddBtn');
+  var modelPickerAddForm = document.getElementById('modelPickerAddForm');
+  var modelPickerAddInput = document.getElementById('modelPickerAddInput');
+  var modelPickerSaveBtn = document.getElementById('modelPickerSaveBtn');
+  var modelPickerCancelBtn = document.getElementById('modelPickerCancelBtn');
+  var modelPickerAddError = document.getElementById('modelPickerAddError');
+  var activeModelProvider = providerSel.value || 'openai';
+
+  var AI_MODEL_OPTIONS = {
+    openai: [
+      { id:'gpt-4o-mini', label:'GPT-4o Mini' },
+      { id:'gpt-4o', label:'GPT-4o' },
+      { id:'gpt-5-mini', label:'GPT-5 Mini' },
+      { id:'gpt-5', label:'GPT-5' },
+      { id:'gpt-5.5', label:'GPT-5.5' }
+    ],
+    gemini: [
+      { id:'gemini-flash-latest', label:'Gemini Flash Latest' },
+      { id:'gemini-2.5-flash', label:'Gemini 2.5 Flash' },
+      { id:'gemini-2.5-flash-lite', label:'Gemini 2.5 Flash Lite' },
+      { id:'gemini-2.5-pro', label:'Gemini 2.5 Pro' },
+      { id:'gemini-3.1-pro', label:'Gemini 3.1 Pro' },
+      { id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash Lite' },
+      { id:'gemini-3.5-flash', label:'Gemini 3.5 Flash' },
+      { id:'gemini-3.5-flash-lite', label:'Gemini 3.5 Flash Lite' },
+      { id:'gemini-3.6-flash', label:'Gemini 3.6 Flash' },
+      { id:'gemma-4-26b-a4b-it', label:'Gemma 4 26B A4B IT' },
+      { id:'gemma-4-31b-it', label:'Gemma 4 31B IT' },
+      { id:'gemini-pro-latest', label:'Gemini Pro Latest' }
+    ]
+  };
+  var AI_MODEL_DEFAULTS = { openai:'gpt-4o-mini', gemini:'gemini-flash-latest' };
+
+  function normalizeCustomModelList(value){
+    if(!Array.isArray(value)) return [];
+    var seen = Object.create(null);
+    return value.map(function(item){
+      if(item && typeof item === 'object') return { id: String(item.id || '').trim() };
+      return { id: String(item || '').trim() };
+    }).filter(function(item){
+      if(!item.id || seen[item.id]) return false;
+      seen[item.id] = true;
+      return true;
+    });
+  }
+
+  function getCustomModelStore(){
+    if(!appData.settings || typeof appData.settings !== 'object') appData.settings = {};
+    var current = appData.settings.customModels;
+    if(!current || typeof current !== 'object' || Array.isArray(current)){
+      current = { openai: [], gemini: [] };
+    }
+    current.openai = normalizeCustomModelList(current.openai);
+    current.gemini = normalizeCustomModelList(current.gemini);
+    appData.settings.customModels = current;
+    return current;
+  }
+
+  function getSelectedModelStore(){
+    if(!appData.settings || typeof appData.settings !== 'object') appData.settings = {};
+    var current = appData.settings.selectedModels;
+    if(!current || typeof current !== 'object' || Array.isArray(current)) current = {};
+    appData.settings.selectedModels = current;
+    return current;
+  }
+
+  function getBuiltInModel(provider, modelId){
+    return (AI_MODEL_OPTIONS[provider] || []).find(function(model){ return model.id === modelId; }) || null;
+  }
+
+  function getCustomModel(provider, modelId){
+    return getCustomModelStore()[provider].find(function(model){ return model.id === modelId; }) || null;
+  }
+
+  function getModelOptionGroups(provider){
+    return {
+      builtIn: Array.isArray(AI_MODEL_OPTIONS[provider]) ? AI_MODEL_OPTIONS[provider].slice() : [],
+      custom: getCustomModelStore()[provider].slice()
+    };
+  }
+
+  function setModelPickerValue(model, persist){
+    var next = String(model || '').trim();
+    if(!next) return;
+    modelInput.value = next;
+    if(modelPickerValue) modelPickerValue.textContent = next;
+    getSelectedModelStore()[providerSel.value || activeModelProvider] = next;
+    if(persist) saveSettings();
+  }
+
+  function clearModelPickerAddError(){
+    if(modelPickerAddError) modelPickerAddError.textContent = '';
+  }
+
+  function setModelPickerAddError(message){
+    if(modelPickerAddError) modelPickerAddError.textContent = message || '';
+  }
+
+  function closeModelPickerAddForm(){
+    if(!modelPickerAddForm) return;
+    modelPickerAddForm.hidden = true;
+    modelPickerAddInput.value = '';
+    clearModelPickerAddError();
+  }
+
+  function closeModelPicker(){
+    if(!modelPicker) return;
+    modelPicker.classList.remove('open');
+    modelPickerTrigger.setAttribute('aria-expanded','false');
+  }
+
+  function openModelPicker(){
+    if(!modelPicker || modelPickerTrigger.disabled) return;
+    clearModelPickerAddError();
+    renderModelPicker();
+    modelPicker.classList.add('open');
+    modelPickerTrigger.setAttribute('aria-expanded','true');
+  }
+
+  function renderModelPicker(){
+    if(!modelPickerList || !modelPickerValue) return;
+    var provider = providerSel.value || 'openai';
+    var current = String(modelInput.value || '').trim();
+    var groups = getModelOptionGroups(provider);
+    modelPickerValue.textContent = current || AI_MODEL_DEFAULTS[provider] || 'เลือกโมเดล';
+    modelPickerList.innerHTML = '';
+
+    function appendSectionLabel(label){
+      var section = document.createElement('div');
+      section.className = 'model-picker-section-label';
+      section.textContent = label;
+      modelPickerList.appendChild(section);
+    }
+
+    function appendOption(model, custom, legacy){
+      var row = document.createElement('div');
+      row.className = 'model-picker-option' + (model.id === current ? ' active' : '');
+      row.setAttribute('role','option');
+      row.setAttribute('aria-selected', model.id === current ? 'true' : 'false');
+
+      var check = document.createElement('span');
+      check.className = 'model-picker-check';
+      check.textContent = model.id === current ? '✓' : '';
+      row.appendChild(check);
+
+      var main = document.createElement('button');
+      main.type = 'button';
+      main.className = 'model-picker-option-main';
+      main.setAttribute('aria-label', 'เลือกโมเดล ' + model.id);
+
+      var label = document.createElement('span');
+      label.className = 'model-picker-option-label';
+      label.textContent = model.label || model.id;
+      main.appendChild(label);
+
+      var id = document.createElement('span');
+      id.className = 'model-picker-option-id';
+      id.textContent = model.id;
+      main.appendChild(id);
+
+      main.addEventListener('click', function(){
+        setModelPickerValue(model.id, true);
+        closeModelPickerAddForm();
+        closeModelPicker();
+      });
+      row.appendChild(main);
+
+      if(custom && !legacy){
+        var badge = document.createElement('span');
+        badge.className = 'model-picker-custom-badge';
+        badge.textContent = 'เพิ่มเอง';
+        row.appendChild(badge);
+
+        var deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'model-picker-delete-btn';
+        deleteBtn.setAttribute('aria-label', 'ลบโมเดล ' + model.id);
+        deleteBtn.textContent = '✕';
+        deleteBtn.addEventListener('click', async function(e){
+          e.stopPropagation();
+          var ok = await showConfirmDialog(
+            'ลบโมเดลที่เพิ่มเอง',
+            'ต้องการลบโมเดล "' + model.id + '" ออกจากรายการหรือไม่?',
+            true
+          );
+          if(!ok) return;
+
+          var store = getCustomModelStore()[provider];
+          getCustomModelStore()[provider] = store.filter(function(item){ return item.id !== model.id; });
+
+          if(modelInput.value === model.id){
+            var fallback = AI_MODEL_DEFAULTS[provider] || ((AI_MODEL_OPTIONS[provider] || [])[0] || {}).id;
+            setModelPickerValue(fallback, false);
+          }
+          saveSettings();
+          renderModelPicker();
+        });
+        row.appendChild(deleteBtn);
+      }
+
+      modelPickerList.appendChild(row);
+    }
+
+    appendSectionLabel('โมเดลแนะนำ');
+    groups.builtIn.forEach(function(model){ appendOption(model, false, false); });
+
+    if(groups.custom.length > 0){
+      appendSectionLabel('โมเดลที่เพิ่มเอง');
+      groups.custom.forEach(function(model){ appendOption(model, true, false); });
+    }
+
+    var known = groups.builtIn.some(function(model){ return model.id === current; }) ||
+      groups.custom.some(function(model){ return model.id === current; });
+    if(current && !known){
+      appendSectionLabel('โมเดลที่บันทึกไว้เดิม');
+      appendOption({ id:current, label:current }, false, true);
+    }
+
+    if(!groups.builtIn.length && !groups.custom.length && !current){
+      var empty = document.createElement('div');
+      empty.className = 'model-picker-empty';
+      empty.textContent = 'ยังไม่มีโมเดลสำหรับผู้ให้บริการนี้';
+      modelPickerList.appendChild(empty);
+    }
+  }
+
+  function addCustomModel(){
+    var next = String(modelPickerAddInput.value || '').trim();
+    if(!next){
+      setModelPickerAddError('กรุณาระบุ Model ID');
+      modelPickerAddInput.focus();
+      return;
+    }
+    if(next.length > 160){
+      setModelPickerAddError('Model ID ยาวเกิน 160 ตัวอักษร');
+      return;
+    }
+    if(/[\s\u0000-\u001f\u007f]/.test(next)){
+      setModelPickerAddError('Model ID ต้องไม่มีช่องว่างหรืออักขระควบคุม');
+      return;
+    }
+
+    var provider = providerSel.value || 'openai';
+    var builtIn = getBuiltInModel(provider, next);
+    var existing = getCustomModel(provider, next);
+    if(builtIn){
+      setModelPickerAddError('โมเดลนี้มีอยู่ในรายการแนะนำแล้ว');
+      return;
+    }
+    if(existing){
+      setModelPickerAddError('โมเดลนี้มีอยู่ในรายการที่เพิ่มเองแล้ว');
+      return;
+    }
+
+    getCustomModelStore()[provider].push({ id: next });
+    setModelPickerValue(next, true);
+    clearModelPickerAddError();
+    closeModelPickerAddForm();
+    renderModelPicker();
+  }
+
+  function ensureModelCatalogSettings(legacyModel){
+    getCustomModelStore();
+    var selected = getSelectedModelStore();
+    var provider = providerSel.value === 'gemini' ? 'gemini' : 'openai';
+    var legacy = String(legacyModel || appData.settings.model || '').trim();
+    if(!selected[provider] && legacy) selected[provider] = legacy;
+    return selected;
+  }
+
+  function setModelPickerDisabled(disabled){
+    if(modelPickerTrigger) modelPickerTrigger.disabled = !!disabled;
+    if(modelPickerAddBtn) modelPickerAddBtn.disabled = !!disabled;
+    if(modelPickerAddInput) modelPickerAddInput.disabled = !!disabled;
+    if(modelPickerSaveBtn) modelPickerSaveBtn.disabled = !!disabled;
+    if(modelPickerCancelBtn) modelPickerCancelBtn.disabled = !!disabled;
+    if(disabled){
+      closeModelPicker();
+      closeModelPickerAddForm();
+    }
+  }
+
   providerSel.addEventListener('change', function(){
-    modelInput.value = providerSel.value === 'openai' ? 'gpt-4o-mini' : 'gemini-flash-latest';
+    var previousProvider = activeModelProvider;
+    getCustomModelStore();
+    var selected = getSelectedModelStore();
+    var currentModel = String(modelInput.value || '').trim();
+    if(previousProvider) selected[previousProvider] = currentModel;
+
+    var nextProvider = providerSel.value === 'gemini' ? 'gemini' : 'openai';
+    var nextModel = selected[nextProvider] || AI_MODEL_DEFAULTS[nextProvider];
+    setModelPickerValue(nextModel, false);
+    activeModelProvider = nextProvider;
+    renderModelPicker();
+    closeModelPickerAddForm();
     saveSettings();
   });
-  modelInput.addEventListener('change', saveSettings);
+
+  modelPickerTrigger.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(modelPicker.classList.contains('open')) closeModelPicker();
+    else openModelPicker();
+  });
+
+  modelPickerAddBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(modelPickerTrigger.disabled) return;
+    if(modelPickerAddForm.hidden){
+      clearModelPickerAddError();
+      modelPickerAddForm.hidden = false;
+      modelPickerAddInput.focus();
+    }else{
+      closeModelPickerAddForm();
+    }
+  });
+
+  modelPickerSaveBtn.addEventListener('click', addCustomModel);
+  modelPickerCancelBtn.addEventListener('click', closeModelPickerAddForm);
+
+  modelPickerAddInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      addCustomModel();
+    }else if(e.key === 'Escape'){
+      e.preventDefault();
+      closeModelPickerAddForm();
+    }
+  });
+
+  document.addEventListener('click', function(e){
+    if(modelPicker && !modelPicker.contains(e.target)) closeModelPicker();
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && modelPicker && modelPicker.classList.contains('open')){
+      closeModelPickerAddForm();
+      closeModelPicker();
+    }
+  });
+
+  ensureModelCatalogSettings();
+  renderModelPicker();
   document.getElementById('chunkLen').addEventListener('change', function(){
     saveSettings();
     updateChunkInfo();

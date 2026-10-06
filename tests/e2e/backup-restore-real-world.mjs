@@ -319,6 +319,7 @@ function verifyBackupArtifact(rawText, expectedProjectName) {
   check(Array.isArray(payload.data?.projects) && payload.data.projects.some(p => p.name === expectedProjectName), 'downloaded artifact contains the real project state');
   check(Array.isArray(payload.data?.books) && payload.data.books.length >= 2, 'downloaded artifact contains both real Books');
   check(Array.isArray(payload.data?.translationJobs) && payload.data.translationJobs.some(j => j.status === 'completed'), 'downloaded artifact contains a completed Translation Job');
+  check(Array.isArray(payload.data?.settings?.customModels?.openai) && payload.data.settings.customModels.openai.some(m => m.id === 'backup-custom-openai-model'), 'downloaded artifact preserves custom AI model settings');
   const serialized = JSON.stringify(payload);
   check(!serialized.includes('e2e-only-test-key'), 'downloaded artifact excludes the browser-only API credential');
   check(!serialized.includes('apiKey'), 'downloaded artifact does not persist an apiKey field');
@@ -327,6 +328,17 @@ function verifyBackupArtifact(rawText, expectedProjectName) {
 
 async function setupRealisticState(ctx) {
   const cdp = ctx.cdp;
+
+  await click(cdp, '#gearBtn');
+  await waitForFunction(cdp, "document.getElementById('settingsPanel').classList.contains('open')");
+  await click(cdp, '#modelPickerTrigger');
+  await click(cdp, '#modelPickerAddBtn');
+  await typeInto(cdp, '#modelPickerAddInput', 'backup-custom-openai-model');
+  await click(cdp, '#modelPickerSaveBtn');
+  await waitForFunction(cdp, "document.getElementById('model').value === 'backup-custom-openai-model'");
+  check(await evaluate(cdp, "[...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'backup-custom-openai-model')"), 'custom model exists before backup export');
+  await click(cdp, '#gearBtn');
+
   await createProject(cdp, 'Backup Validation Workspace');
   await typeInto(cdp, '#chapterTitle', 'Book A Draft');
   await typeInto(cdp, '#inputText', 'Book A persistent draft before backup');

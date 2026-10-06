@@ -73,9 +73,25 @@
 
   function saveSettings(){
     var prevSettings = appData.settings || {};
+    var customModels = typeof getCustomModelStore === 'function'
+      ? getCustomModelStore()
+      : ((prevSettings.customModels && typeof prevSettings.customModels === 'object')
+        ? prevSettings.customModels
+        : { openai: [], gemini: [] });
+    var selectedModels = typeof getSelectedModelStore === 'function'
+      ? getSelectedModelStore()
+      : ((prevSettings.selectedModels && typeof prevSettings.selectedModels === 'object')
+        ? prevSettings.selectedModels
+        : {});
+    var provider = providerSel.value || 'openai';
+    var model = String(modelInput.value || '').trim() || defaultSettings.model;
+    selectedModels[provider] = model;
+
     appData.settings = {
-      provider: providerSel.value,
-      model: modelInput.value,
+      provider: provider,
+      model: model,
+      customModels: customModels,
+      selectedModels: selectedModels,
       chunkLen: document.getElementById('chunkLen').value,
       source: state.source, level: state.level, genre: state.genre, style: state.style,
       outputFontSize: outputFontSize,
@@ -90,8 +106,18 @@
 
   function applySettingsToUI(){
     var s = appData.settings;
-    providerSel.value = s.provider;
-    modelInput.value = s.model;
+    var provider = s.provider === 'gemini' ? 'gemini' : 'openai';
+    providerSel.value = provider;
+    var selectedModels = typeof ensureModelCatalogSettings === 'function'
+      ? ensureModelCatalogSettings(s.model)
+      : ((s.selectedModels && typeof s.selectedModels === 'object') ? s.selectedModels : {});
+    var preferredModel = selectedModels[provider] || String(s.model || '').trim();
+    if(!preferredModel && typeof AI_MODEL_DEFAULTS === 'object') preferredModel = AI_MODEL_DEFAULTS[provider];
+    modelInput.value = preferredModel || defaultSettings.model;
+    if(typeof activeModelProvider !== 'undefined') activeModelProvider = provider;
+    if(typeof setModelPickerValue === 'function') setModelPickerValue(modelInput.value, false);
+    if(typeof renderModelPicker === 'function') renderModelPicker();
+
     document.getElementById('chunkLen').value = s.chunkLen;
     state.source = s.source; state.level = s.level; state.genre = s.genre; state.style = s.style;
     outputFontSize = Number(s.outputFontSize) || defaultSettings.outputFontSize;

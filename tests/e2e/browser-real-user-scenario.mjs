@@ -256,6 +256,51 @@ try {
   await waitForFunction(cdp, `!!window.PrungAksornStorageV2`, 15_000);
   await evaluate(cdp, `navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false`);
   check(true, 'app loads in a real Chromium browser over HTTP');
+
+  await click(cdp, '#gearBtn');
+  await waitForFunction(cdp, `document.getElementById('settingsPanel').classList.contains('open')`);
+  await click(cdp, '#modelPickerTrigger');
+  await waitForFunction(cdp, `document.getElementById('modelPicker').classList.contains('open') && [...document.querySelectorAll('#modelPickerList .model-picker-option-label')].some(x=>x.textContent.includes('GPT-4o Mini'))`);
+  check(await read(cdp, `[...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'gpt-4o-mini')`), 'OpenAI catalog exposes the built-in GPT-4o Mini model');
+
+  await evaluate(cdp, `(()=>{const el=document.getElementById('provider');el.value='gemini';el.dispatchEvent(new Event('change',{bubbles:true}));return el.value;})()`);
+  await waitForFunction(cdp, `document.getElementById('model').value === 'gemini-flash-latest' && document.getElementById('modelPicker').classList.contains('open')`);
+  check(await read(cdp, `[...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'gemini-3.5-flash')`), 'Gemini catalog exposes the built-in 3.5 Flash model');
+  await clickText(cdp, '#modelPickerList .model-picker-option-main', 'gemini-3.5-flash');
+  check(await read(cdp, `document.getElementById('model').value === 'gemini-3.5-flash' && document.getElementById('modelPickerValue').textContent === 'gemini-3.5-flash'`), 'Selecting a built-in model updates the stable runtime model value');
+
+  await click(cdp, '#modelPickerTrigger');
+  await waitForFunction(cdp, `document.getElementById('modelPicker').classList.contains('open')`);
+  await click(cdp, '#modelPickerAddBtn');
+  await typeInto(cdp, '#modelPickerAddInput', 'e2e-custom-gemini-model');
+  await click(cdp, '#modelPickerSaveBtn');
+  await waitForFunction(cdp, `document.getElementById('model').value === 'e2e-custom-gemini-model' && [...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'e2e-custom-gemini-model')`);
+  check(await read(cdp, `document.querySelector('#modelPickerList .model-picker-custom-badge')?.textContent === 'เพิ่มเอง'`), 'Custom model is added to the provider-specific catalog');
+
+  await reload(cdp, e2eUrl);
+  check(await read(cdp, `document.getElementById('provider').value === 'gemini' && document.getElementById('model').value === 'e2e-custom-gemini-model'`), 'Custom model and provider selection survive browser reload');
+
+  await click(cdp, '#modelPickerTrigger');
+  await waitForFunction(cdp, `document.getElementById('modelPicker').classList.contains('open')`);
+  check(await read(cdp, `[...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'e2e-custom-gemini-model')`), 'Persisted custom model remains visible after reload');
+
+  await evaluate(cdp, `(()=>{const el=document.getElementById('provider');el.value='openai';el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+  await waitForFunction(cdp, `document.getElementById('model').value === 'gpt-4o-mini'`);
+  await evaluate(cdp, `(()=>{const el=document.getElementById('provider');el.value='gemini';el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+  await waitForFunction(cdp, `document.getElementById('model').value === 'e2e-custom-gemini-model'`);
+  check(await read(cdp, `window.appData?.settings?.selectedModels?.openai === 'gpt-4o-mini' && window.appData?.settings?.selectedModels?.gemini === 'e2e-custom-gemini-model'`), 'Per-provider model selections are persisted in settings');
+  check(true, 'Each provider remembers its own last selected model');
+
+  await evaluate(cdp, `(()=>{const el=[...document.querySelectorAll('#modelPickerList .model-picker-delete-btn')].find(x=>x.getAttribute('aria-label') === 'ลบโมเดล e2e-custom-gemini-model');if(!el)return false;el.click();return true;})()`);
+  await waitForFunction(cdp, `document.getElementById('appDialogOverlay').classList.contains('show')`);
+  await click(cdp, '#appDialogConfirmBtn');
+  await waitForFunction(cdp, `document.getElementById('model').value === 'gemini-flash-latest' && ![...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'e2e-custom-gemini-model')`);
+  check(true, 'Deleting a custom model falls back to the provider default safely');
+
+  await evaluate(cdp, `(()=>{const el=document.getElementById('provider');el.value='openai';el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+  await waitForFunction(cdp, `document.getElementById('provider').value === 'openai' && document.getElementById('model').value === 'gpt-4o-mini'`);
+  check(true, 'Provider can return to the default OpenAI runtime model after catalog operations');
+
   check(await read(cdp, `document.querySelectorAll('.project-row').length === 0`), 'clean E2E profile starts with no projects');
 
   await click(cdp, '#addProjBtn');

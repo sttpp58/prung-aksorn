@@ -666,6 +666,17 @@ function main() {
   }
   assert(/TQG Phase C Final Audit: PASS WITH LIMITATION/.test(c5Audit.stdout), 'TQG C5 final audit passes');
 
+  const modelCatalogPath = path.join(ROOT, 'scripts', 'model-catalog-regression.mjs');
+  assert(fs.existsSync(modelCatalogPath), 'Model Catalog regression runner is present');
+  const modelCatalog = spawnSync(process.execPath, [modelCatalogPath], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024
+  });
+  if (modelCatalog.status !== 0) {
+    fail('Model Catalog regression suite failed' + (modelCatalog.stderr ? ': ' + modelCatalog.stderr.trim() : ''));
+  }
+  assert(/Model Catalog Regression: PASS/.test(modelCatalog.stdout), 'Model Catalog regression suite passes');
 
   const relevantAsyncNames = [
     'runTranslation',
