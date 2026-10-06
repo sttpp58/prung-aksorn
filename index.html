@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!-- CSP: runtime JavaScript is externalized to the same-origin app entrypoint; script/style/network capabilities remain explicitly restricted. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.openai.com https://generativelanguage.googleapis.com; worker-src 'self' blob:; manifest-src 'self';">
-<meta name="app-release-version" content="v9">
+<meta name="app-release-version" content="v10">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ปรุงอักษร — ห้องทำงานนักแปล</title>
 <link rel="manifest" href="manifest.json">
@@ -50,9 +50,30 @@
         <option value="gemini">Google Gemini</option>
       </select>
     </div>
-    <div class="field">
-      <label>โมเดล</label>
-      <input type="text" id="model" value="gpt-4o-mini">
+    <div class="field model-field">
+      <label for="modelPickerTrigger">โมเดล</label>
+      <div class="model-picker" id="modelPicker">
+        <button class="model-picker-trigger" id="modelPickerTrigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+          <span class="model-picker-value" id="modelPickerValue">gpt-4o-mini</span>
+          <span class="model-picker-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="model-picker-menu" id="modelPickerMenu">
+          <div class="model-picker-list" id="modelPickerList" role="listbox" aria-label="รายการโมเดล AI"></div>
+          <div class="model-picker-add">
+            <button class="model-picker-add-btn" id="modelPickerAddBtn" type="button">＋ เพิ่มโมเดล</button>
+            <div class="model-picker-add-form" id="modelPickerAddForm" hidden>
+              <label for="modelPickerAddInput">Model ID</label>
+              <div class="model-picker-add-controls">
+                <input type="text" id="modelPickerAddInput" maxlength="160" placeholder="เช่น my-gemini-model" autocomplete="off" spellcheck="false">
+                <button class="model-picker-save-btn" id="modelPickerSaveBtn" type="button">เพิ่ม</button>
+                <button class="model-picker-cancel-btn" id="modelPickerCancelBtn" type="button" aria-label="ยกเลิกการเพิ่มโมเดล">✕</button>
+              </div>
+              <div class="model-picker-add-error" id="modelPickerAddError" role="alert"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" id="model" value="gpt-4o-mini">
     </div>
     <div class="field" style="flex:1;">
       <label>API key</label>

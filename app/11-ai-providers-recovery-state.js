@@ -184,6 +184,7 @@
     if(batchImportBtn) batchImportBtn.disabled = busy;
     providerSel.disabled = busy;
     modelInput.disabled = busy;
+    if(typeof setModelPickerDisabled === 'function') setModelPickerDisabled(busy);
     document.getElementById('chunkLen').disabled = busy;
   }
   function warnIfAiBusy(){
