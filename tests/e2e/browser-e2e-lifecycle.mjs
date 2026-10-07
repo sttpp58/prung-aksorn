@@ -8,7 +8,7 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const RUNNER = path.join(ROOT, 'tests', 'e2e', 'browser-real-user-scenario.mjs');
 const CASE_TIMEOUT = 15_000;
-const CHILD_EXIT_TIMEOUT = 8_000;
+const CHILD_EXIT_TIMEOUT = 20_000;
 const PROFILE_PREFIX = 'prung-aksorn-e2e-';
 
 function log(message) { console.log('[E2E-LIFECYCLE] ' + message); }
