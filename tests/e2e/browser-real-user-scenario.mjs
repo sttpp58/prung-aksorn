@@ -388,6 +388,7 @@ function handleSignal(signal) {
   shutdownRequested = true;
   process.exitCode = signal === 'SIGINT' ? 130 : 143;
   globalTimeoutError = new Error('Browser E2E interrupted by ' + signal + '.');
+  console.error(globalTimeoutError.message);
   void cleanupRuntime();
 }
 
@@ -398,6 +399,7 @@ globalTimeoutTimer = setTimeout(() => {
   shutdownRequested = true;
   process.exitCode = 1;
   globalTimeoutError = new Error('Browser E2E global timeout after ' + TEST_TIMEOUT + 'ms. Check the last completed step and CDP/process teardown.');
+  console.error(globalTimeoutError.message);
   void cleanupRuntime();
 }, TEST_TIMEOUT);
 
