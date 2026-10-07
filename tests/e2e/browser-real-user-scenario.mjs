@@ -11,10 +11,52 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const PORT_HOST = '127.0.0.1';
 const repoEntry = path.join(ROOT, 'index.html');
-const TEST_TIMEOUT = 45_000;
+const TEST_TIMEOUT = 60_000;
+const CDP_COMMAND_TIMEOUT = 10_000;
+const CDP_CONNECT_TIMEOUT = 10_000;
+const CHILD_PROCESS_TIMEOUT = 3_000;
+const SERVER_CLOSE_TIMEOUT = 2_000;
+const PROFILE_CLEANUP_TIMEOUT = 5_000;
 
 function log(message) { console.log('[E2E] ' + message); }
 function check(condition, message) { assert.ok(condition, message); console.log('PASS  ' + message); }
+function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function fetchJsonWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function waitForChildExit(child, timeoutMs = CHILD_PROCESS_TIMEOUT, label = 'child process') {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+  return new Promise(resolve => {
+    let done = false;
+    let timer;
+    const finish = (exited) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child.removeListener('exit', onExit);
+      child.removeListener('error', onError);
+      resolve(exited);
+    };
+    const onExit = () => finish(true);
+    const onError = () => finish(true);
+    timer = setTimeout(() => {
+      log(label + ' exit wait timed out after ' + timeoutMs + 'ms');
+      finish(false);
+    }, timeoutMs);
+    child.once('exit', onExit);
+    child.once('error', onError);
+  });
+}
 
 async function findBrowser() {
   const explicit = process.env.E2E_BROWSER;
@@ -41,8 +83,16 @@ async function findBrowser() {
       const probe = spawn(command, ['--version'], { stdio: 'ignore', windowsHide: true });
       if (probe.pid) {
         await new Promise((resolve, reject) => {
-          probe.once('error', reject);
-          probe.once('exit', code => code === 0 ? resolve() : reject(new Error('version probe failed')));
+          let timer = setTimeout(() => {
+            try { probe.kill(); } catch {}
+            reject(new Error('Browser version probe timed out after ' + CHILD_PROCESS_TIMEOUT + 'ms: ' + command));
+          }, CHILD_PROCESS_TIMEOUT);
+          probe.once('error', error => { clearTimeout(timer); reject(error); });
+          probe.once('exit', code => {
+            clearTimeout(timer);
+            if (code === 0) resolve();
+            else reject(new Error('Browser version probe failed: ' + command + ' exit=' + code));
+          });
         });
         return command;
       }
@@ -87,12 +137,12 @@ async function waitForUrl(url, timeoutMs = 10_000) {
   const start = Date.now();
   let lastError;
   while (Date.now() - start < timeoutMs) {
+    if (shutdownRequested) throw (globalTimeoutError || new Error('Browser E2E shutdown requested while waiting for URL: ' + url));
     try {
-      const res = await fetch(url);
-      if (res.ok) return await res.json();
-      lastError = new Error(`HTTP ${res.status}`);
+      const remaining = timeoutMs - (Date.now() - start);
+      return await fetchJsonWithTimeout(url, Math.max(250, Math.min(2_000, remaining)));
     } catch (error) { lastError = error; }
-    await new Promise(r => setTimeout(r, 100));
+    await delay(100);
   }
   throw new Error(`Timed out waiting for ${url}: ${lastError?.message || 'unknown error'}`);
 }
@@ -105,14 +155,32 @@ class CdpClient {
     this.pending = new Map();
     this.events = new Map();
   }
+  rejectPending(error) {
+    for (const [id, pending] of this.pending.entries()) {
+      this.pending.delete(id);
+      clearTimeout(pending.timer);
+      pending.reject(error);
+    }
+  }
   async connect() {
     this.ws = new WebSocket(this.wsUrl);
     await new Promise((resolve, reject) => {
+      let timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('CDP WebSocket connect timed out after ' + CDP_CONNECT_TIMEOUT + 'ms.'));
+      }, CDP_CONNECT_TIMEOUT);
       const onOpen = () => { cleanup(); resolve(); };
       const onError = (e) => { cleanup(); reject(new Error('CDP WebSocket failed: ' + String(e?.message || e))); };
-      const cleanup = () => { this.ws.removeEventListener('open', onOpen); this.ws.removeEventListener('error', onError); };
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.ws.removeEventListener('open', onOpen);
+        this.ws.removeEventListener('error', onError);
+      };
       this.ws.addEventListener('open', onOpen);
       this.ws.addEventListener('error', onError);
+    });
+    this.ws.addEventListener('close', () => {
+      this.rejectPending(new Error('CDP connection closed before all commands completed.'));
     });
     this.ws.addEventListener('message', event => {
       const message = JSON.parse(String(event.data));
@@ -120,7 +188,8 @@ class CdpClient {
         const pending = this.pending.get(message.id);
         if (!pending) return;
         this.pending.delete(message.id);
-        if (message.error) pending.reject(new Error(`CDP ${message.error.code}: ${message.error.message}`));
+        clearTimeout(pending.timer);
+        if (message.error) pending.reject(new Error('CDP ' + message.error.code + ': ' + message.error.message));
         else pending.resolve(message.result);
         return;
       }
@@ -128,11 +197,24 @@ class CdpClient {
       for (const listener of listeners) listener(message.params);
     });
   }
-  send(method, params = {}) {
+  send(method, params = {}, timeoutMs = CDP_COMMAND_TIMEOUT) {
+    if (!this.ws || this.ws.readyState !== 1) {
+      return Promise.reject(new Error('CDP send rejected: WebSocket is not open for ' + method));
+    }
     const id = ++this.nextId;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, method, params }));
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error('CDP command timed out after ' + timeoutMs + 'ms: ' + method));
+      }, timeoutMs);
+      this.pending.set(id, { resolve, reject, timer });
+      try {
+        this.ws.send(JSON.stringify({ id, method, params }));
+      } catch (error) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        reject(error);
+      }
     });
   }
   on(method, listener) {
@@ -147,6 +229,7 @@ async function waitForFunction(cdp, expression, timeoutMs = 8_000, intervalMs = 
   const start = Date.now();
   let last;
   while (Date.now() - start < timeoutMs) {
+    if (shutdownRequested) throw (globalTimeoutError || new Error('Browser E2E shutdown requested while waiting for: ' + expression));
     last = await evaluate(cdp, expression);
     if (last === true) return;
     await new Promise(r => setTimeout(r, intervalMs));
@@ -216,7 +299,80 @@ let server;
 let chrome;
 let cdp;
 let profileDir;
+let cleanupPromise = null;
+let globalTimeoutTimer = null;
+let globalTimeoutError = null;
+let shutdownRequested = false;
 const pageErrors = [];
+
+async function cleanupRuntime() {
+  if (cleanupPromise) return cleanupPromise;
+  cleanupPromise = (async () => {
+    try {
+      if (cdp) {
+        try { await cdp.send('Browser.close', {}, 2_000); } catch {}
+        try { cdp.close(); } catch {}
+      }
+    } catch {}
+
+    try {
+      if (chrome && chrome.exitCode === null && chrome.signalCode === null) {
+        try { chrome.kill('SIGTERM'); } catch {}
+        const stopped = await waitForChildExit(chrome, CHILD_PROCESS_TIMEOUT, 'Browser process');
+        if (!stopped && chrome.exitCode === null && chrome.signalCode === null) {
+          try { chrome.kill('SIGKILL'); } catch {}
+          const killed = await waitForChildExit(chrome, CHILD_PROCESS_TIMEOUT, 'Browser process after SIGKILL');
+          if (!killed) log('WARNING: browser process did not confirm exit within the cleanup deadline.');
+        }
+      }
+    } catch (error) {
+      log('Browser cleanup warning: ' + String(error?.message || error));
+    }
+
+    try {
+      if (server?.listening) {
+        await Promise.race([
+          new Promise(resolve => {
+            try { server.close(() => resolve()); } catch { resolve(); }
+          }),
+          delay(SERVER_CLOSE_TIMEOUT).then(() => { throw new Error('Static server close timed out after ' + SERVER_CLOSE_TIMEOUT + 'ms.'); })
+        ]);
+      }
+    } catch (error) {
+      log('Server cleanup warning: ' + String(error?.message || error));
+    }
+
+    if (profileDir) {
+      try {
+        await Promise.race([
+          rm(profileDir, { recursive: true, force: true }),
+          delay(PROFILE_CLEANUP_TIMEOUT).then(() => { throw new Error('Temporary browser profile cleanup timed out after ' + PROFILE_CLEANUP_TIMEOUT + 'ms.'); })
+        ]);
+      } catch (error) {
+        log('Profile cleanup warning: ' + String(error?.message || error));
+      }
+    }
+  })();
+  return cleanupPromise;
+}
+
+function handleSignal(signal) {
+  if (shutdownRequested) return;
+  shutdownRequested = true;
+  process.exitCode = signal === 'SIGINT' ? 130 : 143;
+  globalTimeoutError = new Error('Browser E2E interrupted by ' + signal + '.');
+  void cleanupRuntime();
+}
+
+process.once('SIGINT', handleSignal);
+process.once('SIGTERM', handleSignal);
+globalTimeoutTimer = setTimeout(() => {
+  if (shutdownRequested) return;
+  shutdownRequested = true;
+  process.exitCode = 1;
+  globalTimeoutError = new Error('Browser E2E global timeout after ' + TEST_TIMEOUT + 'ms. Check the last completed step and CDP/process teardown.');
+  void cleanupRuntime();
+}, TEST_TIMEOUT);
 
 try {
   const browser = await findBrowser();
@@ -240,7 +396,6 @@ try {
     '--no-default-browser-check', '--user-data-dir=' + profileDir,
     '--remote-debugging-port=' + debugPortHolder, '--window-size=1440,1200', e2eUrl
   ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-  const browserExit = new Promise(resolve => chrome.once('exit', resolve));
   chrome.on('exit', code => log('Browser exited with code ' + code));
   await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json/version`, 15_000);
   const targets = await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json`, 10_000);
@@ -262,7 +417,7 @@ try {
 
   await waitForFunction(cdp, `document.readyState === 'complete' && !!document.getElementById('addProjBtn')`, 15_000);
   await waitForFunction(cdp, `!!window.PrungAksornStorageV2`, 15_000);
-  await evaluate(cdp, `navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false`);
+  await waitForFunction(cdp, `navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false`, 10_000, 100);
   check(true, 'app loads in a real Chromium browser over HTTP');
 
   await click(cdp, '#gearBtn');
@@ -396,22 +551,20 @@ try {
   console.log('Browser E2E / Real User Scenario: PASS');
 } catch (error) {
   console.error('');
-  console.error('Browser E2E / Real User Scenario: FAIL — ' + (error.stack || error.message || error));
+  const failure = globalTimeoutError || error;
+  console.error('Browser E2E / Real User Scenario: FAIL — ' + (failure.stack || failure.message || failure));
   if (pageErrors.length) console.error('Browser errors:\n' + pageErrors.join('\n'));
   process.exitCode = 1;
 } finally {
-  try { await cdp?.send('Browser.close'); } catch {}
-  try { cdp?.close(); } catch {}
-  try { if (chrome && chrome.exitCode === null) chrome.kill(); } catch {}
-  try { if (chrome && chrome.exitCode === null) await Promise.race([browserExit, new Promise(resolve => setTimeout(resolve, 3_000))]); } catch {}
-  if (chrome) {
-    try { await new Promise(resolve => chrome.once('exit', resolve)); } catch {}
+  if (globalTimeoutTimer) clearTimeout(globalTimeoutTimer);
+  process.removeListener('SIGINT', handleSignal);
+  process.removeListener('SIGTERM', handleSignal);
+  shutdownRequested = true;
+  try { await cleanupRuntime(); } catch (cleanupError) { console.error('Cleanup warning:', cleanupError.message); }
+  if (chrome && chrome.exitCode !== null) {
+    console.log('PASS  browser child process exited before E2E teardown completed');
   }
-  try { server?.close(); } catch {}
-  if (profileDir) {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try { await rm(profileDir, { recursive: true, force: true }); break; }
-      catch (cleanupError) { if (attempt === 4) console.error('Cleanup warning:', cleanupError.message); else await new Promise(r => setTimeout(r, 200)); }
-    }
+  if (!server || !server.listening) {
+    console.log('PASS  local static server is closed before E2E teardown completed');
   }
 }
