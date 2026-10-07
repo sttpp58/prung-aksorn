@@ -11,7 +11,9 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const PORT_HOST = '127.0.0.1';
 const repoEntry = path.join(ROOT, 'index.html');
-const TEST_TIMEOUT = 60_000;
+const configuredTestTimeout = Number(process.env.E2E_TEST_TIMEOUT_MS);
+const TEST_TIMEOUT = Number.isFinite(configuredTestTimeout) && configuredTestTimeout > 0 ? configuredTestTimeout : 60_000;
+const LIFECYCLE_TEST_MODE = process.env.E2E_LIFECYCLE_TEST || '';
 const CDP_COMMAND_TIMEOUT = 10_000;
 const CDP_CONNECT_TIMEOUT = 10_000;
 const CHILD_PROCESS_TIMEOUT = 3_000;
@@ -101,7 +103,7 @@ async function findBrowser() {
   throw new Error('No Chromium-family browser found. Set E2E_BROWSER to the browser executable path.');
 }
 
-function startStaticServer() {
+function startStaticServer(timeoutMs = 5_000) {
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
       try {
@@ -118,8 +120,8 @@ function startStaticServer() {
         }
         const contentType = filePath.endsWith('.html') ? 'text/html; charset=utf-8'
           : filePath.endsWith('.js') || filePath.endsWith('.mjs') ? 'text/javascript; charset=utf-8'
-          : filePath.endsWith('.json') ? 'application/json; charset=utf-8'
-          : filePath.endsWith('.css') ? 'text/css; charset=utf-8'
+          : filePath.endsWith('.json') ? 'application/json'
+          : filePath.endsWith('.css') ? 'text/css'
           : filePath.endsWith('.png') ? 'image/png'
           : 'application/octet-stream';
         res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-store' });
@@ -128,8 +130,28 @@ function startStaticServer() {
         res.writeHead(500); res.end(String(error));
       }
     });
-    server.once('error', reject);
-    server.listen(0, PORT_HOST, () => resolve({ server, port: server.address().port }));
+
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { server.close(); } catch {}
+      reject(new Error('Static server startup timed out after ' + timeoutMs + 'ms.'));
+    }, timeoutMs);
+    const onError = error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error('Static server startup failed: ' + String(error?.message || error)));
+    };
+    server.once('error', onError);
+    server.listen(0, PORT_HOST, () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      server.removeListener('error', onError);
+      resolve({ server, port: server.address().port });
+    });
   });
 }
 
@@ -353,7 +375,11 @@ async function cleanupRuntime() {
       }
     }
   })();
-  return cleanupPromise;
+  try {
+    return await cleanupPromise;
+  } finally {
+    cleanupPromise = null;
+  }
 }
 
 function handleSignal(signal) {
@@ -386,8 +412,30 @@ try {
   profileDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-e2e-'));
   const debugPortHolder = await new Promise((resolve, reject) => {
     const probe = createServer();
-    probe.once('error', reject);
-    probe.listen(0, PORT_HOST, () => { const port = probe.address().port; probe.close(() => resolve(port)); });
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { probe.close(); } catch {}
+      reject(new Error('Remote debugging port probe timed out after 5_000ms.'));
+    }, 5_000);
+    const onError = error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error('Remote debugging port probe failed: ' + String(error?.message || error)));
+    };
+    probe.once('error', onError);
+    probe.listen(0, PORT_HOST, () => {
+      if (settled) return;
+      const port = probe.address().port;
+      probe.close(() => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(port);
+      });
+    });
   });
 
   chrome = spawn(browser, [
@@ -419,6 +467,19 @@ try {
   await waitForFunction(cdp, `!!window.PrungAksornStorageV2`, 15_000);
   await waitForFunction(cdp, `navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false`, 10_000, 100);
   check(true, 'app loads in a real Chromium browser over HTTP');
+
+  if (LIFECYCLE_TEST_MODE) {
+    if (!['setup-exception', 'global-timeout', 'signal'].includes(LIFECYCLE_TEST_MODE)) {
+      throw new Error('Unknown lifecycle test mode: ' + LIFECYCLE_TEST_MODE);
+    }
+    log('Lifecycle test hook armed: ' + LIFECYCLE_TEST_MODE);
+    if (LIFECYCLE_TEST_MODE === 'setup-exception') {
+      throw new Error('Injected setup exception after browser/server/CDP initialization.');
+    }
+    if (LIFECYCLE_TEST_MODE === 'global-timeout' || LIFECYCLE_TEST_MODE === 'signal') {
+      await new Promise(() => {});
+    }
+  }
 
   await click(cdp, '#gearBtn');
   await waitForFunction(cdp, `document.getElementById('settingsPanel').classList.contains('open')`);
