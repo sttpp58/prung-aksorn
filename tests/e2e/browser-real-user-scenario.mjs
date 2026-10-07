@@ -197,6 +197,14 @@ async function typeInto(cdp, selector, text) {
 }
 
 async function read(cdp, expression) { return await evaluate(cdp, expression); }
+async function waitForDurableBookDraft(cdp, expectedDraft, expectedTitle) {
+  const draft = JSON.stringify(expectedDraft);
+  const title = JSON.stringify(expectedTitle);
+  const expression = `window.PrungAksornStorageV2.exportBackup().then(function(payload){return (payload.data.books || []).some(function(book){return book.draft === ${draft} && book.chapterTitle === ${title};});})`;
+  await waitForFunction(cdp, expression, 12_000, 100);
+  check(true, 'durable Book draft/title reached IndexedDB before continuing');
+}
+
 
 async function reload(cdp, url) {
   await cdp.send('Page.navigate', { url });
@@ -312,7 +320,7 @@ try {
 
   await typeInto(cdp, '#chapterTitle', 'E2E Draft A');
   await typeInto(cdp, '#inputText', 'Draft content belonging to Book A');
-  await new Promise(r => setTimeout(r, 800));
+  await waitForDurableBookDraft(cdp, 'Draft content belonging to Book A', 'E2E Draft A');
   check(await read(cdp, `document.getElementById('inputText').value === 'Draft content belonging to Book A'`), 'Book A draft entered through the editor');
 
   await click(cdp, '.book-list.open .utility-btn');
@@ -324,7 +332,7 @@ try {
 
   await typeInto(cdp, '#chapterTitle', 'E2E Draft B');
   await typeInto(cdp, '#inputText', 'Draft content belonging to Book B');
-  await new Promise(r => setTimeout(r, 800));
+  await waitForDurableBookDraft(cdp, 'Draft content belonging to Book B', 'E2E Draft B');
 
   await evaluate(cdp, `document.querySelector('.book-title-text').click()`);
   await waitForFunction(cdp, `document.getElementById('inputText').value === 'Draft content belonging to Book A'`);
@@ -366,7 +374,7 @@ try {
   check(await read(cdp, `window.__e2e.blockedExternalCalls.length === 0`), 'E2E scenario made no unexpected external network calls');
   check(await read(cdp, `window.__e2e.calls === 1`), 'E2E scenario made exactly one mocked provider request');
 
-  await new Promise(r => setTimeout(r, 900));
+  await waitForDurableBookDraft(cdp, 'Draft content belonging to Book B', 'E2E Draft B');
   await reload(cdp, e2eUrl);
   check(await read(cdp, `document.getElementById('inputText').value === 'Draft content belonging to Book B'`), 'Book B draft survives a real browser reload');
   check(await read(cdp, `document.getElementById('chapterTitle').value === 'E2E Draft B'`), 'Book B chapter title survives reload');
