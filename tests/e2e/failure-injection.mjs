@@ -356,6 +356,119 @@ async function runScenario(name, allowedLogs, body) {
   }
 }
 
+async function scenarioCancelPersistenceFailure(ctx) {
+  await createProject(ctx, 'FI Cancel Persistence Failure');
+  await installFetchFault(ctx, 'cancel');
+  await prepareTranslation(ctx, 'FI Cancel Persistence', 'Cancel persistence failure source');
+  await click(ctx.cdp, '#processBtn');
+  await waitForFunction(ctx.cdp,
+    "window.__fi.pending === true && document.getElementById('cancelBtn').classList.contains('show')");
+  await evaluate(ctx.cdp,
+    "window.__origCancel=window.PrungAksornStorageV2.cancelTranslationJob;" +
+    "window.PrungAksornStorageV2.cancelTranslationJob=async()=>{throw new Error('Injected cancelTranslationJob persistence failure')};"
+  );
+  await click(ctx.cdp, '#cancelBtn');
+  await waitForFunction(ctx.cdp,
+    "document.getElementById('processBtn').disabled === false && !document.getElementById('cancelBtn').classList.contains('show')");
+  const job = await latestJob(ctx);
+  check(job?.status === 'running', 'cancellation persistence failure leaves the Translation Job running and recoverable');
+  check(
+    await evaluate(ctx.cdp, "document.getElementById('resumeBtn').classList.contains('show')"),
+    'cancellation persistence failure exposes same-session recovery control'
+  );
+  check(
+    await evaluate(ctx.cdp, "document.getElementById('errorBox').classList.contains('show')"),
+    'cancellation persistence failure surfaces a visible recovery warning'
+  );
+  check(
+    await evaluate(ctx.cdp, "document.getElementById('errorBox').textContent.includes('บันทึกสถานะการยกเลิกไม่สำเร็จ')"),
+    'cancellation persistence warning explains the durable-state failure'
+  );
+  check(
+    await evaluate(ctx.cdp, "window.__fi.calls === 1"),
+    'cancellation persistence failure does not retry or resend the provider request'
+  );
+  check(ctx.runtimeErrors.length === 0, 'cancellation persistence failure has no uncaught browser runtime exceptions');
+  check(
+    await evaluate(ctx.cdp, '!window.__fi || window.__fi.external.length === 0'),
+    'cancellation persistence failure makes no unexpected external calls'
+  );
+  await evaluate(ctx.cdp, 'window.PrungAksornStorageV2.cancelTranslationJob=window.__origCancel');
+  await ctx.cdp.send('Page.navigate', { url: ctx.url });
+  await waitForFunction(ctx.cdp, "document.readyState === 'complete' && !!document.getElementById('translationRecoveryBox')", 10000);
+  const recoveredJob = await latestJob(ctx);
+  check(recoveredJob?.status === 'running', 'cancellation persistence failure remains recoverable after browser reload');
+  check(
+    await evaluate(ctx.cdp, "document.getElementById('translationRecoveryBox').textContent.includes('กู้คืน')"),
+    'browser reload exposes the persistent Translation Job recovery control'
+  );
+}
+
+async function scenarioDestructiveMutationGuard(ctx) {
+  await createProject(ctx, 'FI Destructive Mutation Guard');
+  await prepareTranslation(ctx, 'FI Guard Chapter', 'Block destructive mutation while translation is in flight');
+  await installFetchFault(ctx, 'cancel');
+  await click(ctx.cdp, '#processBtn');
+  await waitForFunction(ctx.cdp,
+    "window.__fi.pending === true && document.getElementById('cancelBtn').classList.contains('show')");
+  await click(ctx.cdp, "button[title='ลบเรื่องนี้']");
+  await new Promise(r => setTimeout(r, 150));
+  check(
+    await evaluate(ctx.cdp, "document.querySelectorAll('.project-row').length === 1"),
+    'active Project remains while translation is in flight'
+  );
+  check(
+    await evaluate(ctx.cdp, "!document.getElementById('appDialogOverlay').classList.contains('show')"),
+    'Project delete confirmation is blocked while AI work is busy'
+  );
+  check(
+    await evaluate(ctx.cdp, "document.getElementById('errorBox').classList.contains('show') && document.getElementById('errorBox').textContent.includes('กำลังมีงาน AI')"),
+    'Project delete is rejected with the existing AI-busy guard message'
+  );
+  await click(ctx.cdp, "button[title='ลบเล่มนี้']");
+  await new Promise(r => setTimeout(r, 150));
+  check(
+    await evaluate(ctx.cdp, "document.getElementById('appDialogOverlay').classList.contains('show') === false"),
+    'Book delete confirmation is also blocked while AI work is busy'
+  );
+  check(
+    await evaluate(ctx.cdp, "document.querySelectorAll('.project-row').length === 1"),
+    'Project remains intact after blocked Project and Book delete attempts'
+  );
+  await click(ctx.cdp, '#cancelBtn');
+  await waitForFunction(ctx.cdp,
+    "document.getElementById('processBtn').disabled === false && !document.getElementById('cancelBtn').classList.contains('show')");
+  const job = await latestJob(ctx);
+  check(job?.status === 'cancelled', 'guard scenario can still cancel the translation normally');
+
+  await evaluate(ctx.cdp,
+    "window.__origShowConfirmDialog=window.showConfirmDialog;" +
+    "window.showConfirmDialog=async function(){" +
+      "window.__fi.toctouTriggered=true;" +
+      "document.getElementById('processBtn').click();" +
+      "await new Promise(r=>setTimeout(r,75));" +
+      "return true;" +
+    "};"
+  );
+  await click(ctx.cdp, "button[title='ลบเรื่องนี้']");
+  await waitForFunction(ctx.cdp,
+    "window.__fi.toctouTriggered === true && document.getElementById('cancelBtn').classList.contains('show')");
+  await new Promise(r => setTimeout(r, 100));
+  check(
+    await evaluate(ctx.cdp, "document.querySelectorAll('.project-row').length === 1"),
+    'Project remains intact when AI work starts during delete confirmation'
+  );
+  check(
+    await evaluate(ctx.cdp, "!document.getElementById('appDialogOverlay').classList.contains('show')"),
+    'Project mutation is blocked by the second AI-busy guard before commit'
+  );
+  await evaluate(ctx.cdp, "window.showConfirmDialog=window.__origShowConfirmDialog");
+  await click(ctx.cdp, '#cancelBtn');
+  await waitForFunction(ctx.cdp,
+    "document.getElementById('processBtn').disabled === false && !document.getElementById('cancelBtn').classList.contains('show')");
+  check(ctx.runtimeErrors.length === 0, 'destructive guard scenario has no uncaught browser runtime exceptions');
+}
+
 async function scenarioRetrySuccess(ctx) {
   await createProject(ctx, 'FI Retry Success');
   await installFetchFault(ctx, 'retry-success');
@@ -473,6 +586,8 @@ async function scenarioAutosaveTransient(ctx) {
 }
 
 const scenarios = [
+  ['FI-05 Cancellation Persistence Failure', [], scenarioCancelPersistenceFailure],
+  ['FI-06 Destructive Mutation Guard', [], scenarioDestructiveMutationGuard],
   ['FI-01 Provider HTTP 500 Retry → Recovery', [], scenarioRetrySuccess],
   ['FI-02 Provider Permanent Network Failure', [], scenarioPermanentNetwork],
   ['FI-03 In-Flight Cancellation', [], scenarioCancelInFlight],

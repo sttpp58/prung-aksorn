@@ -200,9 +200,27 @@
           pendingResume = null;
         }
       } else {
-        await PrungAksornStorageV2.cancelTranslationJob(translationJobId,translationJobRevision);
-        pendingResume = null;
-        activeTranslationJobId = null;
+        var cancellationPersistenceError = null;
+        try{
+          await PrungAksornStorageV2.cancelTranslationJob(translationJobId,translationJobRevision);
+        }catch(jobErr){
+          cancellationPersistenceError = jobErr;
+          console.warn('Translation Job cancellation state persistence failed:',jobErr);
+        }
+        if(cancellationPersistenceError){
+          activeTranslationJobId = null;
+          if(isAppContextCurrent(translationContext)){
+            pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision, settingsSnapshot: translationSettingsSnapshot };
+            showError('หยุดการแปลแล้ว แต่ระบบบันทึกสถานะการยกเลิกไม่สำเร็จ — Job ยังอยู่ในสถานะกู้คืนได้ กรุณาใช้ "แปลต่อจากที่ค้าง" หรือโหลดหน้านี้ใหม่เพื่อกู้คืนงาน');
+            if(resumeBtn) resumeBtn.classList.add('show');
+            refreshTranslationRecoveryUI();
+          }else{
+            pendingResume = null;
+          }
+        }else{
+          pendingResume = null;
+          activeTranslationJobId = null;
+        }
       }
     } finally {
       setTranslationSettingsLocked(false);

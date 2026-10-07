@@ -53,8 +53,10 @@
       delBtn.textContent = '✕';
       delBtn.addEventListener('click', async function(e){
         e.stopPropagation();
+        if(warnIfAiBusy()) return;
         var ok = await showConfirmDialog('ลบเรื่องนิยาย', 'ลบเรื่อง "' + proj.name + '" พร้อมประวัติทั้งหมด? การลบไม่สามารถย้อนกลับได้', true);
         if(ok){
+          if(warnIfAiBusy()) return;
           var wasCurrentProject = appData.currentProjectId === proj.id;
           if(wasCurrentProject) advanceAppContextGeneration();
           appData.projects = appData.projects.filter(function(p){ return p !== proj; });
@@ -162,9 +164,11 @@
           bdel.title = 'ลบเล่มนี้';
           bdel.addEventListener('click', async function(e){
             e.stopPropagation();
+            if(warnIfAiBusy()) return;
             if(proj.books.length <= 1){ await showAlertDialog('ทำไม่ได้', 'ต้องมีอย่างน้อย 1 เล่มในเรื่องนี้'); return; }
             var ok = await showConfirmDialog('ลบเล่ม', 'ต้องการลบเล่ม "' + book.title + '" พร้อมประวัติในเล่มหรือไม่? การลบไม่สามารถย้อนกลับได้', true);
             if(ok){
+              if(warnIfAiBusy()) return;
               var wasActiveBook = proj.currentBookId === book.id;
               flushPendingDraftSave();
               if(wasActiveBook) advanceAppContextGeneration();
