@@ -89,7 +89,8 @@ async function runCase(name, env, expectedCode, expectedText) {
 
     await waitForExit(child, CHILD_EXIT_TIMEOUT);
     assert.equal(child.exitCode, expectedCode, name + ' exit code');
-    assert.match(output.value, expectedText, name + ' output contains the expected failure reason');
+    const combinedOutput = output.value + '\\n' + stderr;
+    assert.match(combinedOutput, expectedText, name + ' output contains the expected failure reason');
     await assertNoE2EProcesses(baselineProfiles);
     log('PASS ' + name);
   } catch (error) {
