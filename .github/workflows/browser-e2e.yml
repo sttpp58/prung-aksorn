@@ -14,6 +14,7 @@ permissions:
 jobs:
   browser-e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,3 +41,17 @@ jobs:
 
       - name: Run Browser E2E
         run: node tests/e2e/browser-real-user-scenario.mjs
+      - name: Run Browser E2E adversarial lifecycle gate
+        run: node tests/e2e/browser-e2e-lifecycle.mjs
+
+      - name: Verify E2E browser process cleanup
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          leftovers="$(pgrep -af -- '--user-data-dir=' | grep 'prung-aksorn-e2e-' || true)"
+          if [ -n "$leftovers" ]; then
+            echo "ERROR: E2E browser process(es) remain after test teardown"
+            echo "$leftovers"
+            exit 1
+          fi
+          echo "PASS: no Prung Aksorn E2E browser processes remain"

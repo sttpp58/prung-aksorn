@@ -11,10 +11,54 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const PORT_HOST = '127.0.0.1';
 const repoEntry = path.join(ROOT, 'index.html');
-const TEST_TIMEOUT = 45_000;
+const configuredTestTimeout = Number(process.env.E2E_TEST_TIMEOUT_MS);
+const TEST_TIMEOUT = Number.isFinite(configuredTestTimeout) && configuredTestTimeout > 0 ? configuredTestTimeout : 60_000;
+const LIFECYCLE_TEST_MODE = process.env.E2E_LIFECYCLE_TEST || '';
+const CDP_COMMAND_TIMEOUT = 10_000;
+const CDP_CONNECT_TIMEOUT = 10_000;
+const CHILD_PROCESS_TIMEOUT = 3_000;
+const SERVER_CLOSE_TIMEOUT = 2_000;
+const PROFILE_CLEANUP_TIMEOUT = 5_000;
 
 function log(message) { console.log('[E2E] ' + message); }
 function check(condition, message) { assert.ok(condition, message); console.log('PASS  ' + message); }
+function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function fetchJsonWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function waitForChildExit(child, timeoutMs = CHILD_PROCESS_TIMEOUT, label = 'child process') {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+  return new Promise(resolve => {
+    let done = false;
+    let timer;
+    const finish = (exited) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child.removeListener('exit', onExit);
+      child.removeListener('error', onError);
+      resolve(exited);
+    };
+    const onExit = () => finish(true);
+    const onError = () => finish(true);
+    timer = setTimeout(() => {
+      log(label + ' exit wait timed out after ' + timeoutMs + 'ms');
+      finish(false);
+    }, timeoutMs);
+    child.once('exit', onExit);
+    child.once('error', onError);
+  });
+}
 
 async function findBrowser() {
   const explicit = process.env.E2E_BROWSER;
@@ -41,8 +85,16 @@ async function findBrowser() {
       const probe = spawn(command, ['--version'], { stdio: 'ignore', windowsHide: true });
       if (probe.pid) {
         await new Promise((resolve, reject) => {
-          probe.once('error', reject);
-          probe.once('exit', code => code === 0 ? resolve() : reject(new Error('version probe failed')));
+          let timer = setTimeout(() => {
+            try { probe.kill(); } catch {}
+            reject(new Error('Browser version probe timed out after ' + CHILD_PROCESS_TIMEOUT + 'ms: ' + command));
+          }, CHILD_PROCESS_TIMEOUT);
+          probe.once('error', error => { clearTimeout(timer); reject(error); });
+          probe.once('exit', code => {
+            clearTimeout(timer);
+            if (code === 0) resolve();
+            else reject(new Error('Browser version probe failed: ' + command + ' exit=' + code));
+          });
         });
         return command;
       }
@@ -51,7 +103,7 @@ async function findBrowser() {
   throw new Error('No Chromium-family browser found. Set E2E_BROWSER to the browser executable path.');
 }
 
-function startStaticServer() {
+function startStaticServer(timeoutMs = 5_000) {
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
       try {
@@ -68,8 +120,8 @@ function startStaticServer() {
         }
         const contentType = filePath.endsWith('.html') ? 'text/html; charset=utf-8'
           : filePath.endsWith('.js') || filePath.endsWith('.mjs') ? 'text/javascript; charset=utf-8'
-          : filePath.endsWith('.json') ? 'application/json; charset=utf-8'
-          : filePath.endsWith('.css') ? 'text/css; charset=utf-8'
+          : filePath.endsWith('.json') ? 'application/json'
+          : filePath.endsWith('.css') ? 'text/css'
           : filePath.endsWith('.png') ? 'image/png'
           : 'application/octet-stream';
         res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-store' });
@@ -78,8 +130,28 @@ function startStaticServer() {
         res.writeHead(500); res.end(String(error));
       }
     });
-    server.once('error', reject);
-    server.listen(0, PORT_HOST, () => resolve({ server, port: server.address().port }));
+
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { server.close(); } catch {}
+      reject(new Error('Static server startup timed out after ' + timeoutMs + 'ms.'));
+    }, timeoutMs);
+    const onError = error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error('Static server startup failed: ' + String(error?.message || error)));
+    };
+    server.once('error', onError);
+    server.listen(0, PORT_HOST, () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      server.removeListener('error', onError);
+      resolve({ server, port: server.address().port });
+    });
   });
 }
 
@@ -87,12 +159,12 @@ async function waitForUrl(url, timeoutMs = 10_000) {
   const start = Date.now();
   let lastError;
   while (Date.now() - start < timeoutMs) {
+    if (shutdownRequested) throw (globalTimeoutError || new Error('Browser E2E shutdown requested while waiting for URL: ' + url));
     try {
-      const res = await fetch(url);
-      if (res.ok) return await res.json();
-      lastError = new Error(`HTTP ${res.status}`);
+      const remaining = timeoutMs - (Date.now() - start);
+      return await fetchJsonWithTimeout(url, Math.max(250, Math.min(2_000, remaining)));
     } catch (error) { lastError = error; }
-    await new Promise(r => setTimeout(r, 100));
+    await delay(100);
   }
   throw new Error(`Timed out waiting for ${url}: ${lastError?.message || 'unknown error'}`);
 }
@@ -105,14 +177,32 @@ class CdpClient {
     this.pending = new Map();
     this.events = new Map();
   }
+  rejectPending(error) {
+    for (const [id, pending] of this.pending.entries()) {
+      this.pending.delete(id);
+      clearTimeout(pending.timer);
+      pending.reject(error);
+    }
+  }
   async connect() {
     this.ws = new WebSocket(this.wsUrl);
     await new Promise((resolve, reject) => {
+      let timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('CDP WebSocket connect timed out after ' + CDP_CONNECT_TIMEOUT + 'ms.'));
+      }, CDP_CONNECT_TIMEOUT);
       const onOpen = () => { cleanup(); resolve(); };
       const onError = (e) => { cleanup(); reject(new Error('CDP WebSocket failed: ' + String(e?.message || e))); };
-      const cleanup = () => { this.ws.removeEventListener('open', onOpen); this.ws.removeEventListener('error', onError); };
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.ws.removeEventListener('open', onOpen);
+        this.ws.removeEventListener('error', onError);
+      };
       this.ws.addEventListener('open', onOpen);
       this.ws.addEventListener('error', onError);
+    });
+    this.ws.addEventListener('close', () => {
+      this.rejectPending(new Error('CDP connection closed before all commands completed.'));
     });
     this.ws.addEventListener('message', event => {
       const message = JSON.parse(String(event.data));
@@ -120,7 +210,8 @@ class CdpClient {
         const pending = this.pending.get(message.id);
         if (!pending) return;
         this.pending.delete(message.id);
-        if (message.error) pending.reject(new Error(`CDP ${message.error.code}: ${message.error.message}`));
+        clearTimeout(pending.timer);
+        if (message.error) pending.reject(new Error('CDP ' + message.error.code + ': ' + message.error.message));
         else pending.resolve(message.result);
         return;
       }
@@ -128,11 +219,24 @@ class CdpClient {
       for (const listener of listeners) listener(message.params);
     });
   }
-  send(method, params = {}) {
+  send(method, params = {}, timeoutMs = CDP_COMMAND_TIMEOUT) {
+    if (!this.ws || this.ws.readyState !== 1) {
+      return Promise.reject(new Error('CDP send rejected: WebSocket is not open for ' + method));
+    }
     const id = ++this.nextId;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, method, params }));
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error('CDP command timed out after ' + timeoutMs + 'ms: ' + method));
+      }, timeoutMs);
+      this.pending.set(id, { resolve, reject, timer });
+      try {
+        this.ws.send(JSON.stringify({ id, method, params }));
+      } catch (error) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        reject(error);
+      }
     });
   }
   on(method, listener) {
@@ -147,6 +251,7 @@ async function waitForFunction(cdp, expression, timeoutMs = 8_000, intervalMs = 
   const start = Date.now();
   let last;
   while (Date.now() - start < timeoutMs) {
+    if (shutdownRequested) throw (globalTimeoutError || new Error('Browser E2E shutdown requested while waiting for: ' + expression));
     last = await evaluate(cdp, expression);
     if (last === true) return;
     await new Promise(r => setTimeout(r, intervalMs));
@@ -197,18 +302,152 @@ async function typeInto(cdp, selector, text) {
 }
 
 async function read(cdp, expression) { return await evaluate(cdp, expression); }
+async function waitForDurableBookDraft(cdp, expectedDraft, expectedTitle) {
+  const draft = JSON.stringify(expectedDraft);
+  const title = JSON.stringify(expectedTitle);
+  const expression = `window.PrungAksornStorageV2.exportBackup().then(function(payload){return (payload.data.books || []).some(function(book){return book.draft === ${draft} && book.chapterTitle === ${title};});})`;
+  await waitForFunction(cdp, expression, 12_000, 100);
+  check(true, 'durable Book draft/title reached IndexedDB before continuing');
+}
+
 
 async function reload(cdp, url) {
+  const previousTimeOrigin = await read(cdp, 'performance.timeOrigin');
   await cdp.send('Page.navigate', { url });
-  await waitForFunction(cdp, `document.readyState === 'complete' && !!document.getElementById('inputText')`);
-  await waitForFunction(cdp, `!!window.PrungAksornStorageV2 && !!document.getElementById('projectList')`);
+  await waitForFunction(
+    cdp,
+    `performance.timeOrigin !== ${JSON.stringify(previousTimeOrigin)} && document.readyState === 'complete' && location.href === ${JSON.stringify(url)} && !!document.getElementById('inputText')`,
+    15_000
+  );
+  await waitForFunction(
+    cdp,
+    `typeof storageReady !== 'undefined' && storageReady === true && typeof appData !== 'undefined'`,
+    15_000
+  );
+  await waitForFunction(cdp, `!!window.PrungAksornStorageV2 && !!document.getElementById('projectList')`, 10_000);
+}
+
+async function waitForReloadedBookState(cdp, expectedDraft, expectedTitle) {
+  const draft = JSON.stringify(expectedDraft);
+  const title = JSON.stringify(expectedTitle);
+  await waitForFunction(
+    cdp,
+    `document.getElementById('inputText').value === ${draft} && document.getElementById('chapterTitle').value === ${title}`,
+    10_000
+  );
 }
 
 let server;
 let chrome;
 let cdp;
 let profileDir;
+let cleanupPromise = null;
+let globalTimeoutTimer = null;
+let globalTimeoutError = null;
+let shutdownRequested = false;
 const pageErrors = [];
+let browserStdErr = '';
+
+function signalBrowserProcessTree(signal) {
+  if (!chrome?.pid) return;
+  if (process.platform === 'win32') {
+    const taskkill = spawn('taskkill', ['/PID', String(chrome.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true
+    });
+    taskkill.unref();
+    return;
+  }
+  try {
+    process.kill(-chrome.pid, signal);
+  } catch {
+    try { process.kill(chrome.pid, signal); } catch {}
+  }
+}
+
+async function cleanupRuntime() {
+  if (cleanupPromise) return cleanupPromise;
+  cleanupPromise = (async () => {
+    try {
+      if (cdp) {
+        try { await cdp.send('Browser.close', {}, 2_000); } catch {}
+        try { cdp.close(); } catch {}
+      }
+    } catch {}
+
+    try {
+      if (chrome && chrome.exitCode === null && chrome.signalCode === null) {
+        signalBrowserProcessTree('SIGTERM');
+        const stopped = await waitForChildExit(chrome, CHILD_PROCESS_TIMEOUT, 'Browser process tree');
+        if (!stopped) {
+          signalBrowserProcessTree('SIGKILL');
+          const killed = await waitForChildExit(chrome, CHILD_PROCESS_TIMEOUT, 'Browser process tree after SIGKILL');
+          if (!killed) log('WARNING: browser process tree did not confirm exit within the cleanup deadline.');
+        }
+      }
+    } catch (error) {
+      log('Browser cleanup warning: ' + String(error?.message || error));
+    }
+
+    try {
+      if (server?.listening) {
+        await Promise.race([
+          new Promise(resolve => {
+            try { server.close(() => resolve()); } catch { resolve(); }
+          }),
+          delay(SERVER_CLOSE_TIMEOUT).then(() => { throw new Error('Static server close timed out after ' + SERVER_CLOSE_TIMEOUT + 'ms.'); })
+        ]);
+      }
+    } catch (error) {
+      log('Server cleanup warning: ' + String(error?.message || error));
+    }
+
+    if (profileDir) {
+      try {
+        await Promise.race([
+          rm(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 }),
+          delay(PROFILE_CLEANUP_TIMEOUT).then(() => { throw new Error('Temporary browser profile cleanup timed out after ' + PROFILE_CLEANUP_TIMEOUT + 'ms.'); })
+        ]);
+      } catch (error) {
+        log('Profile cleanup warning: ' + String(error?.message || error));
+      }
+    }
+  })();
+  try {
+    return await cleanupPromise;
+  } finally {
+    cleanupPromise = null;
+  }
+}
+
+function requestShutdown(signal, message, exitCode) {
+  if (shutdownRequested) return;
+  shutdownRequested = true;
+  process.exitCode = exitCode;
+  globalTimeoutError = new Error(message);
+  console.error(globalTimeoutError.message);
+  void cleanupRuntime()
+    .catch(() => {})
+    .finally(() => process.exit(exitCode));
+}
+
+function handleSignal(signal) {
+  requestShutdown(
+    signal,
+    'Browser E2E interrupted by ' + signal + '.',
+    signal === 'SIGINT' ? 130 : 143
+  );
+}
+
+process.once('SIGINT', handleSignal);
+process.once('SIGTERM', handleSignal);
+globalTimeoutTimer = setTimeout(() => {
+  requestShutdown(
+    'TIMEOUT',
+    'Browser E2E global timeout after ' + TEST_TIMEOUT + 'ms. Check the last completed step and CDP/process teardown.',
+    1
+  );
+}, TEST_TIMEOUT);
 
 try {
   const browser = await findBrowser();
@@ -222,8 +461,30 @@ try {
   profileDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-e2e-'));
   const debugPortHolder = await new Promise((resolve, reject) => {
     const probe = createServer();
-    probe.once('error', reject);
-    probe.listen(0, PORT_HOST, () => { const port = probe.address().port; probe.close(() => resolve(port)); });
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { probe.close(); } catch {}
+      reject(new Error('Remote debugging port probe timed out after 5_000ms.'));
+    }, 5_000);
+    const onError = error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error('Remote debugging port probe failed: ' + String(error?.message || error)));
+    };
+    probe.once('error', onError);
+    probe.listen(0, PORT_HOST, () => {
+      if (settled) return;
+      const port = probe.address().port;
+      probe.close(() => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(port);
+      });
+    });
   });
 
   chrome = spawn(browser, [
@@ -231,10 +492,23 @@ try {
     '--disable-background-networking', '--disable-component-update', '--no-first-run',
     '--no-default-browser-check', '--user-data-dir=' + profileDir,
     '--remote-debugging-port=' + debugPortHolder, '--window-size=1440,1200', e2eUrl
-  ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-  const browserExit = new Promise(resolve => chrome.once('exit', resolve));
+  ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' });
+  chrome.on('error', error => log('Browser child error: ' + String(error?.message || error)));
+  chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
   chrome.on('exit', code => log('Browser exited with code ' + code));
-  await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json/version`, 15_000);
+  try {
+    await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json/version`, 15_000);
+  } catch (error) {
+    const exitState = chrome.exitCode !== null || chrome.signalCode !== null
+      ? ' exitCode=' + chrome.exitCode + ' signal=' + chrome.signalCode
+      : ' processStillRunning=true';
+    const stderr = browserStdErr.trim();
+    throw new Error(
+      'Browser DevTools endpoint did not become ready: ' + error.message +
+      exitState +
+      (stderr ? '\nBrowser stderr:\n' + stderr.slice(-4000) : '\nBrowser stderr: <empty>')
+    );
+  }
   const targets = await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json`, 10_000);
   const pageTarget = Array.isArray(targets) ? targets.find(target => target.type === 'page' && target.webSocketDebuggerUrl) : null;
   if (!pageTarget) throw new Error('No browser page target available for CDP.');
@@ -254,17 +528,30 @@ try {
 
   await waitForFunction(cdp, `document.readyState === 'complete' && !!document.getElementById('addProjBtn')`, 15_000);
   await waitForFunction(cdp, `!!window.PrungAksornStorageV2`, 15_000);
-  await evaluate(cdp, `navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false`);
+  await waitForFunction(cdp, `navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false`, 10_000, 100);
   check(true, 'app loads in a real Chromium browser over HTTP');
 
+  if (LIFECYCLE_TEST_MODE) {
+    if (!['setup-exception', 'global-timeout', 'signal'].includes(LIFECYCLE_TEST_MODE)) {
+      throw new Error('Unknown lifecycle test mode: ' + LIFECYCLE_TEST_MODE);
+    }
+    log('Lifecycle test hook armed: ' + LIFECYCLE_TEST_MODE);
+    if (LIFECYCLE_TEST_MODE === 'setup-exception') {
+      throw new Error('Injected setup exception after browser/server/CDP initialization.');
+    }
+    if (LIFECYCLE_TEST_MODE === 'global-timeout' || LIFECYCLE_TEST_MODE === 'signal') {
+      await new Promise(() => {});
+    }
+  }
+
   await click(cdp, '#gearBtn');
-  await waitForFunction(cdp, `document.getElementById('settingsPanel').classList.contains('open')`);
+  await waitForFunction(cdp, `document.getElementById('settingsPanel').classList.contains('open')`, 8_000);
   await click(cdp, '#modelPickerTrigger');
-  await waitForFunction(cdp, `document.getElementById('modelPicker').classList.contains('open') && [...document.querySelectorAll('#modelPickerList .model-picker-option-label')].some(x=>x.textContent.includes('GPT-4o Mini'))`);
+  await waitForFunction(cdp, `document.getElementById('modelPicker').classList.contains('open') && [...document.querySelectorAll('#modelPickerList .model-picker-option-label')].some(x=>x.textContent.includes('GPT-4o Mini'))`, 8_000);
   check(await read(cdp, `[...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'gpt-4o-mini')`), 'OpenAI catalog exposes the built-in GPT-4o Mini model');
 
   await evaluate(cdp, `(()=>{const el=document.getElementById('provider');el.value='gemini';el.dispatchEvent(new Event('change',{bubbles:true}));return el.value;})()`);
-  await waitForFunction(cdp, `document.getElementById('model').value === 'gemini-flash-latest' && document.getElementById('modelPicker').classList.contains('open')`);
+  await waitForFunction(cdp, `document.getElementById('model').value === 'gemini-flash-latest' && document.getElementById('modelPicker').classList.contains('open')`, 8_000);
   check(await read(cdp, `[...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'gemini-3.5-flash')`), 'Gemini catalog exposes the built-in 3.5 Flash model');
   await clickText(cdp, '#modelPickerList .model-picker-option-main', 'gemini-3.5-flash');
   check(await read(cdp, `document.getElementById('model').value === 'gemini-3.5-flash' && document.getElementById('modelPickerValue').textContent === 'gemini-3.5-flash'`), 'Selecting a built-in model updates the stable runtime model value');
@@ -274,7 +561,7 @@ try {
   await click(cdp, '#modelPickerAddBtn');
   await typeInto(cdp, '#modelPickerAddInput', 'e2e-custom-gemini-model');
   await click(cdp, '#modelPickerSaveBtn');
-  await waitForFunction(cdp, `document.getElementById('model').value === 'e2e-custom-gemini-model' && [...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'e2e-custom-gemini-model')`);
+  await waitForFunction(cdp, `document.getElementById('model').value === 'e2e-custom-gemini-model' && [...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'e2e-custom-gemini-model')`, 8_000);
   check(await read(cdp, `document.querySelector('#modelPickerList .model-picker-custom-badge')?.textContent === 'เพิ่มเอง'`), 'Custom model is added to the provider-specific catalog');
 
   await reload(cdp, e2eUrl);
@@ -285,49 +572,49 @@ try {
   check(await read(cdp, `[...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'e2e-custom-gemini-model')`), 'Persisted custom model remains visible after reload');
 
   await evaluate(cdp, `(()=>{const el=document.getElementById('provider');el.value='openai';el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
-  await waitForFunction(cdp, `document.getElementById('model').value === 'gpt-4o-mini'`);
+  await waitForFunction(cdp, `document.getElementById('model').value === 'gpt-4o-mini'`, 8_000);
   await evaluate(cdp, `(()=>{const el=document.getElementById('provider');el.value='gemini';el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
-  await waitForFunction(cdp, `document.getElementById('model').value === 'e2e-custom-gemini-model'`);
+  await waitForFunction(cdp, `document.getElementById('model').value === 'e2e-custom-gemini-model'`, 8_000);
   check(await read(cdp, `window.appData?.settings?.selectedModels?.openai === 'gpt-4o-mini' && window.appData?.settings?.selectedModels?.gemini === 'e2e-custom-gemini-model'`), 'Per-provider model selections are persisted in settings');
   check(true, 'Each provider remembers its own last selected model');
 
   await evaluate(cdp, `(()=>{const el=[...document.querySelectorAll('#modelPickerList .model-picker-delete-btn')].find(x=>x.getAttribute('aria-label') === 'ลบโมเดล e2e-custom-gemini-model');if(!el)return false;el.click();return true;})()`);
   await waitForFunction(cdp, `document.getElementById('appDialogOverlay').classList.contains('show')`);
   await click(cdp, '#appDialogConfirmBtn');
-  await waitForFunction(cdp, `document.getElementById('model').value === 'gemini-flash-latest' && ![...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'e2e-custom-gemini-model')`);
+  await waitForFunction(cdp, `document.getElementById('model').value === 'gemini-flash-latest' && ![...document.querySelectorAll('#modelPickerList .model-picker-option-id')].some(x=>x.textContent === 'e2e-custom-gemini-model')`, 8_000);
   check(true, 'Deleting a custom model falls back to the provider default safely');
 
   await evaluate(cdp, `(()=>{const el=document.getElementById('provider');el.value='openai';el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
-  await waitForFunction(cdp, `document.getElementById('provider').value === 'openai' && document.getElementById('model').value === 'gpt-4o-mini'`);
+  await waitForFunction(cdp, `document.getElementById('provider').value === 'openai' && document.getElementById('model').value === 'gpt-4o-mini'`, 8_000);
   check(true, 'Provider can return to the default OpenAI runtime model after catalog operations');
 
   check(await read(cdp, `document.querySelectorAll('.project-row').length === 0`), 'clean E2E profile starts with no projects');
 
   await click(cdp, '#addProjBtn');
-  await waitForFunction(cdp, `document.getElementById('appDialogOverlay').classList.contains('show') && document.getElementById('appDialogInput').style.display !== 'none'`);
+  await waitForFunction(cdp, `document.getElementById('appDialogOverlay').classList.contains('show') && document.getElementById('appDialogInput').style.display !== 'none'`, 8_000);
   await typeInto(cdp, '#appDialogInput', 'E2E Workspace');
   await click(cdp, '#appDialogConfirmBtn');
-  await waitForFunction(cdp, `document.querySelector('.project-row') && document.querySelector('.project-row').textContent.includes('E2E Workspace')`);
+  await waitForFunction(cdp, `document.querySelector('.project-row') && document.querySelector('.project-row').textContent.includes('E2E Workspace')`, 8_000);
   check(await read(cdp, `document.querySelectorAll('.project-row').length === 1`), 'Project created through visible UI');
 
   await typeInto(cdp, '#chapterTitle', 'E2E Draft A');
   await typeInto(cdp, '#inputText', 'Draft content belonging to Book A');
-  await new Promise(r => setTimeout(r, 800));
+  await waitForDurableBookDraft(cdp, 'Draft content belonging to Book A', 'E2E Draft A');
   check(await read(cdp, `document.getElementById('inputText').value === 'Draft content belonging to Book A'`), 'Book A draft entered through the editor');
 
   await click(cdp, '.book-list.open .utility-btn');
   await waitForFunction(cdp, `document.getElementById('appDialogOverlay').classList.contains('show')`);
   await typeInto(cdp, '#appDialogInput', 'Book B');
   await click(cdp, '#appDialogConfirmBtn');
-  await waitForFunction(cdp, `[...document.querySelectorAll('.book-title-text')].some(x=>x.textContent.includes('Book B'))`);
+  await waitForFunction(cdp, `[...document.querySelectorAll('.book-title-text')].some(x=>x.textContent.includes('Book B'))`, 8_000);
   check(await read(cdp, `document.getElementById('inputText').value === ''`), 'new Book B starts with isolated empty editor state');
 
   await typeInto(cdp, '#chapterTitle', 'E2E Draft B');
   await typeInto(cdp, '#inputText', 'Draft content belonging to Book B');
-  await new Promise(r => setTimeout(r, 800));
+  await waitForDurableBookDraft(cdp, 'Draft content belonging to Book B', 'E2E Draft B');
 
   await evaluate(cdp, `document.querySelector('.book-title-text').click()`);
-  await waitForFunction(cdp, `document.getElementById('inputText').value === 'Draft content belonging to Book A'`);
+  await waitForFunction(cdp, `document.getElementById('inputText').value === 'Draft content belonging to Book A'`, 8_000);
   check(await read(cdp, `document.getElementById('chapterTitle').value === 'E2E Draft A'`), 'switching back restores Book A draft and title');
 
   await evaluate(cdp, `(()=>{
@@ -355,7 +642,7 @@ try {
   check(await read(cdp, `document.getElementById('cancelBtn').classList.contains('show')`), 'real UI enters translating state while provider request is in flight');
 
   await clickText(cdp, '.book-title-text', 'Book B');
-  await waitForFunction(cdp, `document.getElementById('inputText').value === 'Draft content belonging to Book B'`);
+  await waitForFunction(cdp, `document.getElementById('inputText').value === 'Draft content belonging to Book B'`, 8_000);
   check(await read(cdp, `document.getElementById('output').textContent.trim() === ''`), 'Book B output remains empty during Book A translation');
 
   await evaluate(cdp, `window.__e2e.resolve()`);
@@ -366,8 +653,9 @@ try {
   check(await read(cdp, `window.__e2e.blockedExternalCalls.length === 0`), 'E2E scenario made no unexpected external network calls');
   check(await read(cdp, `window.__e2e.calls === 1`), 'E2E scenario made exactly one mocked provider request');
 
-  await new Promise(r => setTimeout(r, 900));
+  await waitForDurableBookDraft(cdp, 'Draft content belonging to Book B', 'E2E Draft B');
   await reload(cdp, e2eUrl);
+  await waitForReloadedBookState(cdp, 'Draft content belonging to Book B', 'E2E Draft B');
   check(await read(cdp, `document.getElementById('inputText').value === 'Draft content belonging to Book B'`), 'Book B draft survives a real browser reload');
   check(await read(cdp, `document.getElementById('chapterTitle').value === 'E2E Draft B'`), 'Book B chapter title survives reload');
 
@@ -388,22 +676,20 @@ try {
   console.log('Browser E2E / Real User Scenario: PASS');
 } catch (error) {
   console.error('');
-  console.error('Browser E2E / Real User Scenario: FAIL — ' + (error.stack || error.message || error));
+  const failure = globalTimeoutError || error;
+  console.error('Browser E2E / Real User Scenario: FAIL — ' + (failure.stack || failure.message || failure));
   if (pageErrors.length) console.error('Browser errors:\n' + pageErrors.join('\n'));
   process.exitCode = 1;
 } finally {
-  try { await cdp?.send('Browser.close'); } catch {}
-  try { cdp?.close(); } catch {}
-  try { if (chrome && chrome.exitCode === null) chrome.kill(); } catch {}
-  try { if (chrome && chrome.exitCode === null) await Promise.race([browserExit, new Promise(resolve => setTimeout(resolve, 3_000))]); } catch {}
-  if (chrome) {
-    try { await new Promise(resolve => chrome.once('exit', resolve)); } catch {}
+  if (globalTimeoutTimer) clearTimeout(globalTimeoutTimer);
+  process.removeListener('SIGINT', handleSignal);
+  process.removeListener('SIGTERM', handleSignal);
+  shutdownRequested = true;
+  try { await cleanupRuntime(); } catch (cleanupError) { console.error('Cleanup warning:', cleanupError.message); }
+  if (chrome && chrome.exitCode !== null) {
+    console.log('PASS  browser child process exited before E2E teardown completed');
   }
-  try { server?.close(); } catch {}
-  if (profileDir) {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try { await rm(profileDir, { recursive: true, force: true }); break; }
-      catch (cleanupError) { if (attempt === 4) console.error('Cleanup warning:', cleanupError.message); else await new Promise(r => setTimeout(r, 200)); }
-    }
+  if (!server || !server.listening) {
+    console.log('PASS  local static server is closed before E2E teardown completed');
   }
 }
