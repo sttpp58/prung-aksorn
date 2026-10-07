@@ -41,6 +41,9 @@ jobs:
 
       - name: Run Browser E2E
         run: node tests/e2e/browser-real-user-scenario.mjs
+      - name: Run Browser E2E adversarial lifecycle gate
+        run: node tests/e2e/browser-e2e-lifecycle.mjs
+
       - name: Verify E2E browser process cleanup
         if: ${{ always() }}
         shell: bash
