@@ -49,7 +49,7 @@ async function assertNoE2EProcesses(baselineProfiles) {
   let last = '';
   while (Date.now() - start < 5_000) {
     const result = await new Promise(resolve => {
-      const child = spawn('bash', ['-lc', "pgrep -af -- '--user-data-dir=.*prung-aksorn-e2e-' || true"], { stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn('bash', ['-lc', "pgrep -af -- '(^|/)(google-chrome|chromium|chromium-browser|chrome|msedge)( |$).*--user-data-dir=[^ ]*prung-aksorn-e2e-' || true"], { stdio: ['ignore', 'pipe', 'pipe'] });
       let stdout = '';
       child.stdout.on('data', chunk => { stdout += String(chunk); });
       child.once('exit', () => resolve(stdout.trim()));
