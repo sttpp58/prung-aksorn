@@ -361,6 +361,30 @@ async function installProviderPlan(ctx, plan) {
   '})()');
 }
 
+async function injectResumeStorageFailure(ctx) {
+  await evaluate(ctx.cdp, '(() => {' +
+    'const storage=window.PrungAksornStorageV2;' +
+    'if(storage.__resumeFailureOriginal) return;' +
+    'storage.__resumeFailureOriginal=storage.updateTranslationJob;' +
+    'storage.updateTranslationJob=async function(payload){' +
+      "if(payload?.status==='running' && payload?.expectedRevision !== undefined){" +
+        "throw new Error('Injected resume storage failure');" +
+      '}' +
+      'return storage.__resumeFailureOriginal.call(this,payload);' +
+    '};' +
+  '})()');
+}
+
+async function restoreResumeStorage(ctx) {
+  await evaluate(ctx.cdp, '(() => {' +
+    'const storage=window.PrungAksornStorageV2;' +
+    'if(storage.__resumeFailureOriginal){' +
+      'storage.updateTranslationJob=storage.__resumeFailureOriginal;' +
+      'delete storage.__resumeFailureOriginal;' +
+    '}' +
+  '})()');
+}
+
 async function latestJob(ctx) {
   return await evaluate(ctx.cdp, '(async()=>{' +
     'const jobs=await window.PrungAksornStorageV2.listTranslationJobs();' +
@@ -521,6 +545,56 @@ async function scenarioFailedJobRecoveryAfterReload(ctx) {
     'failed Job recovery writes the recovered output visibly');
 }
 
+async function scenarioResumeSetupFailureCleansUp(ctx) {
+  await createProject(ctx, 'Recovery Stress Resume Setup Failure');
+  const source = Array.from({ length: 4 }, (_, index) =>
+    'Resume setup failure paragraph ' + (index + 1) + ' — ' +
+    'A storage failure before the provider call must release every translation UI lock. '.repeat(6)
+  ).join('\n\n');
+  await prepareTranslation(ctx, 'Recovery Stress Resume Setup Failure Chapter', source);
+  await installProviderPlan(ctx, 'fail-all');
+  await click(ctx.cdp, '#processBtn');
+  await waitForJob(ctx, job => job.status === 'failed', 15000);
+  await reloadBrowser(ctx);
+  await typeInto(ctx.cdp, '#apiKey', 'recovery-stress-only-key');
+  await waitForFunction(ctx.cdp,
+    "document.querySelector('#translationRecoveryBox') && document.querySelectorAll('#translationRecoveryBox button').length >= 1",
+    12000);
+
+  await installProviderPlan(ctx, 'resume-final');
+  await injectResumeStorageFailure(ctx);
+  await clickText(ctx.cdp, '#translationRecoveryBox button', 'กู้คืน');
+  await waitForFunction(ctx.cdp, "document.getElementById('resumeBtn').classList.contains('show')");
+  await click(ctx.cdp, '#resumeBtn');
+  await waitForFunction(ctx.cdp,
+    "!document.getElementById('processBtn').disabled && !document.getElementById('cancelBtn').classList.contains('show')",
+    10000);
+
+  const failedState = await evaluate(ctx.cdp, '(async()=>({' +
+    'job:(await window.PrungAksornStorageV2.listTranslationJobs())[0]||null,' +
+    'error:document.getElementById("errorBox")?.textContent||"",' +
+    'resume:document.getElementById("resumeBtn")?.className||"",' +
+    'processDisabled:document.getElementById("processBtn")?.disabled,' +
+    'cancelVisible:document.getElementById("cancelBtn")?.classList.contains("show"),' +
+    'calls:window.__recoveryStress?.calls||0' +
+  '}))()');
+  check(failedState.job?.status === 'failed', 'Resume setup failure preserves the recoverable Job state');
+  check(failedState.processDisabled === false, 'Resume setup failure releases the process button');
+  check(failedState.cancelVisible === false, 'Resume setup failure hides the cancel button');
+  check(failedState.resume.includes('show'), 'Resume setup failure keeps the recovery action visible');
+  check(failedState.error.includes('Injected resume storage failure'),
+    'Resume setup failure is shown in the visible error UI');
+  check(failedState.calls === 0, 'Resume setup failure makes no provider call before storage recovery succeeds');
+
+  await restoreResumeStorage(ctx);
+  await clickText(ctx.cdp, '#translationRecoveryBox button', 'กู้คืน');
+  await waitForFunction(ctx.cdp, "document.getElementById('resumeBtn').classList.contains('show')");
+  await click(ctx.cdp, '#resumeBtn');
+  await waitForJob(ctx, job => job.status === 'completed', 15000);
+  check((await latestJob(ctx)).status === 'completed',
+    'Job remains resumable and completes after the storage failure is cleared');
+}
+
 async function assertNoUnexpectedErrors(ctx, allowedLogPrefixes = []) {
   const unexpectedLogs = ctx.logErrors.filter(entry =>
     !allowedLogPrefixes.some(prefix => entry.startsWith(prefix))
@@ -548,7 +622,8 @@ async function runScenario(name, body) {
 
 const scenarios = [
   ['RS-01 Repeated Browser-Restart Translation Recovery', scenarioRepeatedReloadRecovery],
-  ['RS-02 Failed Translation Job Recovery After Reload', scenarioFailedJobRecoveryAfterReload]
+  ['RS-02 Failed Translation Job Recovery After Reload', scenarioFailedJobRecoveryAfterReload],
+  ['RS-03 Resume Setup Failure Cleanup', scenarioResumeSetupFailureCleansUp]
 ];
 
 let failed = false;

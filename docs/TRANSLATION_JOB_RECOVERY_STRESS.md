@@ -13,6 +13,7 @@ The test exercises the real application UI in a real Chromium-family browser ove
 - Browser reload while a provider request is in flight after at least one checkpoint.
 - Repeated manual recovery from the visible Translation Recovery UI.
 - Failed Translation Job rediscovery after reload and user-driven recovery.
+- Resume setup storage failure cleanup before any provider call.
 - Checkpoint continuity, duplicate prevention, final completion and visible output.
 - Runtime exception, console error and unexpected external-network detection.
 - Dedicated CI workflow and Regression Gate contract.
@@ -37,6 +38,7 @@ The test exercises the real application UI in a real Chromium-family browser ove
 |---|---|---|
 | RS-01 | Repeated browser reload while a checkpointed Job is running | Recovery UI reappears, checkpoint count remains exact, indexes remain contiguous, repeated recovery continues from the next chunk, final completion is persisted |
 | RS-02 | Provider permanently fails, then browser reloads | Failed Job remains queryable, visible recovery is user-driven, recovery resumes at the saved checkpoint, final completion is persisted |
+| RS-03 | `updateTranslationJob()` fails while resuming a Job | Busy/lock/cancel UI state is released, the recoverable Job and Resume action remain visible, no provider call occurs, and a later retry completes |
 
 ## RS-01 details
 
@@ -49,6 +51,10 @@ Three consecutive recovery cycles are exercised before final completion. Each cy
 The first provider attempt is configured to fail permanently. The resulting failed Translation Job is verified, the browser is reloaded, and the visible Recovery UI is used to resume the failed Job after re-entering the test credential.
 
 The test confirms that failure does not delete the Job or create an uncheckpointed partial result.
+
+## RS-03 details
+
+The runner injects a deterministic storage failure into the Resume initialization step. It verifies that the failure is handled by the same lifecycle cleanup as the translation loop: the process action is re-enabled, the Cancel action is hidden, the recovery action remains available, and the provider is not called before the Job is successfully marked running. The storage failure is then removed and the same Job is resumed to completion.
 
 ## Safety boundary
 

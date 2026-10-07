@@ -79,33 +79,36 @@
     var translationProvider = providerSel.value;
     var translationSettingsSnapshot = normalizeTranslationSettingsSnapshot(settingsSnapshot, translationProvider, model, document.getElementById('chunkLen').value);
     var translationJobRevision = null;
-    if(!jobId){
-      try{
-        var createdJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:translationProvider,model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length,sourceSnapshot:{text:String(sourceSnapshotText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(chapterTitle.value || ''),normalized:true},settingsSnapshot:translationSettingsSnapshot});
-        var runningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',expectedRevision:createdJob.revision});
-        translationJobRevision = runningJob.revision;
-      }catch(jobErr){
-        setAiBusy(false);
-        if(isAppContextCurrent(translationContext)){
-          cancelBtn.classList.remove('show');
-          showError('ไม่สามารถสร้าง Translation Job ได้: ' + (jobErr.message || jobErr));
-        }
-        return;
-      }
-    }else{
-      var recoveredSettingsSnapshot = normalizeTranslationSettingsSnapshot(settingsSnapshot, translationProvider, model, document.getElementById('chunkLen').value);
-      var recoveredRunningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',settingsSnapshot:recoveredSettingsSnapshot,expectedRevision:Number(pendingResume && pendingResume.revision || 0)});
-      translationJobRevision = recoveredRunningJob.revision;
-      translationProvider = recoveredRunningJob.provider;
-      translationSettingsSnapshot = normalizeTranslationSettingsSnapshot(recoveredRunningJob.settingsSnapshot || settingsSnapshot, translationProvider, recoveredRunningJob.model, recoveredRunningJob.chunkSize);
-    }
-    activeTranslationJobId = translationJobId;
-    activeTranslationJobRevision = translationJobRevision;
-    setTranslationSettingsLocked(true);
-    var chunkRatios = [];
-    var suspiciousChunks = [];
+    var translationStarted = false;
 
     try {
+      if(!jobId){
+        try{
+          var createdJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:translationProvider,model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length,sourceSnapshot:{text:String(sourceSnapshotText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(chapterTitle.value || ''),normalized:true},settingsSnapshot:translationSettingsSnapshot});
+          var runningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',expectedRevision:createdJob.revision});
+          translationJobRevision = runningJob.revision;
+        }catch(jobErr){
+          setAiBusy(false);
+          if(isAppContextCurrent(translationContext)){
+            cancelBtn.classList.remove('show');
+            showError('ไม่สามารถสร้าง Translation Job ได้: ' + (jobErr.message || jobErr));
+          }
+          return;
+        }
+      }else{
+        var recoveredSettingsSnapshot = normalizeTranslationSettingsSnapshot(settingsSnapshot, translationProvider, model, document.getElementById('chunkLen').value);
+        var recoveredRunningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',settingsSnapshot:recoveredSettingsSnapshot,expectedRevision:Number(pendingResume && pendingResume.revision || 0)});
+        translationJobRevision = recoveredRunningJob.revision;
+        translationProvider = recoveredRunningJob.provider;
+        translationSettingsSnapshot = normalizeTranslationSettingsSnapshot(recoveredRunningJob.settingsSnapshot || settingsSnapshot, translationProvider, recoveredRunningJob.model, recoveredRunningJob.chunkSize);
+      }
+      activeTranslationJobId = translationJobId;
+      activeTranslationJobRevision = translationJobRevision;
+      setTranslationSettingsLocked(true);
+      translationStarted = true;
+      var chunkRatios = [];
+      var suspiciousChunks = [];
+
       for(var i = startIndex; i < chunks.length; i++){
         // ตรวจนับจำนวนคำศัพท์ที่ตรวจพบใน Chunk ปัจจุบัน
         var termCheck = filterRelevantGlossary(proj.glossary, chunks[i]);
@@ -179,6 +182,15 @@
 
     } catch(err){
       if(err.name !== 'AbortError'){
+        if(!translationStarted){
+          activeTranslationJobId = null;
+          if(isAppContextCurrent(translationContext)){
+            showError('ไม่สามารถเริ่มงานแปลต่อจากจุดกู้คืนได้: ' + (err.message || err) + ' — กรุณาลองกู้คืนอีกครั้ง');
+            if(resumeBtn) resumeBtn.classList.add('show');
+            refreshTranslationRecoveryUI();
+          }
+          return;
+        }
         var failedJob = null;
         var failurePersistenceError = null;
         try{
