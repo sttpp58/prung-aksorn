@@ -179,12 +179,21 @@
 
     } catch(err){
       if(err.name !== 'AbortError'){
-        var failedJob = await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:i,retryCount:translationRetryCount,timestamp:Date.now()},translationJobRevision);
-        translationJobRevision = failedJob.revision;
+        var failedJob = null;
+        var failurePersistenceError = null;
+        try{
+          failedJob = await PrungAksornStorageV2.failTranslationJob(translationJobId,{code:'TRANSLATION_FAILED',message:String(err.message || 'เกิดข้อผิดพลาด'),chunkIndex:i,retryCount:translationRetryCount,timestamp:Date.now()},translationJobRevision);
+          translationJobRevision = failedJob.revision;
+        }catch(jobErr){
+          failurePersistenceError = jobErr;
+          console.warn('Translation Job failure state persistence failed:',jobErr);
+        }
         activeTranslationJobId = null;
         if(isAppContextCurrent(translationContext)){
           pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision, settingsSnapshot: translationSettingsSnapshot };
-          showError((err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)');
+          var failureMessage = (err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)';
+          if(failurePersistenceError) failureMessage += ' — ระบบบันทึกสถานะ Job ไม่สำเร็จ แต่ข้อมูลที่ทำไปแล้วในเซสชันนี้ยังสามารถกู้คืนและทำต่อได้';
+          showError(failureMessage);
           if(resumeBtn) resumeBtn.classList.add('show');
           refreshTranslationRecoveryUI();
         }else{
