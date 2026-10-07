@@ -420,24 +420,33 @@ async function cleanupRuntime() {
   }
 }
 
-function handleSignal(signal) {
+function requestShutdown(signal, message, exitCode) {
   if (shutdownRequested) return;
   shutdownRequested = true;
-  process.exitCode = signal === 'SIGINT' ? 130 : 143;
-  globalTimeoutError = new Error('Browser E2E interrupted by ' + signal + '.');
+  process.exitCode = exitCode;
+  globalTimeoutError = new Error(message);
   console.error(globalTimeoutError.message);
-  void cleanupRuntime();
+  void cleanupRuntime()
+    .catch(() => {})
+    .finally(() => process.exit(exitCode));
+}
+
+function handleSignal(signal) {
+  requestShutdown(
+    signal,
+    'Browser E2E interrupted by ' + signal + '.',
+    signal === 'SIGINT' ? 130 : 143
+  );
 }
 
 process.once('SIGINT', handleSignal);
 process.once('SIGTERM', handleSignal);
 globalTimeoutTimer = setTimeout(() => {
-  if (shutdownRequested) return;
-  shutdownRequested = true;
-  process.exitCode = 1;
-  globalTimeoutError = new Error('Browser E2E global timeout after ' + TEST_TIMEOUT + 'ms. Check the last completed step and CDP/process teardown.');
-  console.error(globalTimeoutError.message);
-  void cleanupRuntime();
+  requestShutdown(
+    'TIMEOUT',
+    'Browser E2E global timeout after ' + TEST_TIMEOUT + 'ms. Check the last completed step and CDP/process teardown.',
+    1
+  );
 }, TEST_TIMEOUT);
 
 try {
