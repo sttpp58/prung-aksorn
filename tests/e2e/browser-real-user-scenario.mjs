@@ -326,6 +326,7 @@ let globalTimeoutTimer = null;
 let globalTimeoutError = null;
 let shutdownRequested = false;
 const pageErrors = [];
+let browserStdErr = '';
 
 async function cleanupRuntime() {
   if (cleanupPromise) return cleanupPromise;
@@ -444,8 +445,22 @@ try {
     '--no-default-browser-check', '--user-data-dir=' + profileDir,
     '--remote-debugging-port=' + debugPortHolder, '--window-size=1440,1200', e2eUrl
   ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  chrome.on('error', error => log('Browser child error: ' + String(error?.message || error)));
+  chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
   chrome.on('exit', code => log('Browser exited with code ' + code));
-  await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json/version`, 15_000);
+  try {
+    await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json/version`, 15_000);
+  } catch (error) {
+    const exitState = chrome.exitCode !== null || chrome.signalCode !== null
+      ? ' exitCode=' + chrome.exitCode + ' signal=' + chrome.signalCode
+      : ' processStillRunning=true';
+    const stderr = browserStdErr.trim();
+    throw new Error(
+      'Browser DevTools endpoint did not become ready: ' + error.message +
+      exitState +
+      (stderr ? '\nBrowser stderr:\n' + stderr.slice(-4000) : '\nBrowser stderr: <empty>')
+    );
+  }
   const targets = await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json`, 10_000);
   const pageTarget = Array.isArray(targets) ? targets.find(target => target.type === 'page' && target.webSocketDebuggerUrl) : null;
   if (!pageTarget) throw new Error('No browser page target available for CDP.');
