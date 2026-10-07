@@ -1070,8 +1070,9 @@ function main() {
   assert(
     recoveryStressE2E.includes('RS-01 Repeated Browser-Restart Translation Recovery') &&
       recoveryStressE2E.includes('RS-02 Failed Translation Job Recovery After Reload') &&
+      recoveryStressE2E.includes('RS-03 Resume Setup Failure Cleanup') &&
       recoveryStressE2E.includes('Page.navigate'),
-    'Translation Job Recovery Stress covers repeated reload and failed-job recovery'
+    'Translation Job Recovery Stress covers reload, failed-job recovery and setup-failure cleanup'
   );
   assert(
     recoveryStressWorkflow.includes('actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1') &&
