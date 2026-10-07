@@ -328,6 +328,23 @@ let shutdownRequested = false;
 const pageErrors = [];
 let browserStdErr = '';
 
+function signalBrowserProcessTree(signal) {
+  if (!chrome?.pid) return;
+  if (process.platform === 'win32') {
+    const taskkill = spawn('taskkill', ['/PID', String(chrome.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true
+    });
+    taskkill.unref();
+    return;
+  }
+  try {
+    process.kill(-chrome.pid, signal);
+  } catch {
+    try { process.kill(chrome.pid, signal); } catch {}
+  }
+}
+
 async function cleanupRuntime() {
   if (cleanupPromise) return cleanupPromise;
   cleanupPromise = (async () => {
@@ -340,12 +357,12 @@ async function cleanupRuntime() {
 
     try {
       if (chrome && chrome.exitCode === null && chrome.signalCode === null) {
-        try { chrome.kill('SIGTERM'); } catch {}
-        const stopped = await waitForChildExit(chrome, CHILD_PROCESS_TIMEOUT, 'Browser process');
-        if (!stopped && chrome.exitCode === null && chrome.signalCode === null) {
-          try { chrome.kill('SIGKILL'); } catch {}
-          const killed = await waitForChildExit(chrome, CHILD_PROCESS_TIMEOUT, 'Browser process after SIGKILL');
-          if (!killed) log('WARNING: browser process did not confirm exit within the cleanup deadline.');
+        signalBrowserProcessTree('SIGTERM');
+        const stopped = await waitForChildExit(chrome, CHILD_PROCESS_TIMEOUT, 'Browser process tree');
+        if (!stopped) {
+          signalBrowserProcessTree('SIGKILL');
+          const killed = await waitForChildExit(chrome, CHILD_PROCESS_TIMEOUT, 'Browser process tree after SIGKILL');
+          if (!killed) log('WARNING: browser process tree did not confirm exit within the cleanup deadline.');
         }
       }
     } catch (error) {
@@ -368,7 +385,7 @@ async function cleanupRuntime() {
     if (profileDir) {
       try {
         await Promise.race([
-          rm(profileDir, { recursive: true, force: true }),
+          rm(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 }),
           delay(PROFILE_CLEANUP_TIMEOUT).then(() => { throw new Error('Temporary browser profile cleanup timed out after ' + PROFILE_CLEANUP_TIMEOUT + 'ms.'); })
         ]);
       } catch (error) {
@@ -446,7 +463,7 @@ try {
     '--disable-background-networking', '--disable-component-update', '--no-first-run',
     '--no-default-browser-check', '--user-data-dir=' + profileDir,
     '--remote-debugging-port=' + debugPortHolder, '--window-size=1440,1200', e2eUrl
-  ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' });
   chrome.on('error', error => log('Browser child error: ' + String(error?.message || error)));
   chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
   chrome.on('exit', code => log('Browser exited with code ' + code));
