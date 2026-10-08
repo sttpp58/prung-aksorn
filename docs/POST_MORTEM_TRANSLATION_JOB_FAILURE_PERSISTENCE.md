@@ -153,9 +153,9 @@ Post-merge verification confirmed:
 
 ### Follow-up
 
-- [ ] Promote the FI-05 failure-persistence scenario from temporary debug harness to the permanent Failure Injection regression suite.
+- [x] Promote the FI-05 failure-persistence scenario from temporary debug harness to the permanent Failure Injection regression suite.
 
-The follow-up test should verify at minimum:
+The permanent FI-05 test verifies at minimum:
 
 - no uncaught runtime exception;
 - recovery control remains available in the same session;

@@ -16,6 +16,8 @@ changing production provider or storage implementations.
 | FI-02 | OpenAI request rejects permanently | Exhaust retry budget, persist failed Job, expose resume |
 | FI-03 | Provider request is in flight, user cancels | Abort cleanly, persist cancelled Job, no false failure |
 | FI-04 | First two autosaves reject, then succeed | Retry, preserve newer draft, persist through reload |
+| FI-05 | Cancellation terminal-state persistence rejects | Keep the Job recoverable, expose a same-session warning, preserve reload recovery, and avoid a second provider request |
+| FI-06 | Destructive mutation races with an active translation | Reject the destructive mutation before commit and preserve the active Project/Book |
 
 ## Test Architecture
 
@@ -31,6 +33,10 @@ browser console errors. Deliberately handled autosave diagnostics are allowed
 only by an exact log-prefix exception. Unexpected cross-origin fetches are blocked
 and recorded as a test failure.
 
+The permanent matrix currently runs FI-01 through FI-06. FI-05 specifically
+guards the second-order failure boundary where cancellation persistence itself
+rejects; it is not a substitute for the normal provider-failure path.
+
 ## Production Fix Found by Failure Injection
 
 FI-03 exposed a real cancellation race: the cancel button directly attempted a
@@ -41,6 +47,9 @@ conflict that could become an uncaught browser runtime exception.
 The minimal fix is for the cancel button to signal cancellation by aborting the
 active controller and letting the operation owner persist the terminal Job
 state. No translation, TQG, schema, or provider semantics were changed.
+
+FI-05 provides permanent coverage for the cancellation persistence-failure
+boundary, including same-session recovery and reload-preserved Job invariants.
 
 ## CI
 
