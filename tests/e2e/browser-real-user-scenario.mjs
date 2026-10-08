@@ -11,6 +11,7 @@ import {
   asApplicationFailure,
   asEnvironmentFailure,
   connectCdpWithDiagnostics,
+  enableCdpDomainsWithDiagnostics,
   formatHarnessFailure,
   waitForDevToolsTargets
 } from './harness-diagnostics.mjs';
@@ -356,6 +357,7 @@ let shutdownRequested = false;
 const pageErrors = [];
 let browserStdErr = '';
 let browserSpawnError = null;
+let environmentSetup = true;
 
 function signalBrowserProcessTree(signal) {
   if (!chrome?.pid) return;
@@ -495,6 +497,7 @@ try {
       });
     });
   });
+  environmentSetup = false;
 
   chrome = spawn(browser, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
@@ -521,9 +524,7 @@ try {
     port: debugPortHolder,
     stderr: browserStdErr.slice(-4000)
   });
-  await cdp.send('Page.enable');
-  await cdp.send('Runtime.enable');
-  await cdp.send('Log.enable');
+  await enableCdpDomainsWithDiagnostics(cdp, ['Page.enable', 'Runtime.enable', 'Log.enable'], { port: debugPortHolder, stderr: browserStdErr.slice(-4000) });
   cdp.on('Runtime.exceptionThrown', params => {
     const detail = params?.exceptionDetails;
     const description = detail?.exception?.description || detail?.text || 'unknown exception';
@@ -684,7 +685,8 @@ try {
 } catch (error) {
   console.error('');
   const failure = globalTimeoutError || error;
-  console.error('Browser E2E / Real User Scenario: FAIL — ' + formatHarnessFailure(asApplicationFailure(failure)));
+  const typedFailure = environmentSetup ? asEnvironmentFailure(failure, 'environment_setup') : asApplicationFailure(failure);
+  console.error('Browser E2E / Real User Scenario: FAIL — ' + formatHarnessFailure(typedFailure));
   if (pageErrors.length) console.error('Browser errors:\n' + pageErrors.join('\n'));
   process.exitCode = 1;
 } finally {

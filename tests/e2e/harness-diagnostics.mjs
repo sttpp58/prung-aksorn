@@ -1,4 +1,5 @@
 import net from 'node:net';
+import { rm } from 'node:fs/promises';
 
 export const HARNESS_FAILURE_KINDS = Object.freeze({
   APPLICATION_FAILURE: 'APPLICATION_FAILURE',
@@ -185,6 +186,41 @@ export async function connectCdpWithDiagnostics(connect, details = {}) {
       error?.message || String(error),
       details
     );
+  }
+}
+
+export async function enableCdpDomainsWithDiagnostics(cdp, methods, details = {}) {
+  try {
+    for (const method of methods) await cdp.send(method);
+  } catch (error) {
+    throw new HarnessFailure(
+      HARNESS_FAILURE_KINDS.BROWSER_STARTUP_FAILURE,
+      'devtools_handshake',
+      error?.message || String(error),
+      details
+    );
+  }
+}
+
+export async function cleanupHarnessResources({ cdp, chrome, browserExit, servers = [], profileDirs = [] } = {}) {
+  try { await cdp?.send('Browser.close'); } catch {}
+  try { cdp?.close(); } catch {}
+  try { if (chrome && chrome.exitCode === null) chrome.kill(); } catch {}
+  if (browserExit && chrome?.pid) {
+    try {
+      await Promise.race([
+        browserExit,
+        new Promise(resolve => setTimeout(resolve, 3_000))
+      ]);
+    } catch {}
+  }
+  for (const server of servers) {
+    try {
+      if (server?.listening) await new Promise(resolve => server.close(() => resolve()));
+    } catch {}
+  }
+  for (const profileDir of profileDirs) {
+    try { if (profileDir) await rm(profileDir, { recursive: true, force: true }); } catch {}
   }
 }
 

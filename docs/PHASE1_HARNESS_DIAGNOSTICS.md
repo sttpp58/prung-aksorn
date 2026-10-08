@@ -44,13 +44,15 @@ DevTools readiness is bounded and explicit:
 
 The failure output includes the phase (`devtools_endpoint`, `page_target`, or
 `devtools_handshake`), whether the TCP port was observed open, Chrome exit and
-signal state, retry settings, the last error, and a bounded stderr tail.
+signal state, retry settings, the last error, and a bounded stderr tail. Every
+runner also tears down partially initialized servers, browser processes, and
+temporary profiles when setup fails before a test context is returned.
 
 ## Regression coverage
 
 `tests/e2e/harness-diagnostics-regression.mjs` injects and checks all three
-failure categories. `scripts/regression-gate.mjs` runs that regression as part
-of the main gate.
+failure categories, CDP domain bootstrap failures, and partial-setup cleanup.
+`scripts/regression-gate.mjs` runs that regression as part of the main gate.
 
 The wrong-browser-path experiment produced:
 
@@ -58,6 +60,10 @@ The wrong-browser-path experiment produced:
 BROWSER_STARTUP_FAILURE phase=devtools_endpoint
 spawn C:\does-not-exist\chrome.exe ENOENT
 ```
+
+The same invalid-browser-path run now exits with code `1` after reporting all
+scenario failures; it no longer hangs while waiting for a child-process exit
+event that cannot occur after an ENOENT spawn failure.
 
 ## Verification record
 

@@ -10,6 +10,7 @@ import {
   asApplicationFailure,
   asEnvironmentFailure,
   connectCdpWithDiagnostics,
+  enableCdpDomainsWithDiagnostics,
   formatHarnessFailure,
   waitForDevToolsTargets
 } from './harness-diagnostics.mjs';
@@ -154,6 +155,7 @@ let server;
 let chrome;
 let cdp;
 let profileDir;
+let environmentSetup = true;
 const pageErrors = [];
 
 try {
@@ -171,6 +173,7 @@ try {
     });
   });
   profileDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-tqg3-'));
+  environmentSetup = false;
   chrome = spawn(browser, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
     '--disable-background-networking', '--disable-component-update', '--no-first-run',
@@ -192,9 +195,7 @@ try {
   });
   cdp = new Cdp(pageTarget.webSocketDebuggerUrl);
   await connectCdpWithDiagnostics(() => cdp.connect(), { port: debugPort, stderr: browserStdErr.slice(-4000) });
-  await cdp.send('Page.enable');
-  await cdp.send('Runtime.enable');
-  await cdp.send('Log.enable');
+  await enableCdpDomainsWithDiagnostics(cdp, ['Page.enable', 'Runtime.enable', 'Log.enable'], { port: debugPort, stderr: browserStdErr.slice(-4000) });
   cdp.ws.addEventListener('message', event => {
     const message = JSON.parse(String(event.data));
     if (message.method === 'Runtime.exceptionThrown') {
@@ -317,7 +318,8 @@ try {
   console.log('TQG Production Assurance: PASS');
 } catch (error) {
   console.error('');
-  console.error('TQG Production Assurance: FAIL — ' + formatHarnessFailure(asApplicationFailure(error)));
+  const typedFailure = environmentSetup ? asEnvironmentFailure(error, 'environment_setup') : asApplicationFailure(error);
+  console.error('TQG Production Assurance: FAIL — ' + formatHarnessFailure(typedFailure));
   if (pageErrors.length) console.error('Browser errors:\\n' + pageErrors.join('\\n'));
   process.exitCode = 1;
 } finally {

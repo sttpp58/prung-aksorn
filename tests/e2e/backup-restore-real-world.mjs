@@ -10,7 +10,9 @@ import path from 'node:path';
 import {
   asApplicationFailure,
   asEnvironmentFailure,
+  cleanupHarnessResources,
   connectCdpWithDiagnostics,
+  enableCdpDomainsWithDiagnostics,
   formatHarnessFailure,
   waitForDevToolsTargets
 } from './harness-diagnostics.mjs';
@@ -194,19 +196,28 @@ async function typeInto(cdp, selector, value) {
 
 async function setupBrowser() {
   const browser = await findBrowser();
-  const started = await startStaticServer();
-  const url = 'http://' + HOST + ':' + started.port + '/index.html';
-  const profileDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-backup-e2e-'));
-  const downloadDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-backup-download-'));
-  const debugPort = await new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once('error', reject);
-    probe.listen(0, HOST, () => {
-      const port = probe.address().port;
-      probe.close(() => resolve(port));
+  let started;
+  let profileDir;
+  let downloadDir;
+  let chrome;
+  let browserExit;
+  let cdp;
+  let environmentSetup = true;
+  try {
+    started = await startStaticServer();
+    const url = 'http://' + HOST + ':' + started.port + '/index.html';
+    profileDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-backup-e2e-'));
+    downloadDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-backup-download-'));
+    const debugPort = await new Promise((resolve, reject) => {
+      const probe = createServer();
+      probe.once('error', reject);
+      probe.listen(0, HOST, () => {
+        const port = probe.address().port;
+        probe.close(() => resolve(port));
+      });
     });
-  });
-  const chrome = spawn(browser, [
+    environmentSetup = false;
+    chrome = spawn(browser, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
     '--disable-background-networking', '--disable-component-update',
     '--no-first-run', '--no-default-browser-check',
@@ -215,38 +226,40 @@ async function setupBrowser() {
     '--remote-debugging-port=' + debugPort,
     '--window-size=1440,1200',
     url
-  ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-  let browserStdErr = '';
-  let browserSpawnError = null;
-  chrome.on('error', error => { browserSpawnError = error; });
-  chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
-  const browserExit = new Promise(resolve => chrome.once('exit', resolve));
-  const { pageTarget } = await waitForDevToolsTargets({
+    ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    let browserStdErr = '';
+    let browserSpawnError = null;
+    chrome.on('error', error => { browserSpawnError = error; });
+    chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
+    browserExit = new Promise(resolve => chrome.once('exit', resolve));
+    const { pageTarget } = await waitForDevToolsTargets({
     host: HOST,
     port: debugPort,
     browserProcess: chrome,
     getStderr: () => browserStdErr,
     getSpawnError: () => browserSpawnError
-  });
-  const cdp = new CdpClient(pageTarget.webSocketDebuggerUrl);
-  await connectCdpWithDiagnostics(() => cdp.connect(), { port: debugPort, stderr: browserStdErr.slice(-4000) });
-  await cdp.send('Page.enable');
-  await cdp.send('Runtime.enable');
-  await cdp.send('Log.enable');
-  try { await cdp.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir }); } catch {}
-  const pageErrors = [];
-  cdp.on('Runtime.exceptionThrown', params => {
+    });
+    cdp = new CdpClient(pageTarget.webSocketDebuggerUrl);
+    await connectCdpWithDiagnostics(() => cdp.connect(), { port: debugPort, stderr: browserStdErr.slice(-4000) });
+    await enableCdpDomainsWithDiagnostics(cdp, ['Page.enable', 'Runtime.enable', 'Log.enable'], { port: debugPort, stderr: browserStdErr.slice(-4000) });
+    try { await cdp.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir }); } catch {}
+    const pageErrors = [];
+    cdp.on('Runtime.exceptionThrown', params => {
     const detail = params?.exceptionDetails;
     pageErrors.push(detail?.exception?.description || detail?.text || 'unknown exception');
-  });
-  cdp.on('Log.entryAdded', params => {
+    });
+    cdp.on('Log.entryAdded', params => {
     if (params.entry?.level === 'error') pageErrors.push(params.entry.text || 'browser log error');
-  });
-  await waitForFunction(cdp, "document.readyState === 'complete' && !!document.getElementById('addProjBtn')", 15000);
-  await waitForFunction(cdp, '!!window.PrungAksornStorageV2', 15000);
-  await evaluate(cdp, "navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false");
-  check(await evaluate(cdp, "document.querySelectorAll('.project-row').length === 0"), 'clean backup-validation profile starts empty');
-  return { browser, url, server: started.server, chrome, browserExit, cdp, profileDir, downloadDir, pageErrors };
+    });
+    await waitForFunction(cdp, "document.readyState === 'complete' && !!document.getElementById('addProjBtn')", 15000);
+    await waitForFunction(cdp, '!!window.PrungAksornStorageV2', 15000);
+    await evaluate(cdp, "navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false");
+    check(await evaluate(cdp, "document.querySelectorAll('.project-row').length === 0"), 'clean backup-validation profile starts empty');
+    return { browser, url, server: started.server, chrome, browserExit, cdp, profileDir, downloadDir, pageErrors };
+  } catch (error) {
+    await cleanupHarnessResources({ cdp, chrome, browserExit, servers: [started?.server], profileDirs: [profileDir, downloadDir] });
+    throw environmentSetup ? asEnvironmentFailure(error, 'environment_setup') : error;
+  }
 }
 
 async function cleanupBrowser(ctx) {
