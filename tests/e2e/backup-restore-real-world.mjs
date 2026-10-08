@@ -7,6 +7,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  asApplicationFailure,
+  asEnvironmentFailure,
+  connectCdpWithDiagnostics,
+  formatHarnessFailure,
+  waitForDevToolsTargets
+} from './harness-diagnostics.mjs';
 
 const ROOT = process.cwd();
 const HOST = '127.0.0.1';
@@ -16,7 +23,8 @@ function check(condition, message) { assert.ok(condition, message); pass(message
 
 async function findBrowser() {
   const explicit = process.env.E2E_BROWSER;
-  const candidates = explicit ? [explicit] : process.platform === 'win32'
+  if (explicit) return explicit;
+  const candidates = process.platform === 'win32'
     ? [
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
@@ -44,7 +52,7 @@ async function findBrowser() {
       return command;
     } catch {}
   }
-  throw new Error('No Chromium-family browser found. Set E2E_BROWSER to a browser executable path.');
+  throw asEnvironmentFailure(new Error('No Chromium-family browser found. Set E2E_BROWSER to a browser executable path.'), 'browser_discovery');
 }
 
 function startStaticServer() {
@@ -203,16 +211,25 @@ async function setupBrowser() {
     '--disable-background-networking', '--disable-component-update',
     '--no-first-run', '--no-default-browser-check',
     '--user-data-dir=' + profileDir,
+    '--remote-debugging-address=' + HOST,
     '--remote-debugging-port=' + debugPort,
     '--window-size=1440,1200',
     url
   ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  let browserStdErr = '';
+  let browserSpawnError = null;
+  chrome.on('error', error => { browserSpawnError = error; });
+  chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
   const browserExit = new Promise(resolve => chrome.once('exit', resolve));
-  const targets = await waitForUrl('http://' + HOST + ':' + debugPort + '/json', 15000);
-  const pageTarget = Array.isArray(targets) ? targets.find(t => t.type === 'page' && t.webSocketDebuggerUrl) : null;
-  if (!pageTarget) throw new Error('No browser page target available for CDP.');
+  const { pageTarget } = await waitForDevToolsTargets({
+    host: HOST,
+    port: debugPort,
+    browserProcess: chrome,
+    getStderr: () => browserStdErr,
+    getSpawnError: () => browserSpawnError
+  });
   const cdp = new CdpClient(pageTarget.webSocketDebuggerUrl);
-  await cdp.connect();
+  await connectCdpWithDiagnostics(() => cdp.connect(), { port: debugPort, stderr: browserStdErr.slice(-4000) });
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   await cdp.send('Log.enable');
@@ -476,7 +493,7 @@ for (const scenario of scenarios) {
     await scenario();
   } catch (error) {
     failed = true;
-    console.error('\nFAIL  ' + (error.stack || error.message || error));
+    console.error('\nFAIL  ' + formatHarnessFailure(asApplicationFailure(error)));
   }
 }
 if (failed) {

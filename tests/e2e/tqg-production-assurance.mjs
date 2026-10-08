@@ -6,6 +6,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  asApplicationFailure,
+  asEnvironmentFailure,
+  connectCdpWithDiagnostics,
+  formatHarnessFailure,
+  waitForDevToolsTargets
+} from './harness-diagnostics.mjs';
 
 const ROOT = process.cwd();
 const HOST = '127.0.0.1';
@@ -23,7 +30,7 @@ async function findBrowser() {
       ]
     : ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
   for (const candidate of candidates) if (fs.existsSync(candidate)) return candidate;
-  throw new Error('No Chromium-family browser found.');
+  throw asEnvironmentFailure(new Error('No Chromium-family browser found.'), 'browser_discovery');
 }
 
 function startServer() {
@@ -168,14 +175,23 @@ try {
     '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
     '--disable-background-networking', '--disable-component-update', '--no-first-run',
     '--no-default-browser-check', '--user-data-dir=' + profileDir,
+    '--remote-debugging-address=' + HOST,
     '--remote-debugging-port=' + debugPort, '--window-size=1440,1200', appUrl
   ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 
-  const targets = await waitJson('http://' + HOST + ':' + debugPort + '/json');
-  const target = targets.find(item => item.type === 'page' && item.webSocketDebuggerUrl);
-  if (!target) throw new Error('No browser page target available.');
-  cdp = new Cdp(target.webSocketDebuggerUrl);
-  await cdp.connect();
+  let browserStdErr = '';
+  let browserSpawnError = null;
+  chrome.on('error', error => { browserSpawnError = error; });
+  chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
+  const { pageTarget } = await waitForDevToolsTargets({
+    host: HOST,
+    port: debugPort,
+    browserProcess: chrome,
+    getStderr: () => browserStdErr,
+    getSpawnError: () => browserSpawnError
+  });
+  cdp = new Cdp(pageTarget.webSocketDebuggerUrl);
+  await connectCdpWithDiagnostics(() => cdp.connect(), { port: debugPort, stderr: browserStdErr.slice(-4000) });
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   await cdp.send('Log.enable');
@@ -301,7 +317,7 @@ try {
   console.log('TQG Production Assurance: PASS');
 } catch (error) {
   console.error('');
-  console.error('TQG Production Assurance: FAIL — ' + (error.stack || error.message || error));
+  console.error('TQG Production Assurance: FAIL — ' + formatHarnessFailure(asApplicationFailure(error)));
   if (pageErrors.length) console.error('Browser errors:\\n' + pageErrors.join('\\n'));
   process.exitCode = 1;
 } finally {

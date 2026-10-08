@@ -654,6 +654,19 @@ function main() {
     fail('TQG regression suite failed' + (tqgRegression.stderr ? `: ${tqgRegression.stderr.trim()}` : ''));
   }
   assert(/TQG-09 Regression: PASS/.test(tqgRegression.stdout), 'TQG regression suite passes');
+
+  const harnessDiagnosticsPath = path.join(ROOT, 'tests', 'e2e', 'harness-diagnostics-regression.mjs');
+  assert(fs.existsSync(harnessDiagnosticsPath), 'Browser harness diagnostics regression runner is present');
+  const harnessDiagnostics = spawnSync(process.execPath, [harnessDiagnosticsPath], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024
+  });
+  if (harnessDiagnostics.status !== 0) {
+    fail('Browser harness diagnostics regression failed' + (harnessDiagnostics.stderr ? `: ${harnessDiagnostics.stderr.trim()}` : ''));
+  }
+  assert(/Harness Diagnostics Regression: PASS/.test(harnessDiagnostics.stdout), 'Browser harness diagnostics regression passes');
+
   const c5AuditPath = path.join(ROOT, 'scripts', 'tqg-phase-c-final-audit.mjs');
   assert(fs.existsSync(c5AuditPath), 'C5 final audit runner is present');
   const c5Audit = spawnSync(process.execPath, [c5AuditPath], {
