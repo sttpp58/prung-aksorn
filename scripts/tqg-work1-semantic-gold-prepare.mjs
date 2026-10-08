@@ -13,6 +13,7 @@ const C2_PATH = process.env.TQG_C2_GOLD_DATASET ||
   path.join(ROOT, 'tests', 'tqg', 'c2-private', 'gold-dataset.json');
 const OUTPUT_PATH = process.env.TQG_WORK1_TEMPLATE ||
   path.join(ROOT, 'tests', 'tqg', 'c2-private', 'gold-repaired-targets.review-template.json');
+const ALLOW_SYNTHETIC_C2 = process.env.TQG_ALLOW_SYNTHETIC_C2 === '1';
 
 const TARGET_REPAIR_CASES = 32;
 const TARGET_CONTROL_CASES = 16;
@@ -115,7 +116,7 @@ function contentHashes(sourceText, brokenTargetText) {
   };
 }
 
-function buildRecord(testCase, expectedAction, analysis, finding) {
+function buildRecord(testCase, expectedAction, analysis, finding, sourceDataset) {
   return {
     caseId: 'SRG-' + testCase.caseId.replace(/^C2-/, ''),
     sourceCaseId: testCase.caseId,
@@ -157,7 +158,7 @@ function buildRecord(testCase, expectedAction, analysis, finding) {
     },
     contentHashes: contentHashes(testCase.sourceText, testCase.targetText),
     provenance: {
-      sourceDataset: 'TQG-C2-real-world-gold',
+      sourceDataset,
       c2ContentHash: testCase.contentHash,
       currentDetectorMayDifferFromC2Snapshot: true
     }
@@ -175,7 +176,13 @@ function main() {
   }
 
   const source = JSON.parse(fs.readFileSync(C2_PATH, 'utf8'));
-  assert.equal(source.dataset, 'TQG-C2-real-world-gold');
+  const isSynthetic = source.synthetic === true || source.dataset === 'TQG-C2-synthetic-harness';
+  if (isSynthetic) {
+    assert.equal(ALLOW_SYNTHETIC_C2, true,
+      'synthetic C2 input requires TQG_ALLOW_SYNTHETIC_C2=1');
+  } else {
+    assert.equal(source.dataset, 'TQG-C2-real-world-gold');
+  }
   assert.equal(source.schemaVersion, '1.0');
   assert.equal(source.cases.length, 175);
 
@@ -212,10 +219,10 @@ function main() {
   );
 
   for (const { testCase, analysis, finding } of selectedRepairs) {
-    prepared.push(buildRecord(testCase, 'REPAIR', analysis, finding));
+    prepared.push(buildRecord(testCase, 'REPAIR', analysis, finding, source.dataset));
   }
   for (const { testCase, analysis, finding } of selectedControls) {
-    prepared.push(buildRecord(testCase, 'NO_REPAIR', analysis, finding));
+    prepared.push(buildRecord(testCase, 'NO_REPAIR', analysis, finding, source.dataset));
   }
 
   prepared.sort((a, b) => a.caseId.localeCompare(b.caseId));
@@ -224,7 +231,8 @@ function main() {
   const template = {
     dataset: 'TQG-semantic-repair-gold',
     schemaVersion: '1.0',
-    sourceDataset: 'TQG-C2-real-world-gold',
+    sourceDataset: source.dataset,
+    synthetic: isSynthetic,
     status: 'REVIEW_TEMPLATE',
     reviewPolicy: {
       minimumIndependentReviewers: 2,
