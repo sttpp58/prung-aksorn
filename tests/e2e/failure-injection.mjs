@@ -371,7 +371,14 @@ async function scenarioCancelPersistenceFailure(ctx) {
   await waitForFunction(ctx.cdp,
     "document.getElementById('processBtn').disabled === false && !document.getElementById('cancelBtn').classList.contains('show')");
   const job = await latestJob(ctx);
+  const jobIdBeforeReload = job?.jobId;
+  const chapterIdBeforeReload = job?.chapterId;
+  const completedChunksBeforeReload = job?.completedChunks;
+  check(Boolean(jobIdBeforeReload && chapterIdBeforeReload),
+    'cancellation persistence failure preserves Translation Job identity');
   check(job?.status === 'running', 'cancellation persistence failure leaves the Translation Job running and recoverable');
+  check(completedChunksBeforeReload === 0,
+    'cancellation persistence failure preserves the zero-completed-chunk checkpoint invariant');
   check(
     await evaluate(ctx.cdp, "document.getElementById('resumeBtn').classList.contains('show')"),
     'cancellation persistence failure exposes same-session recovery control'
@@ -397,7 +404,11 @@ async function scenarioCancelPersistenceFailure(ctx) {
   await ctx.cdp.send('Page.navigate', { url: ctx.url });
   await waitForFunction(ctx.cdp, "document.readyState === 'complete' && !!document.getElementById('translationRecoveryBox')", 10000);
   const recoveredJob = await latestJob(ctx);
+  check(recoveredJob?.jobId === jobIdBeforeReload && recoveredJob?.chapterId === chapterIdBeforeReload,
+    'cancellation persistence failure preserves Job identity after browser reload');
   check(recoveredJob?.status === 'running', 'cancellation persistence failure remains recoverable after browser reload');
+  check(recoveredJob?.completedChunks === completedChunksBeforeReload,
+    'cancellation persistence failure preserves checkpoint progress after browser reload');
   check(
     await evaluate(ctx.cdp, "document.getElementById('translationRecoveryBox').textContent.includes('กู้คืน')"),
     'browser reload exposes the persistent Translation Job recovery control'
