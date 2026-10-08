@@ -374,6 +374,23 @@ async function scenarioCancelPersistenceFailure(ctx) {
   const jobIdBeforeReload = job?.jobId;
   const chapterIdBeforeReload = job?.chapterId;
   const completedChunksBeforeReload = job?.completedChunks;
+  const checkpointBeforeReload = JSON.stringify({
+    jobId: job?.jobId,
+    projectId: job?.projectId,
+    bookId: job?.bookId,
+    chapterId: job?.chapterId,
+    status: job?.status,
+    revision: job?.revision,
+    totalChunks: job?.totalChunks,
+    completedChunks: job?.completedChunks,
+    partialResults: job?.partialResults,
+    previousTail: job?.previousTail,
+    retryCount: job?.retryCount,
+    sourceSnapshot: job?.sourceSnapshot,
+    provider: job?.provider,
+    model: job?.model,
+    chunkSize: job?.chunkSize
+  });
   check(Boolean(jobIdBeforeReload && chapterIdBeforeReload),
     'cancellation persistence failure preserves Translation Job identity');
   check(job?.status === 'running', 'cancellation persistence failure leaves the Translation Job running and recoverable');
@@ -409,6 +426,24 @@ async function scenarioCancelPersistenceFailure(ctx) {
   check(recoveredJob?.status === 'running', 'cancellation persistence failure remains recoverable after browser reload');
   check(recoveredJob?.completedChunks === completedChunksBeforeReload,
     'cancellation persistence failure preserves checkpoint progress after browser reload');
+  check(JSON.stringify({
+    jobId: recoveredJob?.jobId,
+    projectId: recoveredJob?.projectId,
+    bookId: recoveredJob?.bookId,
+    chapterId: recoveredJob?.chapterId,
+    status: recoveredJob?.status,
+    revision: recoveredJob?.revision,
+    totalChunks: recoveredJob?.totalChunks,
+    completedChunks: recoveredJob?.completedChunks,
+    partialResults: recoveredJob?.partialResults,
+    previousTail: recoveredJob?.previousTail,
+    retryCount: recoveredJob?.retryCount,
+    sourceSnapshot: recoveredJob?.sourceSnapshot,
+    provider: recoveredJob?.provider,
+    model: recoveredJob?.model,
+    chunkSize: recoveredJob?.chunkSize
+  }) === checkpointBeforeReload,
+  'cancellation persistence failure preserves Job/checkpoint data after browser reload');
   check(
     await evaluate(ctx.cdp, "document.getElementById('translationRecoveryBox').textContent.includes('กู้คืน')"),
     'browser reload exposes the persistent Translation Job recovery control'
