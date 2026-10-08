@@ -1,7 +1,7 @@
 # TQG Phase D — Observability Contract
 **Contract:** D1
 **Contract Version:** `TQG-OBS-01`
-**Status:** LOCKED — Pre-Implementation
+**Status:** LOCKED — D2-D5 IMPLEMENTED
 **Repository:** `sttpp58/prung-aksorn`
 **Phase:** D — Observability & Operational Telemetry
 **Baseline:** `main` at Phase C final engineering gate
@@ -10,7 +10,9 @@
 
 ## 1. Purpose
 
-This document freezes the observability contract for TQG V1 before runtime instrumentation is implemented.
+This document freezes the observability contract for TQG V1. The contract remains
+locked; the D2-D5 runtime implementation and regressions are tracked separately
+from this D1 contract.
 
 The contract defines:
 

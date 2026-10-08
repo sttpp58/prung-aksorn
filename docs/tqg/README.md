@@ -29,6 +29,21 @@
 - [D4 Telemetry Isolation](TQG_PHASE_D4_TELEMETRY_ISOLATION.md)
 - [D5 Performance & Regression](TQG_PHASE_D5_PERFORMANCE_REGRESSION.md)
 
+## Current release status
+
+The repository reports two independent release dimensions and must not collapse
+them into one status:
+
+- **Engineering Gate: PASS** — the existing release-gate scripts and regression
+  suite pass their engineering-safety checks. Local browser assurance may still
+  be unavailable when Chrome/CDP cannot expose its DevTools endpoint.
+- **Semantic Accuracy: DEFERRED** — no independently reviewed and adjudicated
+  real-world gold repaired-target dataset is available to make this claim.
+
+The complete evidence mapping, including baseline execution results and
+environment limitations, is recorded in
+[STATUS_EVIDENCE_MATRIX.md](STATUS_EVIDENCE_MATRIX.md).
+
 ## Repository structure
 
 - Runtime TQG modules remain at repository root because `index.html` and `sw.js` load them as application assets.
