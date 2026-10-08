@@ -159,12 +159,12 @@ The permanent FI-05 test verifies at minimum:
 
 - no uncaught runtime exception;
 - recovery control remains available in the same session;
-- Job/checkpoint data remains intact;
+- Job/checkpoint identity, partial results, source snapshot, and retry metadata remain intact;
 - the user receives the durable-state warning;
-- the normal provider retry budget remains unchanged.
+- no additional provider request is sent during cancellation; FI-01 separately verifies the normal retry budget.
 
 ## Final assessment
 
 The defect was an error-boundary failure in the Single Translation terminal-error path, not a Translation Job schema or state-machine defect.
 
-The remediation is narrow, preserves existing core semantics, and has passed the repository's local and GitHub release gates. The remaining engineering gap is permanent automated coverage for the second-order persistence failure itself.
+The remediation is narrow, preserves existing core semantics, and has passed the repository's local and GitHub release gates. The remaining evidence gap is independently reviewed real-world semantic repair gold; FI-05 persistence-failure coverage is now permanent.
