@@ -17,7 +17,7 @@ function check(condition, message) {
   console.log('PASS  ' + message);
 }
 
-check(DEVTOOLS_RETRY_POLICY.maxAttempts === 20, 'bounded DevTools retry count is explicit');
+check(DEVTOOLS_RETRY_POLICY.maxAttempts === 60, 'bounded DevTools retry count is explicit');
 check(DEVTOOLS_RETRY_POLICY.backoffMs === 100, 'bounded DevTools retry backoff is explicit');
 check(DEVTOOLS_RETRY_POLICY.requestTimeoutMs === 1000, 'DevTools request timeout is explicit');
 

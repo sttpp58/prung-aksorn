@@ -8,7 +8,7 @@ export const HARNESS_FAILURE_KINDS = Object.freeze({
 });
 
 export const DEVTOOLS_RETRY_POLICY = Object.freeze({
-  maxAttempts: 20,
+  maxAttempts: 60,
   backoffMs: 100,
   requestTimeoutMs: 1_000,
   portProbeTimeoutMs: 250

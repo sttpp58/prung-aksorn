@@ -37,7 +37,7 @@ DevTools readiness is bounded and explicit:
 
 | Setting | Value |
 | --- | ---: |
-| Maximum attempts | 20 |
+| Maximum attempts | 60 |
 | Backoff | 100 ms |
 | Per-request timeout | 1,000 ms |
 | TCP port probe timeout | 250 ms |
