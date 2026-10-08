@@ -8,20 +8,17 @@ import { spawnSync } from 'node:child_process';
 const ROOT = process.cwd();
 const prepare = path.join(ROOT, 'scripts', 'tqg-work1-semantic-gold-prepare.mjs');
 const validate = path.join(ROOT, 'scripts', 'tqg-work1-semantic-gold-validation.mjs');
-const generatedTemplateDir = process.env.TQG_WORK1_TEMPLATE ? null :
-  fs.mkdtempSync(path.join(os.tmpdir(), 'prung-aksorn-work1-'));
-const output = process.env.TQG_WORK1_TEMPLATE ||
-  path.join(generatedTemplateDir, 'gold-repaired-targets.review-template.json');
-if (generatedTemplateDir) {
-  process.on('exit', () => {
-    try { fs.rmSync(generatedTemplateDir, { recursive: true, force: true }); } catch {}
-  });
-}
+const generatedTemplateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prung-aksorn-work1-'));
+const output = path.join(generatedTemplateDir, 'gold-repaired-targets.review-template.json');
+process.on('exit', () => {
+  try { fs.rmSync(generatedTemplateDir, { recursive: true, force: true }); } catch {}
+});
 
 function run(file, env = {}) {
   const baseEnv = { ...process.env };
   delete baseEnv.TQG_WORK1_SELF_TEST;
   delete baseEnv.TQG_REQUIRE_WORK1_GOLD;
+  delete baseEnv.TQG_WORK1_TEMPLATE;
   return spawnSync(process.execPath, [file], {
     cwd: ROOT,
     env: { ...baseEnv, ...env },

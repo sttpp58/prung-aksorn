@@ -60,7 +60,7 @@ function makeCase(index) {
 }
 
 const fixture = {
-  dataset: 'TQG-C2-real-world-gold',
+  dataset: 'TQG-C2-synthetic-harness',
   schemaVersion: '1.0',
   synthetic: true,
   warning: 'Synthetic fixture for harness/concurrency testing only. It is not private production data or semantic gold.',
