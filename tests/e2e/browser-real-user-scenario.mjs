@@ -7,6 +7,14 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  asApplicationFailure,
+  asEnvironmentFailure,
+  connectCdpWithDiagnostics,
+  enableCdpDomainsWithDiagnostics,
+  formatHarnessFailure,
+  waitForDevToolsTargets
+} from './harness-diagnostics.mjs';
 
 const ROOT = process.cwd();
 const PORT_HOST = '127.0.0.1';
@@ -62,7 +70,8 @@ function waitForChildExit(child, timeoutMs = CHILD_PROCESS_TIMEOUT, label = 'chi
 
 async function findBrowser() {
   const explicit = process.env.E2E_BROWSER;
-  const candidates = explicit ? [explicit] : process.platform === 'win32'
+  if (explicit) return explicit;
+  const candidates = process.platform === 'win32'
     ? [
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
@@ -100,7 +109,7 @@ async function findBrowser() {
       }
     } catch {}
   }
-  throw new Error('No Chromium-family browser found. Set E2E_BROWSER to the browser executable path.');
+  throw asEnvironmentFailure(new Error('No Chromium-family browser found. Set E2E_BROWSER to the browser executable path.'), 'browser_discovery');
 }
 
 function startStaticServer(timeoutMs = 5_000) {
@@ -347,6 +356,8 @@ let globalTimeoutError = null;
 let shutdownRequested = false;
 const pageErrors = [];
 let browserStdErr = '';
+let browserSpawnError = null;
+let environmentSetup = true;
 
 function signalBrowserProcessTree(signal) {
   if (!chrome?.pid) return;
@@ -486,37 +497,34 @@ try {
       });
     });
   });
+  environmentSetup = false;
 
   chrome = spawn(browser, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
     '--disable-background-networking', '--disable-component-update', '--no-first-run',
     '--no-default-browser-check', '--user-data-dir=' + profileDir,
+    '--remote-debugging-address=' + PORT_HOST,
     '--remote-debugging-port=' + debugPortHolder, '--window-size=1440,1200', e2eUrl
   ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' });
-  chrome.on('error', error => log('Browser child error: ' + String(error?.message || error)));
+  chrome.on('error', error => {
+    browserSpawnError = error;
+    log('Browser child error: ' + String(error?.message || error));
+  });
   chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
   chrome.on('exit', code => log('Browser exited with code ' + code));
-  try {
-    await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json/version`, 15_000);
-  } catch (error) {
-    const exitState = chrome.exitCode !== null || chrome.signalCode !== null
-      ? ' exitCode=' + chrome.exitCode + ' signal=' + chrome.signalCode
-      : ' processStillRunning=true';
-    const stderr = browserStdErr.trim();
-    throw new Error(
-      'Browser DevTools endpoint did not become ready: ' + error.message +
-      exitState +
-      (stderr ? '\nBrowser stderr:\n' + stderr.slice(-4000) : '\nBrowser stderr: <empty>')
-    );
-  }
-  const targets = await waitForUrl(`http://${PORT_HOST}:${debugPortHolder}/json`, 10_000);
-  const pageTarget = Array.isArray(targets) ? targets.find(target => target.type === 'page' && target.webSocketDebuggerUrl) : null;
-  if (!pageTarget) throw new Error('No browser page target available for CDP.');
+  const { pageTarget } = await waitForDevToolsTargets({
+    host: PORT_HOST,
+    port: debugPortHolder,
+    browserProcess: chrome,
+    getStderr: () => browserStdErr,
+    getSpawnError: () => browserSpawnError
+  });
   cdp = new CdpClient(pageTarget.webSocketDebuggerUrl);
-  await cdp.connect();
-  await cdp.send('Page.enable');
-  await cdp.send('Runtime.enable');
-  await cdp.send('Log.enable');
+  await connectCdpWithDiagnostics(() => cdp.connect(), {
+    port: debugPortHolder,
+    stderr: browserStdErr.slice(-4000)
+  });
+  await enableCdpDomainsWithDiagnostics(cdp, ['Page.enable', 'Runtime.enable', 'Log.enable'], { port: debugPortHolder, stderr: browserStdErr.slice(-4000) });
   cdp.on('Runtime.exceptionThrown', params => {
     const detail = params?.exceptionDetails;
     const description = detail?.exception?.description || detail?.text || 'unknown exception';
@@ -677,7 +685,8 @@ try {
 } catch (error) {
   console.error('');
   const failure = globalTimeoutError || error;
-  console.error('Browser E2E / Real User Scenario: FAIL — ' + (failure.stack || failure.message || failure));
+  const typedFailure = environmentSetup ? asEnvironmentFailure(failure, 'environment_setup') : asApplicationFailure(failure);
+  console.error('Browser E2E / Real User Scenario: FAIL — ' + formatHarnessFailure(typedFailure));
   if (pageErrors.length) console.error('Browser errors:\n' + pageErrors.join('\n'));
   process.exitCode = 1;
 } finally {
