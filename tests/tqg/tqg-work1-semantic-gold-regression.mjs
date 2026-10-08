@@ -1,12 +1,22 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const ROOT = process.cwd();
 const prepare = path.join(ROOT, 'scripts', 'tqg-work1-semantic-gold-prepare.mjs');
 const validate = path.join(ROOT, 'scripts', 'tqg-work1-semantic-gold-validation.mjs');
+const generatedTemplateDir = process.env.TQG_WORK1_TEMPLATE ? null :
+  fs.mkdtempSync(path.join(os.tmpdir(), 'prung-aksorn-work1-'));
+const output = process.env.TQG_WORK1_TEMPLATE ||
+  path.join(generatedTemplateDir, 'gold-repaired-targets.review-template.json');
+if (generatedTemplateDir) {
+  process.on('exit', () => {
+    try { fs.rmSync(generatedTemplateDir, { recursive: true, force: true }); } catch {}
+  });
+}
 
 function run(file, env = {}) {
   const baseEnv = { ...process.env };
@@ -58,11 +68,10 @@ if (!fs.existsSync(privateC2)) {
   process.exit(0);
 }
 
-const output = path.join(ROOT, 'tests', 'tqg', 'c2-private', 'gold-repaired-targets.review-template.json');
 try {
   fs.unlinkSync(output);
 } catch {}
-const prepared = run(prepare);
+const prepared = run(prepare, { TQG_WORK1_TEMPLATE: output });
 check(prepared.status === 0, 'preparation runner creates the Work 1 review template');
 const parsed = JSON.parse(fs.readFileSync(output, 'utf8'));
 check(parsed.status === 'REVIEW_TEMPLATE', 'prepared dataset remains explicitly a review template');
@@ -97,7 +106,7 @@ check(parsed.cases.every(item => item.review.status !== 'GOLD_REVIEWED'),
 const firstDigest = parsed.selectionDigest;
 fs.unlinkSync(output);
 
-const secondPrepared = run(prepare);
+const secondPrepared = run(prepare, { TQG_WORK1_TEMPLATE: output });
 check(secondPrepared.status === 0, 'second preparation replay completes');
 const secondParsed = JSON.parse(fs.readFileSync(output, 'utf8'));
 check(secondParsed.selectionDigest === firstDigest,

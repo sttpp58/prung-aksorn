@@ -21,6 +21,9 @@ function check(condition, message) {
   assert.ok(condition, message);
   pass(message);
 }
+function fail(message) {
+  throw new Error(message);
+}
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === 'object') {
@@ -42,6 +45,16 @@ function countBy(items, selector) {
     return counts;
   }, {});
 }
+function describeChildFailure(file, result) {
+  const status = result.error
+    ? 'spawn error: ' + result.error.message
+    : result.signal
+      ? 'signal: ' + result.signal
+      : 'exit code: ' + result.status;
+  const stdout = result.stdout ? '\nstdout:\n' + result.stdout.trim() : '';
+  const stderr = result.stderr ? '\nstderr:\n' + result.stderr.trim() : '';
+  return file + ' failed (' + status + ')' + stdout + stderr;
+}
 function runPhaseRegression(file) {
   const result = spawnSync(process.execPath, [path.join(ROOT, file)], {
     cwd: ROOT,
@@ -50,9 +63,7 @@ function runPhaseRegression(file) {
   });
 
   if (result.status !== 0) {
-    console.error(result.stdout || '');
-    console.error(result.stderr || '');
-    throw new Error(file + ' failed');
+    fail(describeChildFailure(file, result));
   }
 
   check(
@@ -845,8 +856,7 @@ const work1Regression = spawnSync(process.execPath, [work1RegressionPath], {
   maxBuffer: 8 * 1024 * 1024
 });
 if (work1Regression.status !== 0) {
-  fail('WORK 1 semantic-gold regression failed' +
-    (work1Regression.stderr ? ': ' + work1Regression.stderr.trim() : ''));
+  fail(describeChildFailure('WORK 1 semantic-gold regression', work1Regression));
 }
 const work1Result = /TQG WORK 1 Regression: (PASS|DEFERRED)/.exec(work1Regression.stdout);
 check(
@@ -862,8 +872,7 @@ const work2Regression = spawnSync(process.execPath, [work2RegressionPath], {
   maxBuffer: 8 * 1024 * 1024
 });
 if (work2Regression.status !== 0) {
-  fail('WORK 2 effectiveness regression failed' +
-    (work2Regression.stderr ? ': ' + work2Regression.stderr.trim() : ''));
+  fail(describeChildFailure('WORK 2 effectiveness regression', work2Regression));
 }
 check(
   /TQG WORK 2 Regression: PASS/.test(work2Regression.stdout),
