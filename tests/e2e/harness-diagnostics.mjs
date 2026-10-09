@@ -1,5 +1,6 @@
 import net from 'node:net';
-import { rm } from 'node:fs/promises';
+import path from 'node:path';
+import { readFile, rm } from 'node:fs/promises';
 
 export const HARNESS_FAILURE_KINDS = Object.freeze({
   APPLICATION_FAILURE: 'APPLICATION_FAILURE',
@@ -8,10 +9,11 @@ export const HARNESS_FAILURE_KINDS = Object.freeze({
 });
 
 export const DEVTOOLS_RETRY_POLICY = Object.freeze({
-  maxAttempts: 60,
+  maxAttempts: 300,
   backoffMs: 100,
   requestTimeoutMs: 1_000,
-  portProbeTimeoutMs: 250
+  portProbeTimeoutMs: 250,
+  startupTimeoutMs: 30_000
 });
 
 export class HarnessFailure extends Error {
@@ -90,18 +92,119 @@ function stderrTail(getStderr) {
   return String(value || '').trim().slice(-4_000);
 }
 
-async function waitForEndpoint({ host, port, path, phase, browserProcess, getStderr, getSpawnError }) {
-  const url = `http://${host}:${port}${path}`;
+export async function waitForDevToolsPort({
+  profileDir,
+  browserProcess,
+  getStderr,
+  getSpawnError,
+  timeoutMs = DEVTOOLS_RETRY_POLICY.startupTimeoutMs
+}) {
+  if (typeof profileDir !== 'string' || !profileDir) {
+    throw new HarnessFailure(
+      HARNESS_FAILURE_KINDS.BROWSER_STARTUP_FAILURE,
+      'devtools_port_file',
+      'Chrome profile directory is required to discover the ephemeral DevTools port.'
+    );
+  }
+
+  const portFile = path.join(profileDir, 'DevToolsActivePort');
+  const deadline = Date.now() + timeoutMs;
+  let attempts = 0;
+  let lastError = 'DevToolsActivePort has not been created';
+
+  while (attempts < DEVTOOLS_RETRY_POLICY.maxAttempts && Date.now() < deadline) {
+    attempts += 1;
+
+    const spawnError = typeof getSpawnError === 'function' ? getSpawnError() : null;
+    if (spawnError) {
+      throw new HarnessFailure(
+        HARNESS_FAILURE_KINDS.BROWSER_STARTUP_FAILURE,
+        'devtools_port_file',
+        'Chrome spawn failed before DevToolsActivePort became ready',
+        {
+          portFile,
+          attempt: attempts,
+          spawnError: spawnError.message || String(spawnError),
+          stderr: stderrTail(getStderr)
+        }
+      );
+    }
+
+    const state = processState(browserProcess);
+    if (!state.running) {
+      throw new HarnessFailure(
+        HARNESS_FAILURE_KINDS.BROWSER_STARTUP_FAILURE,
+        'devtools_port_file',
+        'Chrome exited before DevToolsActivePort became ready',
+        {
+          portFile,
+          attempt: attempts,
+          exitCode: state.exitCode,
+          signal: state.signal,
+          stderr: stderrTail(getStderr)
+        }
+      );
+    }
+
+    try {
+      const lines = (await readFile(portFile, 'utf8')).split(/\r?\n/).map(line => line.trim());
+      const port = Number(lines[0]);
+      if (
+        Number.isInteger(port) &&
+        port > 0 &&
+        port <= 65535 &&
+        /^\/devtools\/browser\/[^/]+$/.test(lines[1] || '')
+      ) {
+        return port;
+      }
+      lastError = 'DevToolsActivePort contains an invalid or incomplete port/websocket path';
+    } catch (error) {
+      lastError = error?.code === 'ENOENT'
+        ? 'DevToolsActivePort has not been created yet'
+        : error?.message || String(error);
+    }
+
+    const remaining = deadline - Date.now();
+    if (remaining > 0) {
+      await sleep(Math.min(DEVTOOLS_RETRY_POLICY.backoffMs, remaining));
+    }
+  }
+
+  const state = processState(browserProcess);
+  throw new HarnessFailure(
+    HARNESS_FAILURE_KINDS.BROWSER_STARTUP_FAILURE,
+    'devtools_port_file',
+    `Timed out waiting for ${portFile}`,
+    {
+      portFile,
+      timeoutMs,
+      attempts,
+      backoffMs: DEVTOOLS_RETRY_POLICY.backoffMs,
+      lastError,
+      exitCode: state.exitCode,
+      signal: state.signal,
+      processStillRunning: state.running,
+      stderr: stderrTail(getStderr)
+    }
+  );
+}
+
+async function waitForEndpoint({ host, port, path: endpointPath, phase, browserProcess, getStderr, getSpawnError }) {
+  const url = `http://${host}:${port}${endpointPath}`;
+  const deadline = Date.now() + DEVTOOLS_RETRY_POLICY.startupTimeoutMs;
   let portOpen = false;
   let lastError = 'not attempted';
-  for (let attempt = 1; attempt <= DEVTOOLS_RETRY_POLICY.maxAttempts; attempt += 1) {
+  let attempts = 0;
+
+  while (attempts < DEVTOOLS_RETRY_POLICY.maxAttempts && Date.now() < deadline) {
+    attempts += 1;
     const spawnError = typeof getSpawnError === 'function' ? getSpawnError() : null;
     if (spawnError) {
       throw new HarnessFailure(
         HARNESS_FAILURE_KINDS.BROWSER_STARTUP_FAILURE,
         phase,
-        `Chrome spawn failed before ${path} became ready`,
-        { url, attempt, portOpen, spawnError: spawnError.message || String(spawnError), stderr: stderrTail(getStderr) }
+        `Chrome spawn failed before ${endpointPath} became ready`,
+        { url, attempt: attempts, portOpen, spawnError: spawnError.message || String(spawnError), stderr: stderrTail(getStderr) }
       );
     }
     const state = processState(browserProcess);
@@ -109,19 +212,26 @@ async function waitForEndpoint({ host, port, path, phase, browserProcess, getStd
       throw new HarnessFailure(
         HARNESS_FAILURE_KINDS.BROWSER_STARTUP_FAILURE,
         phase,
-        `Chrome exited before ${path} became ready`,
-        { url, attempt, portOpen, exitCode: state.exitCode, signal: state.signal, stderr: stderrTail(getStderr) }
+        `Chrome exited before ${endpointPath} became ready`,
+        { url, attempt: attempts, portOpen, exitCode: state.exitCode, signal: state.signal, stderr: stderrTail(getStderr) }
       );
     }
     const portProbe = await probePort(host, port, DEVTOOLS_RETRY_POLICY.portProbeTimeoutMs);
     portOpen ||= portProbe.open;
     try {
-      return await fetchJson(url, DEVTOOLS_RETRY_POLICY.requestTimeoutMs);
+      return await fetchJson(url, Math.min(
+        DEVTOOLS_RETRY_POLICY.requestTimeoutMs,
+        Math.max(1, deadline - Date.now())
+      ));
     } catch (error) {
       lastError = error?.message || String(error);
     }
-    if (attempt < DEVTOOLS_RETRY_POLICY.maxAttempts) await sleep(DEVTOOLS_RETRY_POLICY.backoffMs);
+    const remaining = deadline - Date.now();
+    if (remaining > 0) {
+      await sleep(Math.min(DEVTOOLS_RETRY_POLICY.backoffMs, remaining));
+    }
   }
+
   const state = processState(browserProcess);
   throw new HarnessFailure(
     HARNESS_FAILURE_KINDS.BROWSER_STARTUP_FAILURE,
@@ -129,7 +239,8 @@ async function waitForEndpoint({ host, port, path, phase, browserProcess, getStd
     `Timed out waiting for ${url}`,
     {
       url,
-      maxAttempts: DEVTOOLS_RETRY_POLICY.maxAttempts,
+      timeoutMs: DEVTOOLS_RETRY_POLICY.startupTimeoutMs,
+      attempts,
       backoffMs: DEVTOOLS_RETRY_POLICY.backoffMs,
       requestTimeoutMs: DEVTOOLS_RETRY_POLICY.requestTimeoutMs,
       portOpen,
@@ -143,10 +254,14 @@ async function waitForEndpoint({ host, port, path, phase, browserProcess, getStd
   );
 }
 
-export async function waitForDevToolsTargets({ host, port, browserProcess, getStderr, getSpawnError }) {
+export async function waitForDevToolsTargets({ host, port, profileDir, browserProcess, getStderr, getSpawnError }) {
+  const resolvedPort = Number.isInteger(port) && port > 0
+    ? port
+    : await waitForDevToolsPort({ profileDir, browserProcess, getStderr, getSpawnError });
+
   await waitForEndpoint({
     host,
-    port,
+    port: resolvedPort,
     path: '/json/version',
     phase: 'devtools_endpoint',
     browserProcess,
@@ -155,7 +270,7 @@ export async function waitForDevToolsTargets({ host, port, browserProcess, getSt
   });
   const targets = await waitForEndpoint({
     host,
-    port,
+    port: resolvedPort,
     path: '/json',
     phase: 'page_target',
     browserProcess,
@@ -173,7 +288,7 @@ export async function waitForDevToolsTargets({ host, port, browserProcess, getSt
       { portOpen: true, targetCount: Array.isArray(targets) ? targets.length : null, stderr: stderrTail(getStderr) }
     );
   }
-  return { targets, pageTarget };
+  return { targets, pageTarget, port: resolvedPort };
 }
 
 export async function connectCdpWithDiagnostics(connect, details = {}) {

@@ -470,33 +470,6 @@ try {
   log('HTTP origin: ' + e2eUrl);
 
   profileDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-e2e-'));
-  const debugPortHolder = await new Promise((resolve, reject) => {
-    const probe = createServer();
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      try { probe.close(); } catch {}
-      reject(new Error('Remote debugging port probe timed out after 5_000ms.'));
-    }, 5_000);
-    const onError = error => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(new Error('Remote debugging port probe failed: ' + String(error?.message || error)));
-    };
-    probe.once('error', onError);
-    probe.listen(0, PORT_HOST, () => {
-      if (settled) return;
-      const port = probe.address().port;
-      probe.close(() => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        resolve(port);
-      });
-    });
-  });
   environmentSetup = false;
 
   chrome = spawn(browser, [
@@ -504,7 +477,7 @@ try {
     '--disable-background-networking', '--disable-component-update', '--no-first-run',
     '--no-default-browser-check', '--user-data-dir=' + profileDir,
     '--remote-debugging-address=' + PORT_HOST,
-    '--remote-debugging-port=' + debugPortHolder, '--window-size=1440,1200', e2eUrl
+    '--remote-debugging-port=0', '--window-size=1440,1200', e2eUrl
   ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' });
   chrome.on('error', error => {
     browserSpawnError = error;
@@ -512,19 +485,19 @@ try {
   });
   chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
   chrome.on('exit', code => log('Browser exited with code ' + code));
-  const { pageTarget } = await waitForDevToolsTargets({
+  const { pageTarget, port: debugPort } = await waitForDevToolsTargets({
     host: PORT_HOST,
-    port: debugPortHolder,
+    profileDir,
     browserProcess: chrome,
     getStderr: () => browserStdErr,
     getSpawnError: () => browserSpawnError
   });
   cdp = new CdpClient(pageTarget.webSocketDebuggerUrl);
   await connectCdpWithDiagnostics(() => cdp.connect(), {
-    port: debugPortHolder,
+    port: debugPort,
     stderr: browserStdErr.slice(-4000)
   });
-  await enableCdpDomainsWithDiagnostics(cdp, ['Page.enable', 'Runtime.enable', 'Log.enable'], { port: debugPortHolder, stderr: browserStdErr.slice(-4000) });
+  await enableCdpDomainsWithDiagnostics(cdp, ['Page.enable', 'Runtime.enable', 'Log.enable'], { port: debugPort, stderr: browserStdErr.slice(-4000) });
   cdp.on('Runtime.exceptionThrown', params => {
     const detail = params?.exceptionDetails;
     const description = detail?.exception?.description || detail?.text || 'unknown exception';
