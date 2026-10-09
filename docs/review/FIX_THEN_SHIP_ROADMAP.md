@@ -295,7 +295,7 @@ Local final-tree gates pass after the final OpenAI malformed-response compatibil
 
 ### Release-gate reconciliation (2026-10-09)
 
-The first GitHub PR run found that the pre-existing WORK 4 release gate required sw.js to remain blob-identical even though D-07's conditional fix was reproduced by the new browser fixture. A narrow predicate now permits only the exact release-base v10-to-v11 change plus the approved cache-hit/miss fetch-block replacement, with fixture, release-version, same-origin, GET-only and cache-write checks. All other protected storage/TQG files remain under the original blob-identical rule. Two local PR-base WORK 4 runs: PASS WITH LIMITATION in 100.39 and 99.84 seconds. Phase 9 stays pending until the pushed follow-up's GitHub Actions checks all pass.
+The first GitHub PR run found that the pre-existing WORK 4 release gate required sw.js to remain blob-identical even though D-07's conditional fix was reproduced by the new browser fixture. A narrow predicate now permits only the exact release-base v10-to-v11 change plus the approved cache-hit/miss fetch-block replacement, with fixture, release-version, same-origin, GET-only and cache-write checks. All other protected storage/TQG files remain under the original blob-identical rule. Two local PR-base WORK 4 runs: PASS WITH LIMITATION in 100.39 and 99.84 seconds. Phase 9's GitHub CI sub-gate passed 8/8 workflows on e02db35. Phase 9 remains pending for verification of actual branch-protection/required checks (the connected integration returned HTTP 403 for that administration endpoint) and explicit user authorization; PR #52 remains draft and unmerged.
 
 ## 9. Completion rule
 

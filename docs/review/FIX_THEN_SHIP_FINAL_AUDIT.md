@@ -126,4 +126,14 @@ storage-v2.js, tqg-inspector.js, tqg-repair.js, tqg-integration.js, and tqg-ui.j
 - Deep Review 3 — compatibility/release boundary: PASS locally. The gate continues all artifact checks, secret scan, protected storage/TQG checks, syntax checks, TQG sub-gates, Regression Gate, TQG Production Assurance, Browser E2E, Failure Injection, Backup/Restore and Recovery Stress.
 - Full Audit 4 — local PR-base release gate: PASS WITH LIMITATION. Run with a pull-request event payload bound to base SHA 2e31ee46ffb86d47a03db863afad2f1d152776ec: node scripts/work4-final-audit-release-gate.mjs completed first in 100.39 seconds and then reran after line-ending cleanup in 99.84 seconds; both ended Engineering Release Gate: PASS WITH LIMITATION. Semantic repair accuracy remains deferred; no private gold data was added.
 
-The original failed run belongs to commit d20deb6. The narrow gate correction in the follow-up commit resolves that mismatched condition and has passed the local PR-base gate twice. PR #52 remains draft and unmerged until GitHub Actions reruns against the follow-up commit and all required checks complete successfully. Do not treat the local pass as a substitute for that remote rerun.
+The original failed run belongs to commit d20deb6. The narrow gate correction was committed and pushed as e02db35a3fd40649ea1c95a48c38e6f4537ae4a4. Its GitHub rerun completed 8/8 workflows successfully:
+- Regression Gate — run 116: success.
+- Final Audit / Release Gate — run 64: success.
+- Failure Injection — run 72: success.
+- Backup Restore Real-world Validation — run 70: success.
+- Translation Job Recovery Stress Test — run 68: success.
+- Browser E2E — run 74: success, including adversarial lifecycle and browser cleanup.
+- TQG Production Assurance — run 64: success.
+- TQG Semantic / Gold-target Validation — run 66: success.
+
+PR #52 remains open, draft, and unmerged. The direct branch-protection endpoint returned HTTP 403 because the connected GitHub integration lacks permission to read that administration endpoint; therefore actual required-status-check/branch-protection configuration is not independently verified. Keep the PR in draft and do not merge until that setting is verified with sufficient access and the user authorizes the next release step. The remote CI result applies to commit e02db35; any later commit must receive its own checks.
