@@ -102,3 +102,28 @@ A final source inventory confirmed translation checkpoints are behind the shared
 **PASS WITH LIMITATION — local implementation gates pass; merge is not authorized.**
 
 The implementation can be committed and pushed on `fix-then-ship/roadmap-implementation` after recording the 3 Deep Reviews and this Full Audit. The merge gate remains blocked until the PR's required GitHub checks and actual branch-protection requirements are confirmed green. No change to `main` has been made by this work.
+
+
+## 7. Follow-up audit — reconcile the existing release gate with evidence-backed D-07
+
+Trigger: GitHub PR #52 run “Final Audit / Release Gate” (run 63) failed at the protected-file assertion “sw.js remains blob-identical to release base”. All preceding artifact, permissions, pinned-action, no-secret and storage-v2.js checks passed. The failure was caused by a blanket legacy rule that did not allow the roadmap's conditional D-07 change even after a browser fixture reproduced mixed-version cache behavior.
+
+Narrow correction: scripts/work4-final-audit-release-gate.mjs now retains blob-identical enforcement for every protected file except two explicit, separately reviewed exceptions (the prior tqg-integration.js contract and this D-07 Service Worker fix). The D-07 predicate does not merely whitelist sw.js: it constructs the only accepted file by applying exactly two transformations to release-base sw.js—v10 to v11 and replacement of the previously background-refreshing fetch block with the version-pinned cache-hit/miss behavior. It then requires:
+- the candidate sw.js worktree blob matches committed HEAD;
+- exact transformed source matches with no additional changed line;
+- manifest.json, index.html, and sw.js agree on v11;
+- cross-origin and non-GET bypasses remain present;
+- cached hits return the active cache entry and background refresh is absent;
+- cache misses are written only to that active cache; and
+- the real-browser A/A no-bump, B/B versioned release, and offline cached-release fixtures remain present.
+
+storage-v2.js, tqg-inspector.js, tqg-repair.js, tqg-integration.js, and tqg-ui.js continue to have their strict original protected-file rules; the SW condition cannot approve changes to those files.
+
+### Four-round follow-up review
+
+- Deep Review 1 — scope/correctness: PASS. The only modified gate is scripts/work4-final-audit-release-gate.mjs. The SW exception is exact-diff bound to the reproduced cache-coherence change; no storage or TQG semantics were relaxed.
+- Deep Review 2 — adversarial gate behavior: PASS by construction and current execution. The predicate checks the full baseline-to-HEAD SW transformation plus independent release, fixture and bypass contracts. A change to any other SW line causes expected-source comparison to fail.
+- Deep Review 3 — compatibility/release boundary: PASS locally. The gate continues all artifact checks, secret scan, protected storage/TQG checks, syntax checks, TQG sub-gates, Regression Gate, TQG Production Assurance, Browser E2E, Failure Injection, Backup/Restore and Recovery Stress.
+- Full Audit 4 — local PR-base release gate: PASS WITH LIMITATION. Run with a pull-request event payload bound to base SHA 2e31ee46ffb86d47a03db863afad2f1d152776ec: node scripts/work4-final-audit-release-gate.mjs completed first in 100.39 seconds and then reran after line-ending cleanup in 99.84 seconds; both ended Engineering Release Gate: PASS WITH LIMITATION. Semantic repair accuracy remains deferred; no private gold data was added.
+
+The original failed run belongs to commit d20deb6. The narrow gate correction in the follow-up commit resolves that mismatched condition and has passed the local PR-base gate twice. PR #52 remains draft and unmerged until GitHub Actions reruns against the follow-up commit and all required checks complete successfully. Do not treat the local pass as a substitute for that remote rerun.

@@ -106,7 +106,7 @@ or locked semantics of TQG C1–D5.
 | D-03 chunk boundaries | Versioned V1/V2 splitter, V2 only for newly created Translation Jobs | V1 default remains for non-translation consumers; contract suite tests Thai/no-space and Unicode boundaries |
 | D-04 recovery integrity | New jobs persist chunker version, lengths and SHA-256 ordered-chunk digest | Recovery rejects mismatching new metadata; old jobs without digest remain legacy V1 with limited verification |
 | D-05 glossary correction | Large edits require confirmation; exact Undo and stale-output guard added | FI-10–FI-12 pass in the final isolated FI matrix, including exact text restore and stale-output protection |
-| D-07 Service Worker | Mixed-version behavior reproduced in a controlled browser fixture and addressed | Cache hits stay pinned to the active version; new release version is v11; versioned/offline fixture passed |
+| D-07 Service Worker | Mixed-version behavior reproduced in a controlled browser fixture and addressed | Cache hits stay pinned to the active version; new release version is v11; versioned/offline fixture passed. WORK 4 now accepts only the exact fixture-backed v10-to-v11 cache-coherence diff while keeping the other protected storage/TQG blobs identical; local PR-base gate passes, GitHub rerun pending. |
 | D-08 HTML/XSS context | Reviewed sink contexts; no demonstrated exploitable issue in the bounded audit | Not a proof of XSS absence; keep the documented trust boundaries |
 | D-11 Thai glossary substring semantics | Unchanged | No vetted corpus demonstrated a material false-positive/negative rate; do not alter matching semantics in this workstream |
 

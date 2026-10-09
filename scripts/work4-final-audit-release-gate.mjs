@@ -202,6 +202,97 @@ const PROTECTED_FILES = [
   'tqg-ui.js'
 ];
 
+function replaceExactlyOnce(source, before, after) {
+  if (!source || !before || source.split(before).length !== 2) return null;
+  return source.replace(before, after);
+}
+
+function isApprovedServiceWorkerCoherenceFix() {
+  const newline = String.fromCharCode(10);
+  const baseline = git(['show', RELEASE_BASE + ':sw.js'])
+    .split(String.fromCharCode(13) + newline).join(newline);
+  const current = read('sw.js')
+    .split(String.fromCharCode(13) + newline).join(newline).trimEnd();
+
+  const oldVersionLine = "const APP_RELEASE_VERSION = 'v10';";
+  if (baseline.split(oldVersionLine).length !== 2) return false;
+  let expected = replaceExactlyOnce(
+    baseline,
+    oldVersionLine,
+    "const APP_RELEASE_VERSION = 'v11';"
+  );
+  if (!expected) return false;
+
+  const oldFetchBlock = [
+    '  event.respondWith(',
+    '    caches.match(event.request).then((cached) => {',
+    '      const networkFetch = fetch(event.request)',
+    '        .then((response) => {',
+    '          if (response && response.status === 200) {',
+    '            const clone = response.clone();',
+    '            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));',
+    '          }',
+    '          return response;',
+    '        })',
+    '        .catch(() => cached);',
+    '      return cached || networkFetch;',
+    '    })',
+    '  );'
+  ].join(newline);
+  const newFetchBlock = [
+    '  event.respondWith(',
+    '    caches.open(CACHE_NAME).then((cache) => cache.match(event.request).then((cached) => {',
+    '      // Do not refresh a cached hit in the background. Doing so can write assets',
+    '      // from a newly deployed release into the cache still serving an older worker,',
+    '      // yielding a mixed app shell while the update is waiting to activate.',
+    '      if (cached) {',
+    '        return cached;',
+    '      }',
+    '',
+    "      // Cache misses are fetched and written only into this worker's versioned cache.",
+    '      // A new release pre-caches its complete APP_SHELL before activation.',
+    '      return fetch(event.request).then((response) => {',
+    '        if (response && response.status === 200) {',
+    '          return cache.put(event.request, response.clone()).then(() => response);',
+    '        }',
+    '        return response;',
+    '      }).catch(() => cached);',
+    '    }))',
+    '  );'
+  ].join(newline);
+  expected = replaceExactlyOnce(expected, oldFetchBlock, newFetchBlock);
+  if (!expected || expected.trimEnd() !== current) return false;
+
+  const sw = read('sw.js');
+  const html = read('index.html');
+  let manifest;
+  try {
+    manifest = JSON.parse(read('manifest.json'));
+  } catch {
+    return false;
+  }
+  const fixture = read('tests/e2e/browser-real-user-scenario.mjs');
+
+  const cachedHitGuard = [
+    '      if (cached) {',
+    '        return cached;',
+    '      }'
+  ].join(newline);
+  return manifest['x-app-release-version'] === 'v11' &&
+    html.includes('<meta name="app-release-version" content="v11">') &&
+    sw.includes("const APP_RELEASE_VERSION = 'v11';") &&
+    sw.includes("if (url.origin !== self.location.origin) {") &&
+    sw.includes("if (event.request.method !== 'GET') {") &&
+    sw.includes(cachedHitGuard) &&
+    !sw.includes('const networkFetch = fetch(event.request)') &&
+    sw.includes('return cache.put(event.request, response.clone()).then(() => response);') &&
+    fixture.includes('async function runServiceWorkerVersionCoherenceFixture(cdp, baseUrl)') &&
+    fixture.includes('without a cache-version bump the active worker keeps serving a consistent cached A/A release instead of mixing individual B assets') &&
+    fixture.includes('versioned cache isolates the B release and serves a consistent B/B asset set') &&
+    fixture.includes('offline fallback keeps the active unbumped release assets consistent') &&
+    fixture.includes('offline fallback keeps the newly activated versioned release assets consistent');
+}
+
 function isApprovedTQGIntegrationFix() {
   const diff = git(['diff', '--unified=0', RELEASE_BASE, 'HEAD', '--', 'tqg-integration.js']);
   const changedLines = diff
@@ -227,6 +318,18 @@ for (const file of PROTECTED_FILES) {
     check(
       isApprovedTQGIntegrationFix(),
       'tqg-integration.js contains only the approved explicit-exception forwarding fix'
+    );
+    continue;
+  }
+  if (file === 'sw.js' && current !== baseline) {
+    const head = git(['rev-parse', 'HEAD:sw.js']);
+    check(
+      current === head,
+      'sw.js working tree matches committed HEAD'
+    );
+    check(
+      isApprovedServiceWorkerCoherenceFix(),
+      'sw.js contains only the reproduced D-07 v10-to-v11 cache-coherence fix and passes the browser/version/bypass contract'
     );
     continue;
   }
