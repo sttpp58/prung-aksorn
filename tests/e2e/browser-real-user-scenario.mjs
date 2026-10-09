@@ -22,6 +22,7 @@ const repoEntry = path.join(ROOT, 'index.html');
 const configuredTestTimeout = Number(process.env.E2E_TEST_TIMEOUT_MS);
 const TEST_TIMEOUT = Number.isFinite(configuredTestTimeout) && configuredTestTimeout > 0 ? configuredTestTimeout : 60_000;
 const LIFECYCLE_TEST_MODE = process.env.E2E_LIFECYCLE_TEST || '';
+const LIFECYCLE_TEST_SIGNAL_DELIVERY = process.env.E2E_LIFECYCLE_SIGNAL_DELIVERY || 'process';
 const CDP_COMMAND_TIMEOUT = 10_000;
 const CDP_CONNECT_TIMEOUT = 10_000;
 const CHILD_PROCESS_TIMEOUT = 3_000;
@@ -521,6 +522,16 @@ try {
       throw new Error('Injected setup exception after browser/server/CDP initialization.');
     }
     if (LIFECYCLE_TEST_MODE === 'global-timeout' || LIFECYCLE_TEST_MODE === 'signal') {
+      if (LIFECYCLE_TEST_MODE === 'signal' && LIFECYCLE_TEST_SIGNAL_DELIVERY === 'handler') {
+        const testSignal = process.env.E2E_LIFECYCLE_SIGNAL;
+        if (!['SIGINT', 'SIGTERM'].includes(testSignal)) {
+          throw new Error('Unsupported lifecycle test signal: ' + testSignal);
+        }
+        setImmediate(() => {
+          log('Lifecycle test signal handler simulation: ' + testSignal);
+          handleSignal(testSignal);
+        });
+      }
       await new Promise(() => {});
     }
   }
