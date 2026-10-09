@@ -277,18 +277,22 @@ All completed phases -> P9 Release Candidate / Final Audit -> explicit user auth
 
 - [x] Create isolated implementation branch from recorded `main` baseline.
 - [x] Commit this roadmap as the branch's initial implementation baseline.
-- [ ] P0 — Baseline/evidence collection.
-- [ ] P1 — D5 performance gate reliability.
-- [ ] P2 — Provider truncation guard.
-- [ ] P7A — Read-only audit prerequisite.
-- [ ] P3 — Recovery integrity metadata.
-- [ ] P4 — Versioned Thai-safe chunker.
-- [ ] P5 — AI glossary edit safety.
-- [ ] P6 — Service Worker conditional investigation.
-- [ ] P7B — Optional non-translation call-site migration (only if evidence warrants).
-- [ ] P8 — Documentation/governance evidence.
+- [x] P0 — Baseline/evidence collection (local baseline captured; GitHub historical CI entries unavailable).
+- [x] P1 — D5 performance gate reliability (paired-trial quantiles, injected-regression check, 50/50 local runs).
+- [x] P2 — Provider truncation guard (OpenAI/Gemini metadata, bounded split, fail-closed on repeated and second-half truncation; final isolated FI-07–FI-09 and FI-13–FI-14 all passed).
+- [x] P7A — Read-only audit prerequisite (call-site/XSS-context matrix published; no D-11 semantic change justified).
+- [x] P3 — Recovery integrity metadata (SHA-256/length/version checks and reload-persistence coverage).
+- [x] P4 — Versioned Thai-safe chunker (V1 compatibility, opt-in V2 for new Translation Jobs; Thai/Unicode contract tests).
+- [x] P5 — AI glossary edit safety (magnitude confirmation, exact Undo, stale-output guard; FI-10–FI-12 passed).
+- [x] P6 — Service Worker conditional investigation (mixed-cache behavior reproduced; cache-hit mutation removed; release advanced to v11; browser fixture passes).
+- [x] P7B — Disposition complete; Phase 7A evidence did not warrant changing OCR/glossary/export/book consumers, so they remain on V1.
+- [x] P8 — Documentation/governance evidence (README, Phase 0 baseline, D5 evidence and status matrix updated).
 - [ ] P9 — Release candidate final audit and merge-gate report.
 
-## 8. Completion rule
+## 8. Current implementation evidence and open gates
+
+Local final-tree gates pass after the final OpenAI malformed-response compatibility correction: Regression Gate (15.89 s), isolated FI matrix including FI-14 (30.43 s), backup/restore with metadata assertions, recovery stress, browser real-user/SW fixture, lifecycle cleanup, TQG Production Assurance, 35-assertion chunker/integrity contract and D5 50/50 repeat evidence. One FI-04 invocation failed when other browser suites overlapped; the serial rerun passed, but the cause is unproven and the test remains enabled. GitHub PR CI and actual branch-protection verification still must pass before Phase 9 can be closed or merge considered.
+
+## 9. Completion rule
 
 This branch is the sole integration line for the Fix-Then-Ship implementation. The roadmap file is the baseline for scope and acceptance criteria. If evidence requires changing the plan, record the finding, impact, tests, and reason in this file before widening scope. No merge to `main` occurs until the full release-candidate gate is green and the user explicitly instructs the merge.

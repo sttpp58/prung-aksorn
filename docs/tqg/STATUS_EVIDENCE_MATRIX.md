@@ -90,3 +90,24 @@ an overall local PASS.
    readiness retries and explicit failure categories.
 4. Keep semantic accuracy `DEFERRED` until human reviewers produce and
    adjudicate the private gold repaired-target dataset.
+
+
+
+## Fix-Then-Ship implementation branch update (2026-10-09)
+
+This section records a separate reliability-hardening workstream on
+fix-then-ship/roadmap-implementation; it does not change the evidence limits
+or locked semantics of TQG C1–D5.
+
+| Roadmap item | Current disposition | Evidence / limitation |
+|---|---|---|
+| D-01 / D-06 provider truncation | Implemented with typed fail-closed errors and one bounded split attempt | Final isolated FI matrix passed FI-07–FI-09 and FI-13; FI-14 confirms same-session digest mismatch is rejected before another API call. FI-04 failed once under overlapping browser load and passed in the isolated serial rerun; exact cause is unproven. |
+| D-02 D5 measurement | Updated to paired per-trial deltas and interpolated quantiles | 50/50 local Windows Node v24.20.0 runs after change; no Linux/CI reliability conclusion |
+| D-03 chunk boundaries | Versioned V1/V2 splitter, V2 only for newly created Translation Jobs | V1 default remains for non-translation consumers; contract suite tests Thai/no-space and Unicode boundaries |
+| D-04 recovery integrity | New jobs persist chunker version, lengths and SHA-256 ordered-chunk digest | Recovery rejects mismatching new metadata; old jobs without digest remain legacy V1 with limited verification |
+| D-05 glossary correction | Large edits require confirmation; exact Undo and stale-output guard added | FI-10–FI-12 pass in the final isolated FI matrix, including exact text restore and stale-output protection |
+| D-07 Service Worker | Mixed-version behavior reproduced in a controlled browser fixture and addressed | Cache hits stay pinned to the active version; new release version is v11; versioned/offline fixture passed |
+| D-08 HTML/XSS context | Reviewed sink contexts; no demonstrated exploitable issue in the bounded audit | Not a proof of XSS absence; keep the documented trust boundaries |
+| D-11 Thai glossary substring semantics | Unchanged | No vetted corpus demonstrated a material false-positive/negative rate; do not alter matching semantics in this workstream |
+
+Local final-tree gates pass: Regression Gate, the serial FI matrix including FI-14, backup/restore with integrity metadata, repeated recovery stress, browser real-user/SW fixture, lifecycle cleanup, TQG Production Assurance, 35-assertion contract suite, and D5 (50/50 repeated runs). The merge gate is still blocked on GitHub PR CI and actual branch-protection verification; local results do not substitute for Ubuntu CI.

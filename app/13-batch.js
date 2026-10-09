@@ -32,7 +32,7 @@
     return segments.length >= 2 ? segments : null;
   }
 
-  async function runSingleTranslationForBatch(chunks, proj, key, model, label, originalText, batchId, batchIndex, chunkSize, normalizedText, targetBookId){
+  async function runSingleTranslationForBatch(chunks, proj, key, model, label, originalText, batchId, batchIndex, chunkSize, normalizedText, targetBookId, chunkerVersion){
     var results = [];
     var previousTail = '';
     var activeBook = (proj.books || []).find(function(b){ return b.id === targetBookId; }) || null;
@@ -46,7 +46,8 @@
     var batchContext = captureAppContext(proj, activeBook);
     var batchJobRevision = null;
     try{
-      var batchCreatedJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'batch',batchId:batchId,batchIndex:batchIndex,provider:batchProvider,model:model,chunkSize:chunkSize,totalChunks:chunks.length,sourceSnapshot:{text:String(normalizedText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(label || ''),normalized:true},settingsSnapshot:batchSettingsSnapshot});
+      var batchChunkMeta = await buildTranslationChunkMetadata(chunks, chunkerVersion || 'v2');
+      var batchCreatedJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'batch',batchId:batchId,batchIndex:batchIndex,provider:batchProvider,model:model,chunkSize:chunkSize,totalChunks:chunks.length,chunkerVersion:batchChunkMeta.chunkerVersion,chunkLengths:batchChunkMeta.chunkLengths,chunkDigest:batchChunkMeta.chunkDigest,sourceSnapshot:{text:String(normalizedText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(label || ''),normalized:true},settingsSnapshot:batchSettingsSnapshot});
       jobCreated = true;
       var batchRunningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',expectedRevision:batchCreatedJob.revision});
       batchJobRevision = batchRunningJob.revision;
@@ -54,8 +55,7 @@
       activeTranslationJobId = translationJobId;
       for(var i = 0; i < chunks.length; i++){
         // ส่ง chunks[i] เข้าไปด้วย Snapshot ของ settings เพื่อไม่ให้ global UI state เปลี่ยน prompt ระหว่าง Batch Job
-        var sys = buildTranslatePromptWithSettings(proj, previousTail, chunks[i], batchSettingsSnapshot);
-        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2, batchProvider);
+        var part = await callTranslationChunkWithTruncationGuard(proj, previousTail, chunks[i], key, model, activeController.signal, 2, batchProvider, batchSettingsSnapshot);
         var partTrim = part.trim();
         previousTail = getTail(partTrim, 300);
         var batchCheckpointedJob = await PrungAksornStorageV2.checkpointTranslationJob({jobId:translationJobId,retryCount:0,expectedRevision:batchJobRevision},i,partTrim,previousTail);
@@ -121,9 +121,9 @@
         activeController = new AbortController();
         var raw = await readFileAsText(f);
         var text = normalizeOCR(raw);
-        var chunks = splitIntoChunks(text, maxLen);
+        var chunks = splitIntoChunksForVersion(text, maxLen, 'v2');
         var label = f.name.replace(/\.[^.]+$/, '');
-        await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text, batchId, idx, maxLen, text, batchTargetBookId);
+        await runSingleTranslationForBatch(chunks, proj, key, modelInput.value, label, text, batchId, idx, maxLen, text, batchTargetBookId, 'v2');
         succeeded.push(f.name);
         commitChange();
       }catch(err){
@@ -156,11 +156,11 @@
 
     var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
     var normalizedText = normalizeOCR(text);
-    var chunks = splitIntoChunks(normalizedText, maxLen);
+    var chunks = splitIntoChunksForVersion(normalizedText, maxLen, 'v2');
     pendingResume = null;
     pendingBatchResume = null;
     if(resumeBtn){ resumeBtn.classList.remove('show'); resumeBtn.textContent='ดำเนินการต่อ'; }
-    await runTranslation(chunks, proj, key, modelInput.value, 0, [], text, makeId('h'), null, normalizedText);
+    await runTranslation(chunks, proj, key, modelInput.value, 0, [], text, makeId('h'), null, normalizedText, null, 'v2');
   });
 
   if(resumeBtn){
@@ -176,7 +176,7 @@
       var key = document.getElementById('apiKey').value.trim() || pendingResume.key;
       if(pendingResume.provider && providerSel.value !== pendingResume.provider){ showError('Provider ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก ' + pendingResume.provider + ' ก่อนดำเนินการต่อ'); return; }
       if(modelInput.value !== pendingResume.model){ showError('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก ' + pendingResume.model + ' ก่อนดำเนินการต่อ'); return; }
-      await runTranslation(pendingResume.chunks, pendingResume.proj, key, pendingResume.model, pendingResume.startIndex, pendingResume.results, pendingResume.originalText, pendingResume.chapterId, pendingResume.jobId, pendingResume.sourceSnapshotText, pendingResume.settingsSnapshot);
+      await runTranslation(pendingResume.chunks, pendingResume.proj, key, pendingResume.model, pendingResume.startIndex, pendingResume.results, pendingResume.originalText, pendingResume.chapterId, pendingResume.jobId, pendingResume.sourceSnapshotText, pendingResume.settingsSnapshot, pendingResume.chunkerVersion || 'v1');
     });
   }
 

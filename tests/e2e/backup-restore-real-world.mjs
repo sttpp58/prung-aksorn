@@ -341,6 +341,10 @@ function verifyBackupArtifact(rawText, expectedProjectName) {
   check(Array.isArray(payload.data?.projects) && payload.data.projects.some(p => p.name === expectedProjectName), 'downloaded artifact contains the real project state');
   check(Array.isArray(payload.data?.books) && payload.data.books.length >= 2, 'downloaded artifact contains both real Books');
   check(Array.isArray(payload.data?.translationJobs) && payload.data.translationJobs.some(j => j.status === 'completed'), 'downloaded artifact contains a completed Translation Job');
+  check(payload.data.translationJobs.some(j => j.status === 'completed' && j.chunkerVersion === 'v2' &&
+    Array.isArray(j.chunkLengths) && j.chunkLengths.length === j.totalChunks &&
+    /^[0-9a-f]{64}$/.test(j.chunkDigest || '')),
+    'downloaded Backup V2 preserves Translation Job chunker version, lengths and SHA-256 digest');
   check(Array.isArray(payload.data?.settings?.customModels?.openai) && payload.data.settings.customModels.openai.some(m => m.id === 'backup-custom-openai-model'), 'downloaded artifact preserves custom AI model settings');
   const serialized = JSON.stringify(payload);
   check(!serialized.includes('e2e-only-test-key'), 'downloaded artifact excludes the browser-only API credential');
@@ -420,6 +424,7 @@ async function scenarioRoundTrip() {
     await waitForFunction(ctx.cdp, "document.getElementById('output').textContent.includes('Backup round-trip translated result')", 8000);
     check(await evaluate(ctx.cdp, "document.getElementById('output').textContent.includes('Backup round-trip translated result')"), 'restored translated result remains accessible through visible history UI');
     check(await evaluate(ctx.cdp, "(async()=>{const jobs=await window.PrungAksornStorageV2.listTranslationJobs(); return jobs.some(j=>j.status==='completed' && j.bookId && j.chapterId);})()"), 'restored Translation Job remains queryable after round-trip');
+    check(await evaluate(ctx.cdp, "(async()=>{const jobs=await window.PrungAksornStorageV2.listTranslationJobs(); return jobs.some(j=>j.status==='completed' && j.chunkerVersion==='v2' && Array.isArray(j.chunkLengths) && j.chunkLengths.length===j.totalChunks && /^[0-9a-f]{64}$/.test(j.chunkDigest||''));})()"), 'restored Translation Job retains chunk integrity metadata');
     check(ctx.pageErrors.length === 0, 'round-trip has no uncaught browser/runtime errors');
     pass('BR-01 Export + Full Restore Round-trip — PASS');
   } finally {

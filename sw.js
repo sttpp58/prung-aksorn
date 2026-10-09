@@ -3,7 +3,7 @@
 // ไม่แตะ/ไม่แคชการเรียก AI API (OpenAI, Gemini) หรือฟอนต์จาก Google เด็ดขาด
 // เพื่อไม่ให้คำแปลค้างหรือใช้คีย์/โควตาผิดพลาด
 
-const APP_RELEASE_VERSION = 'v10';
+const APP_RELEASE_VERSION = 'v11';
 const CACHE_NAME = `prung-aksorn-${APP_RELEASE_VERSION}`;
 const APP_SHELL = [
   './',
@@ -68,17 +68,22 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || networkFetch;
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.match(event.request).then((cached) => {
+      // Do not refresh a cached hit in the background. Doing so can write assets
+      // from a newly deployed release into the cache still serving an older worker,
+      // yielding a mixed app shell while the update is waiting to activate.
+      if (cached) {
+        return cached;
+      }
+
+      // Cache misses are fetched and written only into this worker's versioned cache.
+      // A new release pre-caches its complete APP_SHELL before activation.
+      return fetch(event.request).then((response) => {
+        if (response && response.status === 200) {
+          return cache.put(event.request, response.clone()).then(() => response);
+        }
+        return response;
+      }).catch(() => cached);
+    }))
   );
 });

@@ -23,7 +23,18 @@
     if(data.usage) {
       updateApiStats(model, data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0);
     }
-    return data.choices[0].message.content;
+    // Keep the existing provider response contract for malformed payloads:
+    // accessing missing choices/message/content still throws as it did before.
+    var choice = data.choices[0];
+    var choiceText = choice.message.content;
+    if(choice.finish_reason === 'length'){
+      var openAITruncation = new Error('OpenAI ตัดคำตอบเพราะชนขีดจำกัด token — ระบบจะไม่บันทึกคำตอบที่อาจไม่ครบเป็นคำแปลสำเร็จ');
+      openAITruncation.status = 'openai_truncated';
+      openAITruncation.code = 'AI_OUTPUT_TRUNCATED';
+      openAITruncation.partialText = typeof choiceText === 'string' ? choiceText : '';
+      throw openAITruncation;
+    }
+    return choiceText;
   }
 
   /* เรียก Gemini โดยส่ง Key ผ่าน Header x-goog-api-key */
@@ -78,7 +89,11 @@
     }
 
     if(candidate.finishReason === 'MAX_TOKENS'){
-      showError('คำเตือน: คำแปลของส่วนนี้อาจถูกตัดกลางคัน เพราะยาวเกินขีดจำกัดคำตอบของโมเดล ' + model + ' — แนะนำให้ลดขนาด "ความยาวสูงสุดต่อส่วน" ลงแล้วลองแปลส่วนนี้ใหม่');
+      var geminiTruncation = new Error('Gemini ตัดคำตอบเพราะชนขีดจำกัด token — ระบบจะไม่บันทึกคำตอบที่อาจไม่ครบเป็นคำแปลสำเร็จ');
+      geminiTruncation.status = 'gemini_truncated';
+      geminiTruncation.code = 'AI_OUTPUT_TRUNCATED';
+      geminiTruncation.partialText = textOut;
+      throw geminiTruncation;
     }
 
     return textOut;

@@ -622,6 +622,18 @@ function main() {
     ),
     'Service Worker preserves non-GET bypass'
   );
+  assert(
+    /if\s*\(cached\)\s*\{\s*return\s+cached;\s*\}/.test(sw),
+    'Service Worker keeps cache hits pinned to the active release'
+  );
+  assert(
+    !/const\s+networkFetch\s*=\s*fetch\(event\.request\)/.test(sw),
+    'Service Worker does not background-refresh assets in the active release cache'
+  );
+  assert(
+    /cache\.put\(event\.request,\s*response\.clone\(\)\)/.test(sw),
+    'Service Worker caches fetched misses within the active version cache'
+  );
   parseJavaScript(sw, 'sw.js');
 
   let manifest;
@@ -690,6 +702,22 @@ function main() {
     fail('Model Catalog regression suite failed' + (modelCatalog.stderr ? ': ' + modelCatalog.stderr.trim() : ''));
   }
   assert(/Model Catalog Regression: PASS/.test(modelCatalog.stdout), 'Model Catalog regression suite passes');
+
+  const fixThenShipContractPath = path.join(ROOT, 'tests', 'fix-then-ship-contract.mjs');
+  assert(fs.existsSync(fixThenShipContractPath), 'Fix-Then-Ship chunker/integrity contract runner is present');
+  const fixThenShipContract = spawnSync(process.execPath, [fixThenShipContractPath], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024
+  });
+  if (fixThenShipContract.status !== 0) {
+    fail('Fix-Then-Ship chunker/integrity contract failed' +
+      (fixThenShipContract.stderr ? ': ' + fixThenShipContract.stderr.trim() : ''));
+  }
+  assert(
+    fixThenShipContract.stdout.includes('Fix-Then-Ship Chunker / Integrity Contract: PASS'),
+    'Fix-Then-Ship chunker/integrity contract passes'
+  );
 
   const relevantAsyncNames = [
     'runTranslation',
@@ -836,13 +864,23 @@ function main() {
   const translationStart = indexHtml.indexOf('async function runTranslation(');
   const translationEnd = indexHtml.indexOf('\n  var batchInProgress', translationStart);
   const translationBody = indexHtml.slice(translationStart, translationEnd);
+  const translationPromptRetainsSnapshot =
+    translationBody.includes('buildTranslatePromptWithSettings(proj, previousTail, chunks[i], translationSettingsSnapshot)') ||
+    (translationBody.includes('callTranslationChunkWithTruncationGuard(proj, previousTail, chunks[i], key, model, activeController.signal, 2, translationProvider, translationSettingsSnapshot)') &&
+      indexHtml.includes('async function callTranslationChunkWithTruncationGuard(') &&
+      indexHtml.includes('buildTranslatePromptWithSettings(proj, tailText, partText, settingsSnapshot)'));
   assert(
     translationBody.includes('settingsSnapshot') &&
       translationBody.includes('settingsSnapshot:translationSettingsSnapshot') &&
-      translationBody.includes('buildTranslatePromptWithSettings(proj, previousTail, chunks[i], translationSettingsSnapshot)') &&
+      translationPromptRetainsSnapshot &&
       translationBody.includes('pendingResume = {') &&
       translationBody.includes('settingsSnapshot: translationSettingsSnapshot'),
     'single translation snapshots settings through job, prompt, and resume context'
+  );
+  assert(
+    translationBody.includes('getTranslationJob(translationJobId)') &&
+      translationBody.includes('verifyTranslationChunkMetadata(persistedChunkJob, chunks)'),
+    'single translation re-entry validates persisted chunk metadata before in-session recovery'
   );
 
   assert(
@@ -856,7 +894,10 @@ function main() {
   assert(
     batchTranslationBody.includes('batchSettingsSnapshot') &&
       batchTranslationBody.includes('settingsSnapshot:batchSettingsSnapshot') &&
-      batchTranslationBody.includes('buildTranslatePromptWithSettings(proj, previousTail, chunks[i], batchSettingsSnapshot)'),
+      (batchTranslationBody.includes('buildTranslatePromptWithSettings(proj, previousTail, chunks[i], batchSettingsSnapshot)') ||
+        (batchTranslationBody.includes('callTranslationChunkWithTruncationGuard(proj, previousTail, chunks[i], key, model, activeController.signal, 2, batchProvider, batchSettingsSnapshot)') &&
+          indexHtml.includes('async function callTranslationChunkWithTruncationGuard(') &&
+          indexHtml.includes('buildTranslatePromptWithSettings(proj, tailText, partText, settingsSnapshot)'))),
     'batch translation snapshots settings through job and prompt context'
   );
 
@@ -867,7 +908,10 @@ function main() {
   assert(
     batchRecoveryBody.includes('recoverySettingsSnapshot') &&
       batchRecoveryBody.includes('settingsSnapshot:recoverySettingsSnapshot') &&
-      batchRecoveryBody.includes('buildTranslatePromptWithSettings(state.proj,previousTail,chunks[i],recoverySettingsSnapshot)'),
+      (batchRecoveryBody.includes('buildTranslatePromptWithSettings(state.proj,previousTail,chunks[i],recoverySettingsSnapshot)') ||
+        (batchRecoveryBody.includes('callTranslationChunkWithTruncationGuard(state.proj,previousTail,chunks[i],key,job.model,activeController.signal,2,job.provider,recoverySettingsSnapshot)') &&
+          indexHtml.includes('async function callTranslationChunkWithTruncationGuard(') &&
+          indexHtml.includes('buildTranslatePromptWithSettings(proj, tailText, partText, settingsSnapshot)'))),
     'batch recovery preserves translation settings snapshot'
   );
 
@@ -878,7 +922,10 @@ function main() {
   assert(
     retryBodyForSettings.includes('retrySettingsSnapshot') &&
       retryBodyForSettings.includes('settingsSnapshot:retrySettingsSnapshot') &&
-      retryBodyForSettings.includes('buildTranslatePromptWithSettings(proj,previousTail,chunks[i],retrySettingsSnapshot)'),
+      (retryBodyForSettings.includes('buildTranslatePromptWithSettings(proj,previousTail,chunks[i],retrySettingsSnapshot)') ||
+        (retryBodyForSettings.includes('callTranslationChunkWithTruncationGuard(proj,previousTail,chunks[i],key,job.model,activeController.signal,2,job.provider,retrySettingsSnapshot)') &&
+          indexHtml.includes('async function callTranslationChunkWithTruncationGuard(') &&
+          indexHtml.includes('buildTranslatePromptWithSettings(proj, tailText, partText, settingsSnapshot)'))),
     'batch retry preserves translation settings snapshot'
   );
 

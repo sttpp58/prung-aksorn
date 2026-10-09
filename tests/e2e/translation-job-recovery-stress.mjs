@@ -475,6 +475,12 @@ function assertJobShape(job, expectedCompleted, label) {
   check(
     job?.partialResults.every((item, index) => item && item.chunkIndex === index && typeof item.text === 'string'),
     label + ' keeps checkpoint indexes contiguous with no duplicates');
+  check(job?.chunkerVersion === 'v2', label + ' persists the selected V2 chunker version');
+  check(Array.isArray(job?.chunkLengths) && job.chunkLengths.length === job.totalChunks &&
+    job.chunkLengths.every(length => Number.isInteger(length) && length > 0),
+    label + ' persists one positive chunk length per original chunk');
+  check(typeof job?.chunkDigest === 'string' && /^[0-9a-f]{64}$/.test(job.chunkDigest),
+    label + ' persists the SHA-256 chunk sequence digest');
 }
 
 async function scenarioRepeatedReloadRecovery(ctx) {

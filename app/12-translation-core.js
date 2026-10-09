@@ -1,3 +1,63 @@
+  var undoSurgicalGlossaryFixBtn = document.getElementById('undoSurgicalGlossaryFixBtn');
+  var lastSurgicalGlossaryEdit = null;
+  if(undoSurgicalGlossaryFixBtn){ undoSurgicalGlossaryFixBtn.hidden = true; undoSurgicalGlossaryFixBtn.style.display = 'none'; }
+
+  function assessSurgicalEditMagnitude(beforeText, afterText){
+    var before = String(beforeText || '');
+    var after = String(afterText || '');
+    var maxLength = Math.max(before.length, after.length, 1);
+    var prefix = 0;
+    while(prefix < before.length && prefix < after.length && before.charCodeAt(prefix) === after.charCodeAt(prefix)){
+      prefix += 1;
+    }
+    var suffix = 0;
+    while(suffix < before.length - prefix && suffix < after.length - prefix &&
+      before.charCodeAt(before.length - 1 - suffix) === after.charCodeAt(after.length - 1 - suffix)){
+      suffix += 1;
+    }
+    var changedBefore = before.length - prefix - suffix;
+    var changedAfter = after.length - prefix - suffix;
+    var changedRatio = Math.max(changedBefore, changedAfter) / maxLength;
+    var lengthRatio = before.length ? after.length / before.length : (after.length ? Infinity : 1);
+    var requiresConfirmation = (before.length === 0 && after.length > 0) ||
+      changedRatio >= 0.30 ||
+      (before.length >= 20 && after.length < before.length * 0.65) ||
+      (before.length > 0 && after.length > before.length * 1.50);
+    return {
+      requiresConfirmation: requiresConfirmation,
+      changedRatio: changedRatio,
+      lengthRatio: lengthRatio,
+      beforeLength: before.length,
+      afterLength: after.length
+    };
+  }
+
+  function hideSurgicalGlossaryUndo(){
+    lastSurgicalGlossaryEdit = null;
+    if(undoSurgicalGlossaryFixBtn){ undoSurgicalGlossaryFixBtn.hidden = true; undoSurgicalGlossaryFixBtn.style.display = 'none'; }
+  }
+
+  if(output && undoSurgicalGlossaryFixBtn){
+    output.addEventListener('input', function(){
+      if(lastSurgicalGlossaryEdit && output.textContent !== lastSurgicalGlossaryEdit.appliedText){
+        hideSurgicalGlossaryUndo();
+      }
+    });
+    undoSurgicalGlossaryFixBtn.addEventListener('click', function(){
+      var edit = lastSurgicalGlossaryEdit;
+      if(!edit || !isAppContextCurrent(edit.context) || output.textContent !== edit.appliedText){
+        hideSurgicalGlossaryUndo();
+        return;
+      }
+      lastSurgicalGlossaryEdit = null;
+      undoSurgicalGlossaryFixBtn.hidden = true;
+      undoSurgicalGlossaryFixBtn.style.display = 'none';
+      output.textContent = edit.beforeText;
+      output.dispatchEvent(new Event('input'));
+      progressText.textContent = 'คืนค่าข้อความก่อนแก้ไข AI แล้ว';
+    });
+  }
+
   async function runSurgicalGlossaryFixWithAI(missedTerms){
     var key = document.getElementById('apiKey').value.trim();
     if(!key){ await showAlertDialog('ยังไม่ได้ใส่ API Key', 'กรุณาใส่ API Key ในหน้าตั้งค่าก่อน'); return; }
@@ -41,8 +101,29 @@
       var currentOutput = surgicalOutputSnapshot;
       var fixedResult = await callAIWithRetry(sys, currentOutput, key, modelInput.value, activeController.signal, 1);
       if(fixedResult && fixedResult.trim()){
+        var proposedSurgicalText = fixedResult.trim();
         if(!isAppContextCurrent(surgicalContext) || output.textContent !== surgicalOutputSnapshot) return;
-        output.textContent = fixedResult.trim();
+        var editMagnitude = assessSurgicalEditMagnitude(surgicalOutputSnapshot, proposedSurgicalText);
+        if(editMagnitude.requiresConfirmation){
+          var acceptLargeSurgicalEdit = await showConfirmDialog(
+            'ยืนยันการแก้ไขจาก AI',
+            'AI เสนอให้เปลี่ยนข้อความในวงกว้างกว่าการแก้ศัพท์ทั่วไป (' +
+              editMagnitude.beforeLength + ' → ' + editMagnitude.afterLength +
+              ' ตัวอักษร; สัดส่วนส่วนที่เปลี่ยนประมาณ ' + Math.round(editMagnitude.changedRatio * 100) +
+              '%) ซึ่งอาจเกิดจากคำตอบไม่ครบหรือมีการเขียนใหม่เกินขอบเขต\n\nตรวจสอบผลลัพธ์แล้วต้องการนำมาใช้หรือไม่? ข้อความเดิมจะกู้คืนได้ด้วยปุ่ม “เลิกทำการแก้ไข AI”',
+            false,
+            'ใช้ผลลัพธ์นี้'
+          );
+          if(!acceptLargeSurgicalEdit) return;
+          if(!isAppContextCurrent(surgicalContext) || output.textContent !== surgicalOutputSnapshot) return;
+        }
+        lastSurgicalGlossaryEdit = {
+          context: surgicalContext,
+          beforeText: surgicalOutputSnapshot,
+          appliedText: proposedSurgicalText
+        };
+        if(undoSurgicalGlossaryFixBtn){ undoSurgicalGlossaryFixBtn.hidden = false; undoSurgicalGlossaryFixBtn.style.display = 'inline-block'; }
+        output.textContent = proposedSurgicalText;
         output.dispatchEvent(new Event('input'));
         hideGlossaryEnforce();
         progressText.textContent = 'แก้ไขคำศัพท์ให้ตรงตามคลังคำเรียบร้อย!';
@@ -59,7 +140,7 @@
     }
   }
 
-  async function runTranslation(chunks, proj, key, model, startIndex, existingResults, originalText, chapterId, jobId, sourceSnapshotText, settingsSnapshot){
+  async function runTranslation(chunks, proj, key, model, startIndex, existingResults, originalText, chapterId, jobId, sourceSnapshotText, settingsSnapshot, chunkerVersion){
     activeController = new AbortController();
     setAiBusy(true);
     resetActionStats();
@@ -78,13 +159,21 @@
     var translationRetryCount = 0;
     var translationProvider = providerSel.value;
     var translationSettingsSnapshot = normalizeTranslationSettingsSnapshot(settingsSnapshot, translationProvider, model, document.getElementById('chunkLen').value);
+    var translationChunkerVersion = chunkerVersion || (jobId ? String(pendingResume && pendingResume.chunkerVersion || 'v1') : 'v2');
     var translationJobRevision = null;
     var translationStarted = false;
 
     try {
+      if(jobId){
+        var persistedChunkJob = await PrungAksornStorageV2.getTranslationJob(translationJobId);
+        if(!persistedChunkJob) throw new Error('Translation Job disappeared before in-session recovery; no API request was sent');
+        if(persistedChunkJob.totalChunks !== chunks.length) throw new Error('Translation Job chunk count changed before in-session recovery; no API request was sent');
+        await verifyTranslationChunkMetadata(persistedChunkJob, chunks);
+      }
       if(!jobId){
         try{
-          var createdJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:translationProvider,model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length,sourceSnapshot:{text:String(sourceSnapshotText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(chapterTitle.value || ''),normalized:true},settingsSnapshot:translationSettingsSnapshot});
+          var chunkMeta = await buildTranslationChunkMetadata(chunks, translationChunkerVersion);
+          var createdJob = await PrungAksornStorageV2.createTranslationJob({jobId:translationJobId,projectId:proj.id,bookId:activeBook ? activeBook.id : null,chapterId:translationChapterId,jobType:'single',provider:translationProvider,model:model,chunkSize:parseInt(document.getElementById('chunkLen').value)||3000,totalChunks:chunks.length,chunkerVersion:chunkMeta.chunkerVersion,chunkLengths:chunkMeta.chunkLengths,chunkDigest:chunkMeta.chunkDigest,sourceSnapshot:{text:String(sourceSnapshotText || normalizeOCR(originalText || '')),originalText:String(originalText || ''),title:String(chapterTitle.value || ''),normalized:true},settingsSnapshot:translationSettingsSnapshot});
           var runningJob = await PrungAksornStorageV2.updateTranslationJob({jobId:translationJobId,status:'running',expectedRevision:createdJob.revision});
           translationJobRevision = runningJob.revision;
         }catch(jobErr){
@@ -119,8 +208,7 @@
         }
 
         // ส่ง chunks[i] เข้าไปด้วย Snapshot ของ settings เพื่อไม่ให้ global UI state เปลี่ยน prompt ระหว่าง Job
-        var sys = buildTranslatePromptWithSettings(proj, previousTail, chunks[i], translationSettingsSnapshot);
-        var part = await callAIWithRetry(sys, chunks[i], key, model, activeController.signal, 2, translationProvider);
+        var part = await callTranslationChunkWithTruncationGuard(proj, previousTail, chunks[i], key, model, activeController.signal, 2, translationProvider, translationSettingsSnapshot);
         var partTrim = part.trim();
 
         var analysis = analyzeChunkRatio(chunks[i], partTrim, chunkRatios);
@@ -202,7 +290,7 @@
         }
         activeTranslationJobId = null;
         if(isAppContextCurrent(translationContext)){
-          pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision, settingsSnapshot: translationSettingsSnapshot };
+          pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision, settingsSnapshot: translationSettingsSnapshot, chunkerVersion: translationChunkerVersion };
           var failureMessage = (err.message || 'เกิดข้อผิดพลาด') + ' — ทำไปแล้ว ' + i + '/' + chunks.length + ' ส่วน กด "แปลต่อจากที่ค้าง" เพื่อทำต่อจากตรงนี้ได้ (ไม่ต้องเริ่มใหม่)';
           if(failurePersistenceError) failureMessage += ' — ระบบบันทึกสถานะ Job ไม่สำเร็จ แต่ข้อมูลที่ทำไปแล้วในเซสชันนี้ยังสามารถกู้คืนและทำต่อได้';
           showError(failureMessage);
@@ -222,7 +310,7 @@
         if(cancellationPersistenceError){
           activeTranslationJobId = null;
           if(isAppContextCurrent(translationContext)){
-            pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision, settingsSnapshot: translationSettingsSnapshot };
+            pendingResume = { chunks: chunks, proj: proj, key: key, model: model, provider: translationProvider, startIndex: i, results: results, originalText: originalText, chapterId: translationChapterId, jobId: translationJobId, sourceSnapshotText: sourceSnapshotText || normalizeOCR(originalText || ''), revision: translationJobRevision, settingsSnapshot: translationSettingsSnapshot, chunkerVersion: translationChunkerVersion };
             showError('หยุดการแปลแล้ว แต่ระบบบันทึกสถานะการยกเลิกไม่สำเร็จ — Job ยังอยู่ในสถานะกู้คืนได้ กรุณาใช้ "แปลต่อจากที่ค้าง" หรือโหลดหน้านี้ใหม่เพื่อกู้คืนงาน');
             if(resumeBtn) resumeBtn.classList.add('show');
             refreshTranslationRecoveryUI();

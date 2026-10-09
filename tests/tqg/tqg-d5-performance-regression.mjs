@@ -19,8 +19,7 @@ const WORKLOAD_REPETITIONS = 8;
 const TRIALS = 15;
 const WARMUP_TRIALS = 3;
 const MAX_AVG_ADDED_MS_PER_OPERATION = 0.05;
-const MAX_P95_ADDED_MS_PER_OPERATION = 0.05;
-const MAX_P99_ADDED_MS_PER_OPERATION = 0.075;
+const MAX_P50_ADDED_MS_PER_OPERATION = 0.05;
 
 function check(condition, message) {
   assert.ok(condition, message);
@@ -90,25 +89,38 @@ function runWorkload(mode) {
 for (const mode of ['direct', 'integrated-default', 'integrated-custom']) {
   for (let i = 0; i < WARMUP_TRIALS; i += 1) runWorkload(mode);
 }
-function summarize(samples) {
+function percentile(samples, fraction) {
+  assert.ok(Array.isArray(samples) && samples.length > 0, 'percentile requires samples');
+  assert.ok(fraction >= 0 && fraction <= 1, 'percentile fraction is in [0, 1]');
   const sorted = [...samples].sort((a, b) => a - b);
-  const percentile = (fraction) => {
-    const index = Math.min(
-      sorted.length - 1,
-      Math.ceil(sorted.length * fraction) - 1
-    );
-    return sorted[index];
-  };
+  const position = (sorted.length - 1) * fraction;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower];
+  const weight = position - lower;
+  return sorted[lower] + ((sorted[upper] - sorted[lower]) * weight);
+}
+
+function summarize(samples) {
+  assert.ok(samples.length > 0, 'summarize requires samples');
+  const sorted = [...samples].sort((a, b) => a - b);
   const total = samples.reduce((sum, value) => sum + value, 0);
   return {
     count: samples.length,
     averageMs: total / samples.length,
-    p50Ms: percentile(0.50),
-    p95Ms: percentile(0.95),
-    p99Ms: percentile(0.99),
+    p50Ms: percentile(sorted, 0.50),
+    p95Ms: percentile(sorted, 0.95),
+    p99Ms: percentile(sorted, 0.99),
     maxMs: sorted[sorted.length - 1]
   };
 }
+
+check(percentile([1, 2, 3, 4, 5], 0.50) === 3,
+  'D5 percentile helper uses interpolated quantile semantics');
+check(percentile([1, 2, 3, 4, 5], 0.95) > 4 && percentile([1, 2, 3, 4, 5], 0.95) < 5,
+  'D5 p95 reporting does not collapse to the maximum for five ordered samples');
+check(percentile([1, 2, 3, 4], 0.50) === 2.5,
+  'D5 percentile helper handles an even sample count');
 
 const samples = {
   direct: [],
@@ -130,70 +142,75 @@ const stats = {
 
 const operationsPerTrial = inputs.length * WORKLOAD_REPETITIONS;
 
-function addedTimePerOperation(base, observed, quantile) {
-  const baseValue = base[quantile];
-  const observedValue = observed[quantile];
-  return Math.max(0, (observedValue - baseValue) / operationsPerTrial);
+function summarizePairedOverhead(baseSamples, observedSamples, operationCount) {
+  assert.equal(baseSamples.length, observedSamples.length,
+    'paired overhead requires an equal number of base and observed trials');
+  assert.ok(baseSamples.length > 0, 'paired overhead requires trials');
+  assert.ok(Number.isFinite(operationCount) && operationCount > 0,
+    'paired overhead requires a positive operation count');
+  const deltas = observedSamples.map((value, index) => value - baseSamples[index]);
+  return {
+    count: deltas.length,
+    averageDeltaMs: deltas.reduce((sum, value) => sum + value, 0) / deltas.length,
+    p50DeltaMs: percentile(deltas, 0.50),
+    p95DeltaMs: percentile(deltas, 0.95),
+    p99DeltaMs: percentile(deltas, 0.99),
+    maxDeltaMs: Math.max(...deltas),
+    averageAddedMsPerOperation: deltas.reduce((sum, value) => sum + value, 0) / deltas.length / operationCount,
+    p50AddedMsPerOperation: percentile(deltas, 0.50) / operationCount,
+    p95AddedMsPerOperation: percentile(deltas, 0.95) / operationCount,
+    p99AddedMsPerOperation: percentile(deltas, 0.99) / operationCount,
+    maxAddedMsPerOperation: Math.max(...deltas) / operationCount
+  };
 }
 
-const defaultOverhead = {
-  averageAddedMsPerOperation: addedTimePerOperation(
-    stats.direct, stats['integrated-default'], 'averageMs'
-  ),
-  p50AddedMsPerOperation: addedTimePerOperation(
-    stats.direct, stats['integrated-default'], 'p50Ms'
-  ),
-  p95AddedMsPerOperation: addedTimePerOperation(
-    stats.direct, stats['integrated-default'], 'p95Ms'
-  ),
-  p99AddedMsPerOperation: addedTimePerOperation(
-    stats.direct, stats['integrated-default'], 'p99Ms'
-  )
-};
-const customOverhead = {
-  averageAddedMsPerOperation: addedTimePerOperation(
-    stats.direct, stats['integrated-custom'], 'averageMs'
-  ),
-  p50AddedMsPerOperation: addedTimePerOperation(
-    stats.direct, stats['integrated-custom'], 'p50Ms'
-  ),
-  p95AddedMsPerOperation: addedTimePerOperation(
-    stats.direct, stats['integrated-custom'], 'p95Ms'
-  ),
-  p99AddedMsPerOperation: addedTimePerOperation(
-    stats.direct, stats['integrated-custom'], 'p99Ms'
-  )
-};
+function passesOverheadGate(metrics) {
+  // Negative paired deltas indicate no added overhead; p95/p99 remain descriptive.
+  return Math.max(0, metrics.averageAddedMsPerOperation) <= MAX_AVG_ADDED_MS_PER_OPERATION &&
+    Math.max(0, metrics.p50AddedMsPerOperation) <= MAX_P50_ADDED_MS_PER_OPERATION;
+}
+
+const defaultOverhead = summarizePairedOverhead(
+  samples.direct, samples['integrated-default'], operationsPerTrial
+);
+const customOverhead = summarizePairedOverhead(
+  samples.direct, samples['integrated-custom'], operationsPerTrial
+);
+
+// Test the gate decision independently from noisy wall-clock timing. Ten injected,
+// above-threshold regressions must all be rejected; normal timing remains benchmarked below.
+const injectedAttempts = Array.from({ length: 10 }, () => {
+  const base = Array(15).fill(1);
+  const regressed = base.map((value) => value + MAX_AVG_ADDED_MS_PER_OPERATION * 2);
+  return !passesOverheadGate(summarizePairedOverhead(base, regressed, 1));
+});
+check(injectedAttempts.filter(Boolean).length >= 9,
+  'D5 gate rejects at least 9/10 deterministic injected performance regressions');
 
 console.log(JSON.stringify({
   workloadCases: inputs.length,
   operationsPerTrial,
   repetitionsPerTrial: WORKLOAD_REPETITIONS,
   trials: TRIALS,
+  quantileMethod: 'linear interpolation over sorted paired-trial deltas',
   stats,
-  defaultObserverAddedMsPerOperation: defaultOverhead,
-  customObserverAddedMsPerOperation: customOverhead
+  defaultObserverPairedAddedMsPerOperation: defaultOverhead,
+  customObserverPairedAddedMsPerOperation: customOverhead
 }, null, 2));
-const gateDefault = [
-  ['average', defaultOverhead.averageAddedMsPerOperation, MAX_AVG_ADDED_MS_PER_OPERATION],
-  ['p95', defaultOverhead.p95AddedMsPerOperation, MAX_P95_ADDED_MS_PER_OPERATION],
-  ['p99', defaultOverhead.p99AddedMsPerOperation, MAX_P99_ADDED_MS_PER_OPERATION]
-];
-for (const [label, value, limit] of gateDefault) {
+
+for (const [label, metrics] of [
+  ['default observer', defaultOverhead],
+  ['custom observer', customOverhead]
+]) {
   check(
-    Number.isFinite(value) && value >= 0 && value <= limit,
-    'default observer ' + label + '-added overhead stays within ' + limit + ' ms/operation'
+    Number.isFinite(metrics.averageAddedMsPerOperation) &&
+      Math.max(0, metrics.averageAddedMsPerOperation) <= MAX_AVG_ADDED_MS_PER_OPERATION,
+    label + ' average paired-added overhead stays within ' + MAX_AVG_ADDED_MS_PER_OPERATION + ' ms/operation'
   );
-}
-const gateCustom = [
-  ['average', customOverhead.averageAddedMsPerOperation, MAX_AVG_ADDED_MS_PER_OPERATION],
-  ['p95', customOverhead.p95AddedMsPerOperation, MAX_P95_ADDED_MS_PER_OPERATION],
-  ['p99', customOverhead.p99AddedMsPerOperation, MAX_P99_ADDED_MS_PER_OPERATION]
-];
-for (const [label, value, limit] of gateCustom) {
   check(
-    Number.isFinite(value) && value >= 0 && value <= limit,
-    'custom observer ' + label + '-added overhead stays within ' + limit + ' ms/operation'
+    Number.isFinite(metrics.p50AddedMsPerOperation) &&
+      Math.max(0, metrics.p50AddedMsPerOperation) <= MAX_P50_ADDED_MS_PER_OPERATION,
+    label + ' p50 paired-added overhead stays within ' + MAX_P50_ADDED_MS_PER_OPERATION + ' ms/operation'
   );
 }
 

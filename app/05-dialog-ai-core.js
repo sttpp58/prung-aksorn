@@ -181,6 +181,7 @@
 
   function isRetryableError(err){
     if(!err) return false;
+    if(err.code === 'AI_OUTPUT_TRUNCATED') return false;
     if(err.status === 429) return true;
     if(err.status >= 500 && err.status < 600) return true;
     if(err.status === 'gemini_blocked' || err.status === 'gemini_empty') return false;
@@ -276,6 +277,143 @@
       }
     }
     throw lastErr;
+  }
+
+  async function buildTranslationChunkMetadata(chunks, chunkerVersion){
+    if(!Array.isArray(chunks) || chunks.some(function(chunk){ return typeof chunk !== 'string'; })){
+      throw new Error('Translation Job chunk list is invalid; integrity metadata cannot be created');
+    }
+    if(chunkerVersion !== 'v1' && chunkerVersion !== 'v2'){
+      throw new Error('Unsupported Translation Job chunker version: ' + String(chunkerVersion));
+    }
+    if(!window.crypto || !window.crypto.subtle || typeof TextEncoder !== 'function'){
+      throw new Error('This browser cannot create the required Translation Job integrity digest');
+    }
+    var canonical = JSON.stringify(chunks);
+    var digestBuffer = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+    var digestBytes = Array.from(new Uint8Array(digestBuffer));
+    var digest = digestBytes.map(function(byte){ return byte.toString(16).padStart(2, '0'); }).join('');
+    return {
+      chunkerVersion: chunkerVersion,
+      chunkLengths: chunks.map(function(chunk){ return chunk.length; }),
+      chunkDigest: digest
+    };
+  }
+
+  async function verifyTranslationChunkMetadata(job, chunks){
+    if(!job || !Array.isArray(chunks)) throw new Error('Translation Job chunk integrity input is invalid');
+    if(!job.chunkDigest){
+      if(job.chunkerVersion !== undefined || job.chunkLengths !== undefined){
+        throw new Error('Translation Job contains incomplete chunk integrity metadata; recovery was stopped to protect the checkpoint');
+      }
+      return { legacy: true, chunkerVersion: 'v1' };
+    }
+    if(job.chunkerVersion !== 'v1' && job.chunkerVersion !== 'v2'){
+      throw new Error('Translation Job integrity metadata contains an unsupported chunker version');
+    }
+    if(!Array.isArray(job.chunkLengths) || job.chunkLengths.length !== chunks.length ||
+      job.chunkLengths.some(function(length, index){ return !Number.isInteger(length) || length !== chunks[index].length; })){
+      throw new Error('Translation Job chunk lengths do not match the reconstructed chunk sequence');
+    }
+    var current = await buildTranslationChunkMetadata(chunks, job.chunkerVersion);
+    if(current.chunkDigest !== job.chunkDigest){
+      throw new Error('Translation Job chunk digest mismatch — recovered chunks differ from the sequence used when this Job was created; no API request was sent');
+    }
+    return { legacy: false, chunkerVersion: current.chunkerVersion, chunkDigest: current.chunkDigest };
+  }
+
+  function findTranslationChunkSplit(text){
+    if(typeof text !== 'string' || text.length < 2) return null;
+    var middle = Math.floor(text.length / 2);
+
+    function closestBoundary(boundaries){
+      var usable = boundaries.filter(function(index){ return index > 0 && index < text.length; });
+      if(!usable.length) return null;
+      usable.sort(function(a,b){ return Math.abs(a-middle) - Math.abs(b-middle); });
+      return usable[0];
+    }
+
+    var sentenceBoundaries = [];
+    var sentencePattern = /[.!?。！？][」』”’"'）)\]]*\s*/g;
+    var match;
+    while((match = sentencePattern.exec(text)) !== null){
+      sentenceBoundaries.push(match.index + match[0].length);
+    }
+    var boundary = closestBoundary(sentenceBoundaries);
+    if(boundary !== null) return [text.slice(0,boundary), text.slice(boundary)];
+
+    var whitespaceBoundaries = [];
+    var whitespacePattern = /\s+/g;
+    while((match = whitespacePattern.exec(text)) !== null){
+      whitespaceBoundaries.push(match.index + match[0].length);
+    }
+    boundary = closestBoundary(whitespaceBoundaries);
+    if(boundary !== null) return [text.slice(0,boundary), text.slice(boundary)];
+
+    if(typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'){
+      try{
+        var segmenter = new Intl.Segmenter('th', {granularity:'word'});
+        var iterator = segmenter.segment(text)[Symbol.iterator]();
+        var next = iterator.next();
+        var wordBoundaries = [];
+        while(!next.done){
+          var segment = next.value;
+          if(segment.index > 0 && segment.index < text.length) wordBoundaries.push(segment.index);
+          next = iterator.next();
+        }
+        boundary = closestBoundary(wordBoundaries);
+        if(boundary !== null) return [text.slice(0,boundary), text.slice(boundary)];
+      }catch(segmentError){
+        // Deterministic code-point fallback below for environments without a usable Segmenter.
+      }
+    }
+
+    boundary = middle;
+    if(boundary > 0 && boundary < text.length){
+      var leftCode = text.charCodeAt(boundary - 1);
+      var rightCode = text.charCodeAt(boundary);
+      if(leftCode >= 0xD800 && leftCode <= 0xDBFF && rightCode >= 0xDC00 && rightCode <= 0xDFFF){
+        boundary -= 1;
+      }
+    }
+    if(boundary <= 0 || boundary >= text.length) return null;
+    return [text.slice(0,boundary), text.slice(boundary)];
+  }
+
+  async function callTranslationChunkWithTruncationGuard(proj, previousTail, chunk, key, model, signal, maxRetries, provider, settingsSnapshot){
+    async function callPart(partText, tailText){
+      var prompt = buildTranslatePromptWithSettings(proj, tailText, partText, settingsSnapshot);
+      return await callAIWithRetry(prompt, partText, key, model, signal, maxRetries, provider);
+    }
+
+    try{
+      return await callPart(chunk, previousTail);
+    }catch(err){
+      if(!err || err.code !== 'AI_OUTPUT_TRUNCATED') throw err;
+      var halves = findTranslationChunkSplit(String(chunk || ''));
+      if(!halves){
+        err.message = (err.message || 'Provider output truncated') + ' — ไม่สามารถแบ่งข้อความนี้เป็นสองส่วนอย่างปลอดภัย';
+        throw err;
+      }
+
+      // At most one split. A truncation in either half propagates and nothing is checkpointed here.
+      var first = await callPart(halves[0], previousTail);
+      if(typeof first !== 'string' || !first.trim()){
+        var firstEmpty = new Error('ผลลัพธ์ส่วนแรกว่างเปล่าหลังแบ่งข้อความเพื่อแก้ปัญหาคำตอบถูกตัด');
+        firstEmpty.status = 'truncated_split_empty';
+        throw firstEmpty;
+      }
+      var firstTrim = first.trim();
+      var second = await callPart(halves[1], getTail(firstTrim, 300));
+      if(typeof second !== 'string' || !second.trim()){
+        var secondEmpty = new Error('ผลลัพธ์ส่วนที่สองว่างเปล่าหลังแบ่งข้อความเพื่อแก้ปัญหาคำตอบถูกตัด');
+        secondEmpty.status = 'truncated_split_empty';
+        throw secondEmpty;
+      }
+      var sourceSeparator = /\s+$/.exec(halves[0]);
+      var joinSeparator = sourceSeparator ? sourceSeparator[0] : '';
+      return firstTrim + joinSeparator + second.trim();
+    }
   }
 
   function countWords(text){

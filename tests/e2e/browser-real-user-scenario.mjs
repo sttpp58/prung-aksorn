@@ -115,9 +115,42 @@ async function findBrowser() {
 
 function startStaticServer(timeoutMs = 5_000) {
   return new Promise((resolve, reject) => {
+    let swFixtureRelease = 'A';
     const server = createServer((req, res) => {
       try {
-        const rawUrl = decodeURIComponent((req.url || '/').split('?')[0]);
+        const requestUrl = new URL(req.url || '/', 'http://127.0.0.1');
+        const rawUrl = decodeURIComponent(requestUrl.pathname);
+        if (rawUrl === '/__sw-fixture/release') {
+          const requestedRelease = requestUrl.searchParams.get('value');
+          if (requestedRelease === 'A' || requestedRelease === 'B') swFixtureRelease = requestedRelease;
+          res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end(swFixtureRelease); return;
+        }
+        if (rawUrl === '/__sw-fixture/asset-a.js' || rawUrl === '/__sw-fixture/asset-b.js') {
+          const asset = rawUrl.endsWith('asset-a.js') ? 'asset-a' : 'asset-b';
+          res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end(asset + ':' + swFixtureRelease); return;
+        }
+        if (rawUrl === '/__sw-fixture/index.html') {
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end('<!doctype html><html><head><meta charset="utf-8"><title>SW Version Fixture</title></head><body><main id="sw-fixture">Service Worker Version Fixture</main></body></html>');
+          return;
+        }
+        if (rawUrl === '/__sw-fixture/sw.js') {
+          const cacheVersion = requestUrl.searchParams.get('cacheVersion') || 'stable';
+          const release = requestUrl.searchParams.get('release') || 'A';
+          const cacheName = 'pa-sw-fixture-' + cacheVersion;
+          const swSource = [
+            'const RELEASE = ' + JSON.stringify(release) + ';',
+            'const CACHE_NAME = ' + JSON.stringify(cacheName) + ';',
+            "const ASSETS = ['./asset-a.js', './asset-b.js'];",
+            "self.addEventListener('install', event => event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())));",
+            "self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));",
+            "self.addEventListener('fetch', event => { const url = new URL(event.request.url); if (url.origin !== self.location.origin || !url.pathname.startsWith('/__sw-fixture/asset-')) return; event.respondWith((async () => { const cache = await caches.open(CACHE_NAME); const cached = await cache.match(event.request); if (cached) return cached; const response = await fetch(event.request); if (response && response.ok) await cache.put(event.request, response.clone()); return response; })()); });"
+          ].join('\n');
+          res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end(swSource); return;
+        }
         const requestPath = rawUrl === '/' ? '/index.html' : rawUrl;
         if (rawUrl === '/favicon.ico') { res.writeHead(204); res.end(); return; }
         const normalized = path.normalize(requestPath).replace(/^([.][.][\\/])+/, '');
@@ -461,6 +494,129 @@ globalTimeoutTimer = setTimeout(() => {
   );
 }, TEST_TIMEOUT);
 
+async function runServiceWorkerVersionCoherenceFixture(cdp, baseUrl) {
+  const origin = new URL(baseUrl).origin;
+  const fixtureUrl = origin + '/__sw-fixture/index.html';
+  await cdp.send('Page.navigate', {url: fixtureUrl});
+  await waitForFunction(cdp, `document.readyState === 'complete'`, 10_000);
+
+  await evaluate(cdp, `(async () => {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      if (registration.scope.endsWith('/__sw-fixture/')) await registration.unregister();
+    }
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(key => key.startsWith('pa-sw-fixture-')).map(key => caches.delete(key)));
+    await fetch('/__sw-fixture/release?value=A', {cache:'no-store'});
+    window.__swFixtureRegistration = await navigator.serviceWorker.register(
+      '/__sw-fixture/sw.js?release=A&cacheVersion=stable', {scope:'/__sw-fixture/'});
+    return true;
+  })()`);
+  await waitForFunction(cdp,
+    `window.__swFixtureRegistration?.active?.state === 'activated' &&
+      navigator.serviceWorker.controller?.scriptURL.includes('/__sw-fixture/sw.js')`, 12_000);
+  await waitForFunction(cdp, `(async () => {
+    const cache = await caches.open('pa-sw-fixture-stable');
+    const a = await cache.match(new URL('/__sw-fixture/asset-a.js', location.origin));
+    const b = await cache.match(new URL('/__sw-fixture/asset-b.js', location.origin));
+    return !!a && !!b && (await a.text()) === 'asset-a:A' && (await b.text()) === 'asset-b:A';
+  })()`, 10_000);
+  check(true, 'service-worker fixture release A starts with a consistent A/A cache');
+
+  await evaluate(cdp, `fetch('/__sw-fixture/release?value=B', {cache:'no-store'}).then(() => true)`);
+  const firstOld = await evaluate(cdp, `fetch('/__sw-fixture/asset-a.js').then(response => response.text())`);
+  check(firstOld === 'asset-a:A', 'unversioned active worker first serves its cached A asset after release B is deployed');
+  await delay(300);
+  const stable = await evaluate(cdp, `(async () => {
+    const cache = await caches.open('pa-sw-fixture-stable');
+    const cachedA = await cache.match(new URL('/__sw-fixture/asset-a.js', location.origin));
+    const cachedB = await cache.match(new URL('/__sw-fixture/asset-b.js', location.origin));
+    const a = await fetch('/__sw-fixture/asset-a.js').then(response => response.text());
+    const b = await fetch('/__sw-fixture/asset-b.js').then(response => response.text());
+    window.__swFixtureStable = {a,b,cachedA:await cachedA.text(),cachedB:await cachedB.text()};
+    return JSON.stringify(window.__swFixtureStable);
+  })()`);
+  check(stable === JSON.stringify({a:'asset-a:A',b:'asset-b:A',cachedA:'asset-a:A',cachedB:'asset-b:A'}),
+    'without a cache-version bump the active worker keeps serving a consistent cached A/A release instead of mixing individual B assets');
+
+  await cdp.send('Network.enable');
+  await cdp.send('Network.emulateNetworkConditions', {offline:true, latency:0, downloadThroughput:0, uploadThroughput:0});
+  const offlineStable = await evaluate(cdp, `(async () => {
+    const a = await fetch('/__sw-fixture/asset-a.js').then(response => response.text());
+    const b = await fetch('/__sw-fixture/asset-b.js').then(response => response.text());
+    return JSON.stringify({a,b});
+  })()`);
+  check(offlineStable === JSON.stringify({a:'asset-a:A',b:'asset-b:A'}),
+    'offline fallback keeps the active unbumped release assets consistent');
+  await cdp.send('Network.emulateNetworkConditions', {offline:false, latency:0, downloadThroughput:-1, uploadThroughput:-1});
+
+  // A release-version bump creates an isolated cache and pre-caches the full B app shell.
+  await evaluate(cdp, `(async () => {
+    await fetch('/__sw-fixture/release?value=A', {cache:'no-store'});
+    const reg = await navigator.serviceWorker.getRegistration('/__sw-fixture/');
+    if (reg) await reg.unregister();
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(key => key.startsWith('pa-sw-fixture-')).map(key => caches.delete(key)));
+    await new Promise(resolve => setTimeout(resolve, 100));
+    window.__swFixtureRegistration = await navigator.serviceWorker.register(
+      '/__sw-fixture/sw.js?release=A&cacheVersion=A', {scope:'/__sw-fixture/'});
+    return true;
+  })()`);
+  await waitForFunction(cdp,
+    `window.__swFixtureRegistration?.active?.state === 'activated' &&
+      navigator.serviceWorker.controller?.scriptURL.includes('cacheVersion=A')`, 12_000);
+  await waitForFunction(cdp, `(async () => {
+    const cache = await caches.open('pa-sw-fixture-A');
+    const a = await cache.match(new URL('/__sw-fixture/asset-a.js', location.origin));
+    const b = await cache.match(new URL('/__sw-fixture/asset-b.js', location.origin));
+    return !!a && !!b && (await a.text()) === 'asset-a:A' && (await b.text()) === 'asset-b:A';
+  })()`, 10_000);
+  await evaluate(cdp, `fetch('/__sw-fixture/release?value=B', {cache:'no-store'}).then(() => true)`);
+  await evaluate(cdp, `(async () => {
+    window.__swFixtureRegistration = await navigator.serviceWorker.register(
+      '/__sw-fixture/sw.js?release=B&cacheVersion=B', {scope:'/__sw-fixture/'});
+    return true;
+  })()`);
+  await waitForFunction(cdp,
+    `window.__swFixtureRegistration?.active?.state === 'activated' &&
+      navigator.serviceWorker.controller?.scriptURL.includes('release=B')`, 15_000);
+  await waitForFunction(cdp, `(async () => {
+    const cache = await caches.open('pa-sw-fixture-B');
+    const a = await cache.match(new URL('/__sw-fixture/asset-a.js', location.origin));
+    const b = await cache.match(new URL('/__sw-fixture/asset-b.js', location.origin));
+    return !!a && !!b && (await a.text()) === 'asset-a:B' && (await b.text()) === 'asset-b:B';
+  })()`, 12_000);
+  const consistent = await evaluate(cdp, `(async () => {
+    const a = await fetch('/__sw-fixture/asset-a.js').then(response => response.text());
+    const b = await fetch('/__sw-fixture/asset-b.js').then(response => response.text());
+    window.__swFixtureConsistent = {a,b};
+    return JSON.stringify(window.__swFixtureConsistent);
+  })()`);
+  check(consistent === JSON.stringify({a:'asset-a:B',b:'asset-b:B'}),
+    'versioned cache isolates the B release and serves a consistent B/B asset set');
+
+  await cdp.send('Network.emulateNetworkConditions', {offline:true, latency:0, downloadThroughput:0, uploadThroughput:0});
+  const offlineVersioned = await evaluate(cdp, `(async () => {
+    const a = await fetch('/__sw-fixture/asset-a.js').then(response => response.text());
+    const b = await fetch('/__sw-fixture/asset-b.js').then(response => response.text());
+    return JSON.stringify({a,b});
+  })()`);
+  check(offlineVersioned === JSON.stringify({a:'asset-a:B',b:'asset-b:B'}),
+    'offline fallback keeps the newly activated versioned release assets consistent');
+  await cdp.send('Network.emulateNetworkConditions', {offline:false, latency:0, downloadThroughput:-1, uploadThroughput:-1});
+
+  await evaluate(cdp, `(async () => {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      if (registration.scope.endsWith('/__sw-fixture/')) await registration.unregister();
+    }
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(key => key.startsWith('pa-sw-fixture-')).map(key => caches.delete(key)));
+    return true;
+  })()`);
+  check(true, 'service-worker fixture unregisters test registrations and deletes its isolated caches');
+}
+
 try {
   const browser = await findBrowser();
   log('Browser: ' + browser);
@@ -662,6 +818,8 @@ try {
   await cdp.send('Emulation.setDeviceMetricsOverride', {width:390,height:844,deviceScaleFactor:1,mobile:true});
   check(await read(cdp, `(()=>{const host=document.querySelector('.action-container'); const box=document.createElement('div'); box.id='translationRecoveryBox'; box.innerHTML='<div>พบงานแปลที่ต้องตรวจสอบ</div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">千零四十五章 書奇隔落 長標題สำหรับทดสอบมือถือ — 0/1 (failed) — ไม่พบ Project ต้นทาง</span><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><button type="button">ซ่อน</button></div></div><div style="margin-top:8px;font-size:.9em;opacity:.75">ระบบจะไม่เริ่ม API อัตโนมัติ ต้องกดกู้คืนและเริ่มงานด้วยตนเอง</div>'; host.appendChild(box); const dismiss=box.querySelector('button'); const boxRect=box.getBoundingClientRect(); const buttonRect=dismiss.getBoundingClientRect(); const fits=boxRect.left>=0 && boxRect.right<=window.innerWidth && document.documentElement.scrollWidth<=window.innerWidth && buttonRect.width>0 && buttonRect.left>=0 && buttonRect.right<=window.innerWidth; box.remove(); return fits;})()`), 'mobile recovery box keeps the dismiss button inside the viewport');
   await cdp.send('Emulation.clearDeviceMetricsOverride');
+
+  await runServiceWorkerVersionCoherenceFixture(cdp, e2eUrl);
 
   check(pageErrors.length === 0, 'browser reported no uncaught runtime/page errors during E2E scenario');
   console.log('');
