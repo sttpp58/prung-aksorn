@@ -238,14 +238,6 @@ async function setupBrowser(label) {
     started = await startStaticServer();
     const url = 'http://' + HOST + ':' + started.port + '/index.html';
     profileDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-recovery-'));
-    const debugPort = await new Promise((resolve, reject) => {
-      const probe = createServer();
-      probe.once('error', reject);
-      probe.listen(0, HOST, () => {
-        const port = probe.address().port;
-        probe.close(() => resolve(port));
-      });
-    });
     environmentSetup = false;
     chrome = spawn(browser, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
@@ -253,7 +245,7 @@ async function setupBrowser(label) {
     '--no-first-run', '--no-default-browser-check',
     '--user-data-dir=' + profileDir,
     '--remote-debugging-address=' + HOST,
-    '--remote-debugging-port=' + debugPort,
+    '--remote-debugging-port=0',
     '--window-size=1440,1200', url
     ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     let browserStdErr = '';
@@ -261,9 +253,9 @@ async function setupBrowser(label) {
     chrome.on('error', error => { browserSpawnError = error; });
     chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
     browserExit = new Promise(resolve => chrome.once('exit', resolve));
-    const { pageTarget } = await waitForDevToolsTargets({
+    const { pageTarget, port: debugPort } = await waitForDevToolsTargets({
     host: HOST,
-    port: debugPort,
+    profileDir,
     browserProcess: chrome,
     getStderr: () => browserStdErr,
     getSpawnError: () => browserSpawnError

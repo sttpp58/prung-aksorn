@@ -164,14 +164,6 @@ try {
   server = started.server;
   const baseUrl = 'http://' + HOST + ':' + started.port;
   const appUrl = baseUrl + '/index.html';
-  const debugPort = await new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once('error', reject);
-    probe.listen(0, HOST, () => {
-      const port = probe.address().port;
-      probe.close(() => resolve(port));
-    });
-  });
   profileDir = await mkdtemp(path.join(os.tmpdir(), 'prung-aksorn-tqg3-'));
   environmentSetup = false;
   chrome = spawn(browser, [
@@ -179,16 +171,16 @@ try {
     '--disable-background-networking', '--disable-component-update', '--no-first-run',
     '--no-default-browser-check', '--user-data-dir=' + profileDir,
     '--remote-debugging-address=' + HOST,
-    '--remote-debugging-port=' + debugPort, '--window-size=1440,1200', appUrl
+    '--remote-debugging-port=0', '--window-size=1440,1200', appUrl
   ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 
   let browserStdErr = '';
   let browserSpawnError = null;
   chrome.on('error', error => { browserSpawnError = error; });
   chrome.stderr.on('data', chunk => { browserStdErr += String(chunk); });
-  const { pageTarget } = await waitForDevToolsTargets({
+  const { pageTarget, port: debugPort } = await waitForDevToolsTargets({
     host: HOST,
-    port: debugPort,
+    profileDir,
     browserProcess: chrome,
     getStderr: () => browserStdErr,
     getSpawnError: () => browserSpawnError
