@@ -314,6 +314,23 @@ async function installFetchFault(ctx, mode) {
       'const target = String(url);' +
       "if (target.includes('api.openai.com/v1/chat/completions')) {" +
         'window.__fi.calls += 1;' +
+        "if (window.__fi.mode === 'glossary-small' || window.__fi.mode === 'glossary-large') {" +
+          "const content = window.__fi.mode === 'glossary-small' ? 'นี่คือบทแปลภาษาไทยที่มีเนื้อหาสมบูรณ์และมีความยาวเพียงพอสำหรับทดสอบ guard' : 'คำตอบสั้นมาก';" +
+          'window.__fi.glossaryOutput = content;' +
+          'return Promise.resolve(new Response(' +
+            "JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: content } }], usage: { prompt_tokens: 1, completion_tokens: 1 } })," +
+            " { status: 200, headers: { 'Content-Type': 'application/json' } }));" +
+        '}' +
+        "if (window.__fi.mode === 'openai-truncate-repeat' || ((window.__fi.mode === 'openai-truncate-once' || window.__fi.mode === 'openai-second-half-truncate') && window.__fi.calls === 1)) {" +
+          'return Promise.resolve(new Response(' +
+            "JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: 'partial truncated response' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } })," +
+            " { status: 200, headers: { 'Content-Type': 'application/json' } }));" +
+        '}' +
+        "if ((window.__fi.mode === 'openai-truncate-once' || window.__fi.mode === 'openai-second-half-truncate') && window.__fi.calls > 1) {" +
+          'return Promise.resolve(new Response(' +
+            "JSON.stringify({ choices: [{ finish_reason: (window.__fi.mode === 'openai-second-half-truncate' && window.__fi.calls === 3) ? 'length' : 'stop', message: { content: 'OpenAI split part ' + window.__fi.calls } }], usage: { prompt_tokens: 1, completion_tokens: 1 } })," +
+            " { status: 200, headers: { 'Content-Type': 'application/json' } }));" +
+        '}' +
         "if (window.__fi.mode === 'retry-success' && window.__fi.calls <= 2) {" +
           'window.__fi.failures += 1;' +
           'return Promise.resolve(new Response(' +
@@ -337,6 +354,19 @@ async function installFetchFault(ctx, mode) {
             'if (options?.signal?.aborted) { abort(); return; }' +
             "options?.signal?.addEventListener('abort', abort, { once: true });" +
           '});' +
+        '}' +
+      '}' +
+      "if (target.includes('generativelanguage.googleapis.com')) {" +
+        'window.__fi.calls += 1;' +
+        "if (window.__fi.mode === 'gemini-truncate-once' && window.__fi.calls === 1) {" +
+          'return Promise.resolve(new Response(' +
+            "JSON.stringify({ candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: 'partial Gemini response' }] } }], usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 } })," +
+            " { status: 200, headers: { 'Content-Type': 'application/json' } }));" +
+        '}' +
+        "if (window.__fi.mode === 'gemini-truncate-once') {" +
+          'return Promise.resolve(new Response(' +
+            "JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'Gemini split part ' + window.__fi.calls }] } }], usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 } })," +
+            " { status: 200, headers: { 'Content-Type': 'application/json' } }));" +
         '}' +
       '}' +
       "if (/^https?:/i.test(target) && !target.startsWith(window.location.origin)) {" +
@@ -560,6 +590,153 @@ async function scenarioRetrySuccess(ctx) {
   );
 }
 
+async function scenarioOpenAITruncationSplit(ctx) {
+  await createProject(ctx, 'FI OpenAI Truncation Split');
+  await installFetchFault(ctx, 'openai-truncate-once');
+  await prepareTranslation(ctx, 'FI OpenAI Truncation', 'First sentence has useful context. Second sentence continues the chapter. Third sentence closes this test.');
+  await click(ctx.cdp, '#processBtn');
+  await waitForFunction(ctx.cdp,
+    "window.__fi.calls === 3 && document.getElementById('processBtn').disabled === false", 12000);
+  const job = await latestJob(ctx);
+  check(job?.status === 'completed', 'OpenAI length truncation is recovered via exactly one two-part retry');
+  check(job?.completedChunks === job?.totalChunks && job?.partialResults.length === 1,
+    'split retry creates one durable checkpoint for the full original chunk');
+  check(!JSON.stringify(job?.partialResults || []).includes('partial truncated response'),
+    'truncated provider partial text is never checkpointed');
+  check(await evaluate(ctx.cdp,
+    "window.__fi.calls === 3 && document.getElementById('output').textContent === 'OpenAI split part 2 OpenAI split part 3'"),
+    'OpenAI split retry calls provider three times and combines only the two complete halves');
+}
+
+async function scenarioOpenAIRepeatedTruncation(ctx) {
+  await createProject(ctx, 'FI OpenAI Repeated Truncation');
+  await installFetchFault(ctx, 'openai-truncate-repeat');
+  await prepareTranslation(ctx, 'FI Repeated Truncation', 'First sentence. Second sentence. Third sentence.');
+  await click(ctx.cdp, '#processBtn');
+  await waitForFunction(ctx.cdp,
+    "window.__fi.calls === 2 && document.getElementById('resumeBtn').classList.contains('show')", 12000);
+  const job = await latestJob(ctx);
+  check(job?.status === 'failed', 'truncation of the first split half fails the Translation Job closed');
+  check(job?.completedChunks === 0 && job?.partialResults.length === 0,
+    'repeated truncation leaves the current chunk uncheckpointed and has no partial result');
+  check(await evaluate(ctx.cdp,
+    "window.__fi.calls === 2 && document.getElementById('errorBox').classList.contains('show')"),
+    'repeated truncation is non-retryable and surfaces a visible error without an infinite retry loop');
+}
+
+async function scenarioGeminiTruncationSplit(ctx) {
+  await createProject(ctx, 'FI Gemini Truncation Split');
+  await installFetchFault(ctx, 'gemini-truncate-once');
+  await evaluate(ctx.cdp,
+    "document.getElementById('provider').value = 'gemini'; document.getElementById('provider').dispatchEvent(new Event('change', { bubbles: true }));");
+  await waitForFunction(ctx.cdp, "document.getElementById('provider').value === 'gemini'");
+  await prepareTranslation(ctx, 'FI Gemini Truncation', 'First Gemini sentence is here. The second sentence provides another boundary. The third sentence completes the fixture.');
+  await click(ctx.cdp, '#processBtn');
+  await waitForFunction(ctx.cdp,
+    "window.__fi.calls === 3 && document.getElementById('processBtn').disabled === false", 12000);
+  const job = await latestJob(ctx);
+  check(job?.status === 'completed', 'Gemini MAX_TOKENS is recovered through the same bounded two-part path');
+  check(job?.completedChunks === job?.totalChunks && job?.partialResults.length === 1,
+    'Gemini split retry persists only one complete original-chunk checkpoint');
+  check(!JSON.stringify(job?.partialResults || []).includes('partial Gemini response'),
+    'Gemini truncated candidate text is not checkpointed');
+  check(await evaluate(ctx.cdp,
+    "window.__fi.calls === 3 && document.getElementById('output').textContent === 'Gemini split part 2 Gemini split part 3'"),
+    'Gemini split retry combines both completed halves with exactly three provider calls');
+}
+
+async function scenarioSurgicalGlossarySmallEditUndo(ctx) {
+  await createProject(ctx, 'FI Glossary Small Edit Undo');
+  await typeInto(ctx.cdp, '#apiKey', 'fi-only-test-key');
+  const before = 'นี่คือบทแปลภาษาไทยที่มีเนื้อหาครบถ้วนและมีความยาวเพียงพอสำหรับทดสอบ guard';
+  const after = 'นี่คือบทแปลภาษาไทยที่มีเนื้อหาสมบูรณ์และมีความยาวเพียงพอสำหรับทดสอบ guard';
+  await evaluate(ctx.cdp, '(() => { const el=document.getElementById("output"); el.textContent=' +
+    JSON.stringify(before) + '; el.dispatchEvent(new Event("input",{bubbles:true})); return true; })()');
+  await installFetchFault(ctx, 'glossary-small');
+  await evaluate(ctx.cdp, "void runSurgicalGlossaryFixWithAI([{src:'term',trans:'คำ'}]); true;");
+  await waitForFunction(ctx.cdp,
+    "document.getElementById('output').textContent === " + JSON.stringify(after) +
+      " && document.getElementById('undoSurgicalGlossaryFixBtn').style.display === 'inline-block'", 12000);
+  check(
+    await evaluate(ctx.cdp, "!document.getElementById('appDialogOverlay').classList.contains('show')"),
+    'small targeted glossary correction applies without a confirmation dialog');
+  check(await evaluate(ctx.cdp,
+    "document.getElementById('undoSurgicalGlossaryFixBtn').style.display === 'inline-block'"),
+    'successful AI glossary edit exposes the Undo action');
+  await click(ctx.cdp, '#undoSurgicalGlossaryFixBtn');
+  check(await evaluate(ctx.cdp, "document.getElementById('output').textContent === " + JSON.stringify(before)),
+    'Undo restores the exact pre-edit output string');
+  check(await evaluate(ctx.cdp,
+    "document.getElementById('undoSurgicalGlossaryFixBtn').style.display === 'none'"),
+    'Undo action hides after restoring the original text');
+}
+
+async function scenarioSurgicalGlossaryLargeEditConfirmationUndo(ctx) {
+  await createProject(ctx, 'FI Glossary Large Edit Guard');
+  await typeInto(ctx.cdp, '#apiKey', 'fi-only-test-key');
+  const before = 'นี่คือบทแปลภาษาไทยที่มีเนื้อหาครบถ้วนและมีความยาวเพียงพอสำหรับทดสอบ guard';
+  await evaluate(ctx.cdp, '(() => { const el=document.getElementById("output"); el.textContent=' +
+    JSON.stringify(before) + '; el.dispatchEvent(new Event("input",{bubbles:true})); return true; })()');
+  await installFetchFault(ctx, 'glossary-large');
+  await evaluate(ctx.cdp, "void runSurgicalGlossaryFixWithAI([{src:'term',trans:'คำ'}]); true;");
+  await waitForFunction(ctx.cdp,
+    "document.getElementById('appDialogOverlay').classList.contains('show') && window.__fi.calls === 1", 12000);
+  check(await evaluate(ctx.cdp,
+    "document.getElementById('output').textContent === " + JSON.stringify(before)),
+    'large AI replacement is not applied before user confirmation');
+  check(await evaluate(ctx.cdp,
+    "document.getElementById('appDialogMessage').textContent.includes('วงกว้าง')"),
+    'large AI replacement explains why confirmation is required');
+  await click(ctx.cdp, '#appDialogConfirmBtn');
+  await waitForFunction(ctx.cdp,
+    "!document.getElementById('appDialogOverlay').classList.contains('show') && document.getElementById('output').textContent === 'คำตอบสั้นมาก'", 10000);
+  check(await evaluate(ctx.cdp,
+    "document.getElementById('undoSurgicalGlossaryFixBtn').style.display === 'inline-block'"),
+    'confirmed large AI replacement exposes Undo');
+  await click(ctx.cdp, '#undoSurgicalGlossaryFixBtn');
+  check(await evaluate(ctx.cdp, "document.getElementById('output').textContent === " + JSON.stringify(before)),
+    'Undo restores the exact original after a confirmed large replacement');
+}
+
+async function scenarioSurgicalGlossaryStaleOutputGuard(ctx) {
+  await createProject(ctx, 'FI Glossary Stale Output Guard');
+  await typeInto(ctx.cdp, '#apiKey', 'fi-only-test-key');
+  const before = 'นี่คือบทแปลภาษาไทยที่มีเนื้อหาครบถ้วนและมีความยาวเพียงพอสำหรับทดสอบ guard';
+  const newer = 'ผู้ใช้แก้ไขข้อความใหม่ระหว่างรอ';
+  await evaluate(ctx.cdp, '(() => { const el=document.getElementById("output"); el.textContent=' +
+    JSON.stringify(before) + '; el.dispatchEvent(new Event("input",{bubbles:true})); return true; })()');
+  await installFetchFault(ctx, 'glossary-large');
+  await evaluate(ctx.cdp, "void runSurgicalGlossaryFixWithAI([{src:'term',trans:'คำ'}]); true;");
+  await waitForFunction(ctx.cdp,
+    "document.getElementById('appDialogOverlay').classList.contains('show') && window.__fi.calls === 1", 12000);
+  await evaluate(ctx.cdp, '(() => { const el=document.getElementById("output"); el.textContent=' +
+    JSON.stringify(newer) + '; el.dispatchEvent(new Event("input",{bubbles:true})); return true; })()');
+  await click(ctx.cdp, '#appDialogConfirmBtn');
+  await waitForFunction(ctx.cdp,
+    "!document.getElementById('appDialogOverlay').classList.contains('show') && !document.getElementById('processBtn').disabled", 10000);
+  check(await evaluate(ctx.cdp, "document.getElementById('output').textContent === " + JSON.stringify(newer)),
+    'stale confirmation cannot overwrite newer user-edited output');
+  check(await evaluate(ctx.cdp,
+    "document.getElementById('undoSurgicalGlossaryFixBtn').style.display === 'none'"),
+    'stale AI result does not expose an Undo action bound to the wrong output');
+}
+
+async function scenarioOpenAISecondHalfTruncation(ctx) {
+  await createProject(ctx, 'FI OpenAI Second Half Truncation');
+  await installFetchFault(ctx, 'openai-second-half-truncate');
+  await prepareTranslation(ctx, 'FI Second Half Truncation', 'First sentence is complete. Second sentence is deliberately long enough to test second-half truncation.');
+  await click(ctx.cdp, '#processBtn');
+  await waitForFunction(ctx.cdp,
+    "window.__fi.calls === 3 && document.getElementById('resumeBtn').classList.contains('show')", 12000);
+  const job = await latestJob(ctx);
+  check(job?.status === 'failed', 'truncation in the second split half fails the original Translation Job');
+  check(job?.completedChunks === 0 && job?.partialResults.length === 0,
+    'a complete first half is not checkpointed when the second half is truncated');
+  check(await evaluate(ctx.cdp,
+    "window.__fi.calls === 3 && document.getElementById('errorBox').classList.contains('show')"),
+    'second-half truncation fails without extra retry or partial output');
+}
+
 async function scenarioPermanentNetwork(ctx) {
   await createProject(ctx, 'FI Permanent Network');
   await installFetchFault(ctx, 'permanent-network');  await prepareTranslation(ctx, 'FI Permanent Network Chapter', 'Permanent network failure source');
@@ -581,7 +758,32 @@ async function scenarioPermanentNetwork(ctx) {
     await evaluate(ctx.cdp, 'window.__fi.calls === 3 && window.__fi.failures === 3'),
     'permanent network fault exhausts the configured retry budget'
   );
-}async function scenarioCancelInFlight(ctx) {
+}async function scenarioSameSessionResumeDigestMismatch(ctx) {
+  await createProject(ctx, 'FI Same-Session Digest Mismatch');
+  await installFetchFault(ctx, 'permanent-network');
+  await prepareTranslation(ctx, 'FI Same-Session Digest', 'First sentence. Second sentence has enough source text for a digest guard test.');
+  await click(ctx.cdp, '#processBtn');
+  await waitForFunction(ctx.cdp,
+    "document.getElementById('resumeBtn').classList.contains('show') && document.getElementById('processBtn').disabled === false", 15000);
+  const beforeJob = await latestJob(ctx);
+  check(beforeJob?.status === 'failed' && beforeJob?.completedChunks === 0,
+    'digest guard fixture begins with a failed, uncheckpointed Translation Job');
+  const beforeCalls = await evaluate(ctx.cdp, 'window.__fi.calls');
+  const corrupted = await evaluate(ctx.cdp,
+    "(async()=>{const job=await window.PrungAksornStorageV2.getTranslationJob(" + JSON.stringify(beforeJob.jobId) +
+    "); await window.PrungAksornStorageV2.updateTranslationJob({jobId:job.jobId,status:job.status,expectedRevision:job.revision,chunkDigest:'0'.repeat(64)}); return true;})()");
+  check(corrupted, 'test fixture corrupts the stored digest without changing chunk count or checkpoint count');
+  await click(ctx.cdp, '#resumeBtn');
+  await waitForFunction(ctx.cdp,
+    "document.getElementById('errorBox').textContent.includes('digest mismatch') && document.getElementById('processBtn').disabled === false", 12000);
+  const afterJob = await latestJob(ctx);
+  check(await evaluate(ctx.cdp, 'window.__fi.calls === ' + beforeCalls),
+    'same-session resume rejects digest mismatch before another provider/API attempt');
+  check(afterJob?.completedChunks === 0 && afterJob?.partialResults.length === 0,
+    'digest mismatch does not add a checkpoint or preserve partial text as success');
+}
+
+async function scenarioCancelInFlight(ctx) {
   await createProject(ctx, 'FI Cancel In Flight');
   await installFetchFault(ctx, 'cancel');
   await prepareTranslation(ctx, 'FI Cancel Chapter', 'Cancel while provider request is in flight');
@@ -657,6 +859,14 @@ const scenarios = [
   ['FI-05 Cancellation Persistence Failure', [], scenarioCancelPersistenceFailure],
   ['FI-06 Destructive Mutation Guard', [], scenarioDestructiveMutationGuard],
   ['FI-01 Provider HTTP 500 Retry → Recovery', [], scenarioRetrySuccess],
+  ['FI-07 OpenAI Truncation Bounded Split', [], scenarioOpenAITruncationSplit],
+  ['FI-08 Repeated Truncation Fails Closed', [], scenarioOpenAIRepeatedTruncation],
+  ['FI-09 Gemini MAX_TOKENS Bounded Split', [], scenarioGeminiTruncationSplit],
+  ['FI-13 OpenAI Second-Half Truncation Fails Closed', [], scenarioOpenAISecondHalfTruncation],
+  ['FI-14 Same-Session Resume Digest Mismatch Fails Closed', [], scenarioSameSessionResumeDigestMismatch],
+  ['FI-10 Surgical Glossary Small Edit + Exact Undo', [], scenarioSurgicalGlossarySmallEditUndo],
+  ['FI-11 Surgical Glossary Large Edit Confirmation + Undo', [], scenarioSurgicalGlossaryLargeEditConfirmationUndo],
+  ['FI-12 Surgical Glossary Stale Output Guard', [], scenarioSurgicalGlossaryStaleOutputGuard],
   ['FI-02 Provider Permanent Network Failure', [], scenarioPermanentNetwork],
   ['FI-03 In-Flight Cancellation', [], scenarioCancelInFlight],
   ['FI-04 Autosave Transient Storage Failure', ['IndexedDB V2 save failed:'], scenarioAutosaveTransient]

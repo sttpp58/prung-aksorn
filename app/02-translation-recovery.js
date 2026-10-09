@@ -182,8 +182,9 @@
       if(modelInput.value!==job.model)throw new Error('Model ปัจจุบันไม่ตรงกับ Job: กรุณาเลือก '+job.model+' ก่อนกู้คืน');
       if(!document.getElementById('apiKey').value.trim())throw new Error('กรุณาใส่ API Key ก่อนกู้คืนงาน');
 
-      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      var chunks=splitIntoChunksForVersion(snapshot.text,job.chunkSize,job.chunkerVersion || 'v1');
       if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+      var chunkIntegrity=await verifyTranslationChunkMetadata(job,chunks);
 
       advanceAppContextGeneration();
       appData.currentProjectId=proj.id;
@@ -224,7 +225,7 @@
       renderProjects();
       renderBottomHistory();
       clearTranslationRecoveryUI();
-      showError('เตรียมกู้คืน Batch Item '+(job.batchIndex+1)+' แล้ว กด “ดำเนินการต่อจากจุดกู้คืน” เพื่อเริ่ม API');
+      showError((chunkIntegrity.legacy ? 'Legacy job has no chunk digest; original chunk boundaries receive limited verification. ' : '')+'เตรียมกู้คืน Batch Item '+(job.batchIndex+1)+' แล้ว กด “ดำเนินการต่อจากจุดกู้คืน” เพื่อเริ่ม API');
     }catch(e){
       showError('ไม่สามารถเตรียม Batch Recovery Job ได้: '+(e.message||e));
     }
@@ -255,8 +256,9 @@
       var snapshot=job.sourceSnapshot;
       if(!snapshot||snapshot.text!==state.sourceSnapshotText||snapshot.normalized!==true)throw new Error('Recovery Source Snapshot ของ Job เปลี่ยนแปลงไป');
       if(typeof snapshot.originalText!=='string')throw new Error('Original Source Snapshot ไม่ถูกต้อง');
-      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      var chunks=splitIntoChunksForVersion(snapshot.text,job.chunkSize,job.chunkerVersion || 'v1');
       if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+      await verifyTranslationChunkMetadata(job,chunks);
       if(job.completedChunks!==state.completedChunks)throw new Error('Checkpoint ของ Job เปลี่ยนแปลงไป กรุณาเตรียม Recovery ใหม่');
       if(job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
       if(job.completedChunks>0){
@@ -297,8 +299,7 @@
             throw cancelError;
           }
           if(isAppContextCurrent(recoveryContext)) progressText.textContent='กำลังกู้คืน Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
-          var sys=buildTranslatePromptWithSettings(state.proj,previousTail,chunks[i],recoverySettingsSnapshot);
-          var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
+          var part=await callTranslationChunkWithTruncationGuard(state.proj,previousTail,chunks[i],key,job.model,activeController.signal,2,job.provider,recoverySettingsSnapshot);
           var partTrim=part.trim();
           previousTail=getTail(partTrim,300);
           job=await PrungAksornStorageV2.checkpointTranslationJob({jobId:job.jobId,retryCount:activeRetryCount,expectedRevision:job.revision},i,partTrim,previousTail);
@@ -415,8 +416,9 @@
       var key=document.getElementById('apiKey').value.trim();
       if(!key) throw new Error('กรุณาใส่ API Key ก่อน Retry');
 
-      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      var chunks=splitIntoChunksForVersion(snapshot.text,job.chunkSize,job.chunkerVersion || 'v1');
       if(chunks.length!==job.totalChunks) throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+      await verifyTranslationChunkMetadata(job,chunks);
 
       retryCount=Number(job.retryCount||0)+1;
       var retrySettingsSnapshot=normalizeTranslationSettingsSnapshot(job.settingsSnapshot,job.provider,job.model,job.chunkSize);
@@ -443,8 +445,7 @@
           throw cancelError;
         }
         if(isAppContextCurrent(retryContext)) progressText.textContent='กำลัง Retry Batch Item — ส่วนที่ '+(i+1)+'/'+chunks.length;
-        var sys=buildTranslatePromptWithSettings(proj,previousTail,chunks[i],retrySettingsSnapshot);
-        var part=await callAIWithRetry(sys,chunks[i],key,job.model,activeController.signal,2,job.provider);
+        var part=await callTranslationChunkWithTruncationGuard(proj,previousTail,chunks[i],key,job.model,activeController.signal,2,job.provider,retrySettingsSnapshot);
         var partTrim=part.trim();
         previousTail=getTail(partTrim,300);
         job=await PrungAksornStorageV2.checkpointTranslationJob({jobId:job.jobId,retryCount:retryCount,expectedRevision:job.revision},i,partTrim,previousTail);
@@ -528,8 +529,9 @@
       if(!book)throw new Error('ไม่พบ Book ต้นทางของ Job');
       var snapshot=job.sourceSnapshot;
       if(!snapshot||typeof snapshot.text!=='string'||!snapshot.text||snapshot.normalized!==true)throw new Error('ไม่พบ Recovery Source Snapshot ที่สมบูรณ์');
-      var chunks=splitIntoChunks(snapshot.text,job.chunkSize);
+      var chunks=splitIntoChunksForVersion(snapshot.text,job.chunkSize,job.chunkerVersion || 'v1');
       if(chunks.length!==job.totalChunks)throw new Error('จำนวน Chunk ที่สร้างใหม่ไม่ตรงกับ Job: '+chunks.length+' != '+job.totalChunks);
+      var chunkIntegrity=await verifyTranslationChunkMetadata(job,chunks);
       if(job.completedChunks>chunks.length)throw new Error('Checkpoint ของ Job เกินจำนวน Chunk ที่กู้คืนได้');
       if(job.partialResults.length!==job.completedChunks)throw new Error('Checkpoint/partialResults ไม่สอดคล้องกัน');
       if(job.completedChunks>0){
@@ -560,7 +562,8 @@
         provider:job.provider,
         sourceSnapshotText:snapshot.text,
         revision:job.revision,
-        settingsSnapshot: normalizeTranslationSettingsSnapshot(job.settingsSnapshot, job.provider, job.model, job.chunkSize)
+        settingsSnapshot: normalizeTranslationSettingsSnapshot(job.settingsSnapshot, job.provider, job.model, job.chunkSize),
+        chunkerVersion: job.chunkerVersion || 'v1'
       };
       activeTranslationJobId=null;
       if(resumeBtn){
@@ -570,7 +573,7 @@
       renderProjects();
       renderBottomHistory();
       clearTranslationRecoveryUI();
-      showError('เตรียมกู้คืน Job '+job.jobId+' แล้ว กด “ดำเนินการต่อจากจุดกู้คืน” เพื่อเริ่ม API');
+      showError((chunkIntegrity.legacy ? 'Legacy job has no chunk digest; original chunk boundaries receive limited verification. ' : '')+'เตรียมกู้คืน Job '+job.jobId+' แล้ว กด “ดำเนินการต่อจากจุดกู้คืน” เพื่อเริ่ม API');
     }catch(e){
       showError('ไม่สามารถเตรียม Recovery Job ได้: '+(e.message||e));
     }

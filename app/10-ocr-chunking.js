@@ -460,7 +460,7 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     }
   }
 
-  function splitIntoChunks(text, maxLen){
+  function splitIntoChunksV1(text, maxLen){
     if(text.length <= maxLen) return [text];
     var paras = text.split(/\n\s*\n/);
     var chunks = [], current = '';
@@ -501,6 +501,122 @@ Your task is to fix optical character recognition (OCR) scan errors, broken typo
     }
     pushCurrent();
     return chunks;
+  }
+
+  function splitIntoChunksV2(text, maxLen){
+    if(text.length <= maxLen) return [text];
+    var paras = text.split(/(\n\s*\n)/);
+    var chunks = [], current = '';
+
+    function pushCurrent(){
+      if(current){ chunks.push(current); current = ''; }
+    }
+
+    function safeCodePointBoundary(value, limit){
+      var boundary = Math.min(Math.floor(limit), value.length - 1);
+      if(boundary > 0 && boundary < value.length){
+        var leftCode = value.charCodeAt(boundary - 1);
+        var rightCode = value.charCodeAt(boundary);
+        if(leftCode >= 0xD800 && leftCode <= 0xDBFF && rightCode >= 0xDC00 && rightCode <= 0xDFFF){
+          boundary -= 1;
+        }
+      }
+      if(boundary <= 0 && value.length >= 2){
+        var firstCode = value.charCodeAt(0);
+        var secondCode = value.charCodeAt(1);
+        if(firstCode >= 0xD800 && firstCode <= 0xDBFF && secondCode >= 0xDC00 && secondCode <= 0xDFFF){
+          return 2;
+        }
+      }
+      return boundary > 0 ? boundary : Math.min(1, value.length);
+    }
+
+    function findSafeBoundary(value, limit){
+      var max = Math.min(Math.floor(limit), value.length - 1);
+      if(max < 1) return safeCodePointBoundary(value, limit);
+      var boundary = 0;
+      var prefix = value.slice(0, max + 1);
+      var sentencePattern = /[.!?。！？][」』”’"'）)\]]*\s*/g;
+      var match;
+      while((match = sentencePattern.exec(prefix)) !== null){
+        var sentenceEnd = match.index + match[0].length;
+        if(sentenceEnd > 0 && sentenceEnd <= max) boundary = sentenceEnd;
+      }
+      if(boundary) return boundary;
+
+      var whitespacePattern = /\s+/g;
+      while((match = whitespacePattern.exec(value)) !== null){
+        if(match.index >= max) break;
+        var whitespaceEnd = match.index + match[0].length;
+        if(whitespaceEnd <= max) boundary = whitespaceEnd;
+        else if(match.index > 0 && match.index <= max) boundary = match.index;
+      }
+      if(boundary) return boundary;
+
+      if(typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'){
+        try{
+          var segmenter = new Intl.Segmenter('th', {granularity:'word'});
+          var segments = segmenter.segment(value);
+          var iterator = segments[Symbol.iterator]();
+          var next = iterator.next();
+          var wordBoundary = 0;
+          while(!next.done){
+            var segment = next.value;
+            if(segment.index > 0 && segment.index <= max && segment.isWordLike){
+              wordBoundary = segment.index;
+            }
+            next = iterator.next();
+          }
+          if(wordBoundary) return wordBoundary;
+        }catch(segmenterError){
+          // Use the deterministic Unicode-safe fallback when Segmenter is unavailable.
+        }
+      }
+
+      return safeCodePointBoundary(value, limit);
+    }
+
+    function splitOversizedParagraph(para){
+      var parts = [];
+      var remaining = para;
+      while(remaining.length > maxLen){
+        var boundary = findSafeBoundary(remaining, maxLen);
+        if(boundary <= 0 || boundary > maxLen || boundary >= remaining.length){
+          boundary = safeCodePointBoundary(remaining, maxLen);
+        }
+        parts.push(remaining.slice(0, boundary));
+        remaining = remaining.slice(boundary);
+      }
+      if(remaining.length) parts.push(remaining);
+      return parts;
+    }
+
+    for(var i=0; i<paras.length; i+=2){
+      var p = paras[i] + (paras[i+1] || '');
+      if(p.length > maxLen){
+        pushCurrent();
+        splitOversizedParagraph(p).forEach(function(part){ chunks.push(part); });
+        continue;
+      }
+      if((current + p).length > maxLen){
+        pushCurrent();
+        current = p;
+      } else current += p;
+    }
+    pushCurrent();
+    return chunks;
+  }
+
+  // Compatibility default stays V1. Consumers must opt into versioned behavior explicitly.
+  function splitIntoChunks(text, maxLen){
+    return splitIntoChunksV1(text, maxLen);
+  }
+
+  function splitIntoChunksForVersion(text, maxLen, chunkerVersion){
+    var version = chunkerVersion || 'v1';
+    if(version === 'v1') return splitIntoChunksV1(text, maxLen);
+    if(version === 'v2') return splitIntoChunksV2(text, maxLen);
+    throw new Error('Unsupported Translation Job chunker version: ' + String(version));
   }
 
   function showError(msg){ errorBox.textContent = msg; errorBox.classList.add('show'); }

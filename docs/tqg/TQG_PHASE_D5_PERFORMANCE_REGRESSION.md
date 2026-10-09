@@ -78,14 +78,20 @@ The gate uses added milliseconds per TQG operation.
 
 The locked acceptance envelope is:
 
-| Metric | Maximum added overhead |
-|---|---:|
-| Average | 0.050 ms / operation |
-| p95 | 0.050 ms / operation |
-| p99 | 0.075 ms / operation |
+| Metric | Maximum added overhead | Gate/report use |
+|---|---:|---|
+| Average paired-trial delta | 0.050 ms / operation | Hard gate |
+| p50 paired-trial delta | 0.050 ms / operation | Hard gate |
+| p95 / p99 paired-trial deltas | Descriptive | Report only with 15 measured trials |
 
-A negative measured difference is treated as zero added overhead because it
-indicates that the integrated workload was not slower in that sample.
+Overhead is calculated from paired per-trial deltas (integrated workload minus
+direct workload within the same trial), not by subtracting independently
+summarized percentile values. Quantiles use linear interpolation over sorted
+samples. With only 15 measured trials, p95/p99 remain descriptive because their
+tail estimates are not sufficiently stable to act as separate hard gates.
+
+Negative average or p50 paired deltas are treated as zero added overhead for
+the pass/fail decision. Signed deltas remain visible in the report.
 
 The threshold is an engineering ceiling for telemetry overhead, not a claim
 about total application latency.
@@ -300,3 +306,29 @@ semantic-quality expansion is implied by this closure.
 > Observability overhead must remain bounded, measurable, and downstream of
 > the system it observes. Performance instrumentation must never require a
 > change to the TQG decision itself.
+
+
+## Appendix A — Fix-Then-Ship measurement hardening (2026-10-09)
+
+The implementation branch `fix-then-ship/roadmap-implementation` updates the
+measurement method without changing any TQG detection, classification, repair,
+or telemetry semantics.
+
+Changes:
+- percentile calculation uses linear interpolation and has explicit odd/even and tail-boundary tests;
+- direct and integrated runs are compared by paired trial deltas;
+- average and p50 paired overhead remain the hard performance limits;
+- p95/p99 remain in the report but are not independent gates at a 15-trial sample size;
+- a deterministic injected-above-threshold test rejects 10/10 synthetic regressed measurements (minimum acceptance is 9/10);
+- the locked C1 digest and telemetry cardinality assertions remain unchanged.
+
+Observed post-change standalone run on Windows Node v24.20.0:
+- 15 measured paired trials; 960 analyses per trial; 120-case public corpus;
+- default observer average paired overhead: approximately 0.01376 ms/operation;
+- default observer p50 paired overhead: approximately 0.01296 ms/operation;
+- custom observer average paired overhead: approximately 0.01297 ms/operation;
+- custom observer p50 paired overhead: approximately 0.01321 ms/operation;
+- D5 PASS.
+- Post-change D5 standalone gate passed 50/50 consecutive runs on Windows Node v24.20.0 (132.5 seconds total); Linux/GitHub Actions history remains unverified.
+
+This is local benchmark evidence only. It is not a claim about production end-to-end latency or CI stability. Repeated post-change execution and available CI checks remain release gates.

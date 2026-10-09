@@ -26,7 +26,7 @@
     }
     var maxLen = parseInt(document.getElementById('chunkLen').value) || 3000;
     var chars = text.length;
-    var chunks = splitIntoChunks(text, maxLen);
+    var chunks = splitIntoChunksForVersion(text, maxLen, 'v2');
 
     var str = '· ' + chars.toLocaleString() + ' อักขระ';
     if (chunks.length > 1) {
