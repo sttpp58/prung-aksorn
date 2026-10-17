@@ -1,15 +1,15 @@
 /* ---------------- External Auto-Ingestion Receiver (พร้อมแปลชื่อตอนเป็นไทย) ---------------- */
   async function importExternalChapter(title, content, autoStart) {
-    if (!content) return;
+    if (!content) return { ok: false, reason: 'empty-content' };
     var proj = getCurrentProject();
     if (!proj) {
       showError('กรุณาสร้างหรือเลือกเรื่องนิยายก่อนรับข้อมูลจากเว็บ');
-      return;
+      return { ok: false, reason: 'no-project' };
     }
     var ingestBook = getActiveBook(proj);
     if(!ingestBook){
       showError('ไม่พบเล่มต้นทางของข้อมูลที่นำเข้า');
-      return;
+      return { ok: false, reason: 'no-book' };
     }
     advanceAppContextGeneration();
     var ingestContext = captureAppContext(proj, ingestBook);
@@ -73,6 +73,7 @@
         processBtn.click();
       }, 400);
     }
+    return { ok: true, projectId: ingestContext.projectId, bookId: ingestContext.bookId };
   }
 
   // ดักฟังสัญญาณที่ส่งมาจาก Tampermonkey
@@ -81,10 +82,12 @@
     var data = e.data;
     if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
     if (data.type !== 'PRUNG_INGEST') return null;
+    if (typeof data.id !== 'string' || !data.id || data.id.length > 200) return null;
     if (data.title !== undefined && (typeof data.title !== 'string' || data.title.length > 500)) return null;
     if (typeof data.content !== 'string' || !data.content.trim() || data.content.length > 500000) return null;
     if (data.autoStart !== undefined && typeof data.autoStart !== 'boolean') return null;
     return {
+      id: data.id,
       title: typeof data.title === 'string' ? data.title : '',
       content: data.content,
       autoStart: data.autoStart === true
@@ -92,14 +95,22 @@
   }
 
   // External ingestion receiver
-  window.addEventListener('message', function(e) {
+  window.addEventListener('message', async function(e) {
     var ingestMessage = validatePrungIngestMessage(e);
-    if (ingestMessage) {
-      importExternalChapter(ingestMessage.title, ingestMessage.content, ingestMessage.autoStart)
-        .catch(function(err){
-          console.error('External chapter import failed:', err);
-        });
+    if (!ingestMessage) return;
+    var result;
+    try {
+      result = await importExternalChapter(ingestMessage.title, ingestMessage.content, ingestMessage.autoStart);
+    } catch (err) {
+      console.error('External chapter import failed:', err);
+      result = { ok: false, reason: 'import-error' };
     }
+    window.postMessage({
+      type: 'PRUNG_INGEST_ACK',
+      id: ingestMessage.id,
+      ok: !!(result && result.ok),
+      reason: result && result.reason ? result.reason : ''
+    }, window.location.origin);
   });
 
   /* เริ่มต้นระบบแบบ Asynchronous */
