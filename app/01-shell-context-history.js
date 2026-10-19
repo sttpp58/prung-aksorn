@@ -285,6 +285,27 @@
     historyList.forEach(function(entry, idx){
       var item = document.createElement('div');
       item.className = 'bottom-history-item' + (viewingHistoryId === entry.id ? ' active' : '');
+      item.draggable = !!activeBook && !(bottomHistorySearchInput && bottomHistorySearchInput.value.trim());
+      item.addEventListener('dragstart', function(e){
+        if(!e.dataTransfer || !activeBook || (bottomHistorySearchInput && bottomHistorySearchInput.value.trim())){
+          e.preventDefault();
+          return;
+        }
+        e.dataTransfer.setData('text/plain', entry.id);
+        e.dataTransfer.effectAllowed = 'move';
+        item.classList.add('history-order-dragging');
+      });
+      item.addEventListener('dragend', function(){ item.classList.remove('history-order-dragging'); });
+      item.addEventListener('dragover', function(e){
+        if(!e.dataTransfer) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      item.addEventListener('drop', function(e){
+        e.preventDefault();
+        var draggedId = e.dataTransfer && e.dataTransfer.getData('text/plain');
+        if(draggedId && draggedId !== entry.id) moveHistoryEntry(proj, activeBook, draggedId, 0, idx);
+      });
 
       var title = document.createElement('div');
       title.className = 'bottom-history-title';
@@ -296,6 +317,38 @@
 
       var actions = document.createElement('div');
       actions.className = 'bottom-history-actions';
+
+      var orderPosition = document.createElement('span');
+      orderPosition.className = 'history-order-position';
+      orderPosition.textContent = (idx + 1) + '/' + historyList.length;
+      orderPosition.setAttribute('aria-label', 'ตำแหน่งที่ ' + (idx + 1) + ' จาก ' + historyList.length);
+      actions.appendChild(orderPosition);
+
+      var orderBtnUp = document.createElement('button');
+      orderBtnUp.className = 'icon-btn history-order-btn';
+      orderBtnUp.type = 'button';
+      orderBtnUp.title = 'เลื่อนตอนขึ้น';
+      orderBtnUp.setAttribute('aria-label', 'เลื่อน ' + (entry.label || ('แปล' + (idx + 1))) + ' ขึ้น');
+      orderBtnUp.textContent = '↑';
+      orderBtnUp.disabled = !activeBook || idx === 0 || !!(bottomHistorySearchInput && bottomHistorySearchInput.value.trim());
+      orderBtnUp.addEventListener('click', function(e){
+        e.stopPropagation();
+        moveHistoryEntry(proj, activeBook, entry.id, -1);
+      });
+      actions.appendChild(orderBtnUp);
+
+      var orderBtnDown = document.createElement('button');
+      orderBtnDown.className = 'icon-btn history-order-btn';
+      orderBtnDown.type = 'button';
+      orderBtnDown.title = 'เลื่อนตอนลง';
+      orderBtnDown.setAttribute('aria-label', 'เลื่อน ' + (entry.label || ('แปล' + (idx + 1))) + ' ลง');
+      orderBtnDown.textContent = '↓';
+      orderBtnDown.disabled = !activeBook || idx === historyList.length - 1 || !!(bottomHistorySearchInput && bottomHistorySearchInput.value.trim());
+      orderBtnDown.addEventListener('click', function(e){
+        e.stopPropagation();
+        moveHistoryEntry(proj, activeBook, entry.id, 1);
+      });
+      actions.appendChild(orderBtnDown);
 
       var renameBtn = document.createElement('button');
       renameBtn.className = 'icon-btn';
@@ -363,11 +416,93 @@
   }
 
   var bottomHistorySearchInput = document.getElementById('bottomHistorySearchInput');
+  var historyOrderSaveInFlight = false;
+  function moveHistoryArrayEntry(history, entryId, targetIndex){
+    if(!Array.isArray(history) || !Number.isInteger(targetIndex)) return null;
+    var from = history.findIndex(function(entry){ return entry && entry.id === entryId; });
+    if(from < 0 || targetIndex < 0 || targetIndex >= history.length || from === targetIndex) return null;
+    var previousOrder = history.slice();
+    var moved = history.splice(from, 1)[0];
+    history.splice(targetIndex, 0, moved);
+    return previousOrder;
+  }
+
+  async function moveHistoryEntry(proj, book, entryId, delta, targetIndex){
+    if(!proj || !book || !Array.isArray(book.history)) return;
+    if(historyOrderSaveInFlight) return;
+    if(bottomHistorySearchInput && bottomHistorySearchInput.value.trim()){
+      await showAlertDialog('ปิดการค้นหาก่อนจัดลำดับ', 'ล้างคำค้นหาเพื่อจัดลำดับจากรายการประวัติทั้งหมด ป้องกันการย้ายตอนที่ซ่อนอยู่ผิดตำแหน่ง');
+      return;
+    }
+    if(!storageReady){
+      await showAlertDialog('ยังไม่พร้อมบันทึก', 'ฐานข้อมูลยังไม่พร้อม จึงไม่สามารถเปลี่ยนลำดับประวัติได้');
+      return;
+    }
+    var currentProject = getCurrentProject();
+    if(currentProject !== proj || getActiveBook(proj) !== book){
+      await showAlertDialog('เล่มที่เลือกเปลี่ยนไปแล้ว', 'กรุณาเลือกเล่มเดิมอีกครั้งก่อนจัดลำดับประวัติ');
+      return;
+    }
+    try{
+      var jobs = await PrungAksornStorageV2.listTranslationJobs();
+      var blockingStatuses = ['pending','running','paused','failed'];
+      var hasRecoverableBatch = jobs.some(function(job){
+        return job && job.jobType === 'batch' && job.bookId === book.id && blockingStatuses.indexOf(job.status) !== -1;
+      });
+      if(hasRecoverableBatch){
+        await showAlertDialog('รอให้งาน Batch จัดการเสร็จก่อน', 'มีงาน Batch ที่ยังทำงานหรือกู้คืนได้ในเล่มนี้ ระบบจึงปิดการจัดลำดับชั่วคราวเพื่อป้องกัน Recovery เขียนทับลำดับที่ผู้ใช้กำหนด');
+        return;
+      }
+    }catch(error){
+      console.error('Unable to verify Batch recovery state before history reorder:', error);
+      await showAlertDialog('ตรวจสอบสถานะงานไม่สำเร็จ', 'ไม่สามารถยืนยันได้ว่ามีงาน Batch ที่กู้คืนได้หรือไม่ จึงยกเลิกการจัดลำดับเพื่อความปลอดภัย');
+      return;
+    }
+    if(getCurrentProject() !== proj || getActiveBook(proj) !== book){
+      await showAlertDialog('เล่มที่เลือกเปลี่ยนไปแล้ว', 'ไม่มีการเปลี่ยนลำดับ เพราะเล่มที่เลือกเปลี่ยนระหว่างตรวจสอบสถานะงาน');
+      return;
+    }
+    if(historyOrderSaveInFlight) return;
+    var history = book.history;
+    var from = history.findIndex(function(entry){ return entry && entry.id === entryId; });
+    var to = Number.isInteger(targetIndex) ? targetIndex : from + delta;
+    if(from < 0 || to < 0 || to >= history.length || from === to) return;
+    historyOrderSaveInFlight = true;
+    var previousOrder = moveHistoryArrayEntry(history, entryId, to);
+    if(!previousOrder){ historyOrderSaveInFlight = false; return; }
+    var previousReaderScrollPos = book.readerScrollPos;
+    if(Object.prototype.hasOwnProperty.call(book, 'readerScrollPos')) book.readerScrollPos = 0;
+    commitChange();
+    var saved = false;
+    try{
+      saved = await flushSaveData();
+    }catch(error){
+      console.error('History order persistence failed:', error);
+    }
+    if(!saved){
+      history.splice.apply(history, [0, history.length].concat(previousOrder));
+      if(Object.prototype.hasOwnProperty.call(book, 'readerScrollPos')) book.readerScrollPos = previousReaderScrollPos;
+      commitChange();
+      historyOrderSaveInFlight = false;
+      await showAlertDialog('บันทึกลำดับไม่สำเร็จ', 'คืนลำดับในหน้าจอเป็นค่าเดิมแล้ว ระบบจะพยายามบันทึกข้อมูลเดิมอีกครั้ง โปรดตรวจสถานะการบันทึกก่อนดำเนินการต่อ');
+      return;
+    }
+    historyOrderSaveInFlight = false;
+    renderBottomHistory();
+  }
+
   function applyBottomHistorySearchFilter(){
     var term = (bottomHistorySearchInput.value || '').trim().toLowerCase();
     document.querySelectorAll('#bottomHistoryList .bottom-history-item').forEach(function(item){
       var txt = item.textContent.toLowerCase();
       item.style.display = (!term || txt.indexOf(term) !== -1) ? '' : 'none';
+    });
+    document.querySelectorAll('#bottomHistoryList .history-order-btn').forEach(function(button){
+      button.disabled = !!term;
+      button.title = term ? 'ล้างคำค้นหาก่อนจัดลำดับ' : (button.textContent === '↑' ? 'เลื่อนตอนขึ้น' : 'เลื่อนตอนลง');
+    });
+    document.querySelectorAll('#bottomHistoryList .bottom-history-item').forEach(function(item){
+      item.draggable = !!getActiveBook(getCurrentProject()) && !term;
     });
   }
   bottomHistorySearchInput.addEventListener('input', applyBottomHistorySearchFilter);
