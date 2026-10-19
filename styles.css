@@ -855,6 +855,16 @@
   .bottom-history-actions{
     display:flex;align-items:center;gap:6px;flex-shrink:0;
   }
+  .history-order-position{font-size:11px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .history-order-btn{font-size:15px;min-width:24px;min-height:28px;touch-action:manipulation;}
+  .history-order-btn:disabled{opacity:.35;cursor:not-allowed;}
+  @media (max-width: 600px){
+    .bottom-history-actions{gap:2px;}
+    .history-order-btn{min-width:22px;padding:3px 2px;}
+    .history-order-position{font-size:10px;}
+  }
+  .bottom-history-item[draggable="true"]{cursor:grab;}
+  .bottom-history-item.history-order-dragging{opacity:.45;border-style:dashed;}
 
   .mobile-sidebar-toggle{
     display:none;width:100%;padding:11px 14px;

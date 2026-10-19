@@ -1213,6 +1213,14 @@ function main() {
   const staleTimerPattern = /setTimeout\(function\(\)\s*\{\s*if\s*\(readerCurrentBook\)\s*\{/;
   assert(!staleTimerPattern.test(indexHtml), 'Reader stale mutable-book timer pattern is absent');
 
+  const paHomcOrderingPath = path.join(ROOT, 'tests', 'pa-homc-phase1-history-ordering.mjs');
+  assert(fs.existsSync(paHomcOrderingPath), 'PA-HOMC Phase 1 history-ordering regression runner is present');
+  const paHomcOrdering = spawnSync(process.execPath, [paHomcOrderingPath], { cwd: ROOT, encoding: 'utf8' });
+  if (paHomcOrdering.status !== 0) {
+    fail('PA-HOMC Phase 1 history-ordering regression failed' + (paHomcOrdering.stderr ? ': ' + paHomcOrdering.stderr.trim() : ''));
+  }
+  assert(/PA-HOMC Phase 1 History Ordering Regression: PASS/.test(paHomcOrdering.stdout), 'PA-HOMC Phase 1 history-ordering regression passes');
+
   console.log('');
   console.log('Regression Gate: PASS');
 }
