@@ -30,7 +30,7 @@
     </div>
     <div class="header-actions">
       <div id="costMeter" class="cost-meter" title="ค่าใช้จ่าย API สะสมโดยประมาณ (คลิกเพื่อรีเซ็ต)">
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--gold);"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8m-3-4h6"></path></svg> 
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--gold);"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg> 
         $<span id="costMeterValue">0.0000</span>
       </div>
       <button class="theme-toggle-btn" id="themeToggleBtn" type="button" title="สลับโหมดสีกระดาษ">☾ โหมดมืด</button>
@@ -192,7 +192,7 @@
           </div>
         </div>
         <div class="page output-page">
-          <h2 class="output-heading"><span>ฉบับตรวจแล้ว</span><span class="font-size-controls" aria-label="ขนาดตัวอักษรฉบับตรวจแล้ว"><button id="outputFontDown" type="button" aria-label="ลดขนาดตัวอักษร">A−</button><span class="font-size-value" id="outputFontValue">16</span><button id="outputFontUp" type="button" aria-label="เพิ่มขนาดตัวอักษร">A+</button><button class="tqg-quality-toggle" id="tqgQualityToggleBtn" type="button" aria-controls="tqgQualityPanel" aria-expanded="false" title="เปิดแผงคุณภาพ TQG"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 5 6v5c0 4.4 2.9 8.3 7 10 4.1-1.7 7-5.6 7-10V6l-7-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>TQG</span></button></span></h2>
+          <h2 class="output-heading"><span>ฉบับตรวจแล้ว</span><span class="font-size-controls" aria-label="ขนาดตัวอักษรฉบับตรวจแล้ว"><button id="outputFontDown" type="button" aria-label="ลดขนาดตัวอักษร">A−</button><span class="font-size-value" id="outputFontValue">16</span><button id="outputFontUp" type="button" aria-label="เพิ่มขนาดตัวอักษร">A+</button><button class="tqg-quality-toggle" id="tqgQualityToggleBtn" type="button" aria-controls="tqgQualityPanel" aria-expanded="false" title="เปิดแผงคุณภาพ TQG"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 5 6v5c0 4.4 2.9 8.3 7 10 4.1-1.7 7-5.6 7-10V6l-7-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ตรวจคุณภาพ</span></button></span></h2>
           <div class="stamp" id="stamp">ตรวจแล้ว<br>✒</div>
           <div id="output" role="textbox" aria-label="ฉบับตรวจแล้ว" aria-multiline="true" spellcheck="false"></div>
           <div id="qualityWarningBox" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#FFF8DB;border:1px solid #E6C85C;border-radius:4px;font-size:13px;color:#232F3A;white-space:pre-line;"></div>
@@ -202,10 +202,7 @@
           <div class="page-foot">
             <span id="outCount">0 คำ</span>
             <span>
-              <button class="textbtn" id="copyBtn" disabled>คัดลอก</button>
-              &nbsp;·&nbsp;
-              <button class="textbtn" id="downloadBtn" disabled>ดาวน์โหลด</button>
-              &nbsp;·&nbsp;
+              <button class="utility-btn foot-primary" id="copyBtn" type="button" disabled>คัดลอก</button> <button class="utility-btn foot-primary" id="downloadBtn" type="button" disabled>ดาวน์โหลด</button> &nbsp;&nbsp;
               <button class="textbtn" id="editOutputBtn" disabled>แก้ไขผลลัพธ์</button>
               &nbsp;·&nbsp;
               <button class="textbtn" id="saveRevisionBtn" disabled>บันทึกฉบับแก้ไข</button>
@@ -251,22 +248,30 @@
         
         <div class="bottom-history-controls">
           <input type="text" id="bottomHistorySearchInput" class="history-search-input" placeholder="ค้นหาในประวัติ (ชื่อตอน)...">
-          <button class="utility-btn" id="openReaderBtnBottom" type="button" title="อ่านเรื่องนี้ต่อเนื่อง (โหมดนักอ่าน)">
+          <div class="tool-group" role="group" aria-label="อ่าน">
+            <button class="utility-btn" id="openReaderBtnBottom" type="button" title="อ่านเรื่องนี้ต่อเนื่อง (โหมดนักอ่าน)">
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> โหมดนักอ่าน
           </button>
-          <!-- ปุ่มสแกนคลังคำทั้งเล่ม (Bilingual Alignment) -->
-          <button class="utility-btn" id="mineBookGlossaryBtn" type="button" title="สแกนคำศัพท์จากต้นฉบับและคำแปลทุกตอนในเล่มนี้">
+          </div>
+          <div class="tool-group" role="group" aria-label="คลังคำ">
+            <span class="tool-group-label" aria-hidden="true">คลังคำ</span>
+            <button class="utility-btn" id="mineBookGlossaryBtn" type="button" title="สแกนคำศัพท์จากต้นฉบับและคำแปลทุกตอนในเล่มนี้">
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> สแกนคลังคำทั้งเล่ม
           </button>
-          <!-- ปุ่มสืบทอดสำนวนข้ามเล่ม (Cross-Book Style & Term Inheritance) -->
-          <button class="utility-btn" id="inheritCrossBookBtn" type="button" title="สืบทอดคลังคำ สรรพนาม และสำนวนจากเล่มก่อนหน้า">
+            <button class="utility-btn" id="inheritCrossBookBtn" type="button" title="สืบทอดคลังคำ สรรพนาม และสำนวนจากเล่มก่อนหน้า">
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> สืบทอดสำนวนข้ามเล่ม
           </button>
-          <button class="utility-btn" id="exportDocxBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ Word (.docx)">Export .DOCX</button>
-          <button class="utility-btn" id="exportEpubBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ E-Book (.epub)">Export .EPUB</button>
-          <button class="utility-btn" id="checkConsistencyBtn" type="button" title="ให้ AI ตรวจสอบว่าชื่อตัวละคร/สถานที่ในคลังคำถูกแปลตรงกันทุกตอนในเล่มนี้หรือไม่">
+            <button class="utility-btn" id="checkConsistencyBtn" type="button" title="ให้ AI ตรวจสอบว่าชื่อตัวละคร/สถานที่ในคลังคำถูกแปลตรงกันทุกตอนในเล่มนี้หรือไม่">
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg> ตรวจสอบความสม่ำเสมอ
           </button>
+          </div>
+          <details class="export-menu">
+            <summary class="utility-btn">ส่งออก</summary>
+            <div class="export-menu-list">
+              <button class="utility-btn" id="exportDocxBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ Word (.docx)">Export .DOCX</button>
+              <button class="utility-btn" id="exportEpubBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ E-Book (.epub)">Export .EPUB</button>
+            </div>
+          </details>
         </div>
 
         <div class="project-history-bottom-list" id="bottomHistoryList"></div>
