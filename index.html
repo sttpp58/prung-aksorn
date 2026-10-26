@@ -179,7 +179,7 @@
           <h2>ต้นฉบับ <button class="source-expand-btn" id="expandSourceBtn" type="button">เปิดต้นฉบับ</button><button class="source-collapse-btn" id="collapseSourceBtn" type="button">ย่อต้นฉบับ</button></h2>
           <input class="chapter-title" id="chapterTitle" type="text" aria-label="ชื่อตอน" maxlength="160" placeholder="ชื่อตอนสำหรับประวัติ เช่น ตอนที่ 1: บทนำ">
           <textarea class="main-input" id="inputText" placeholder="วางข้อความนิยายของคุณที่นี่..."></textarea>
-          <div id="suspiciousBox" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#FFF8DB;border:1px solid #E6C85C;border-radius:4px;font-size:13px;color:#232F3A;"></div>
+          <div id="suspiciousBox" role="status" aria-live="polite" class="warn-box" style="display:none;"></div>
           <div class="page-foot">
             <span style="display:flex;align-items:center;gap:4px;">
               <span id="inCount">0 คำ</span>
@@ -195,7 +195,7 @@
           <h2 class="output-heading"><span>ฉบับตรวจแล้ว</span><span class="font-size-controls" aria-label="ขนาดตัวอักษรฉบับตรวจแล้ว"><button id="outputFontDown" type="button" aria-label="ลดขนาดตัวอักษร">A−</button><span class="font-size-value" id="outputFontValue">16</span><button id="outputFontUp" type="button" aria-label="เพิ่มขนาดตัวอักษร">A+</button><button class="tqg-quality-toggle" id="tqgQualityToggleBtn" type="button" aria-controls="tqgQualityPanel" aria-expanded="false" title="เปิดแผงคุณภาพ TQG"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 5 6v5c0 4.4 2.9 8.3 7 10 4.1-1.7 7-5.6 7-10V6l-7-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ตรวจคุณภาพ</span></button></span></h2>
           <div class="stamp" id="stamp">ตรวจแล้ว<br>✒</div>
           <div id="output" role="textbox" aria-label="ฉบับตรวจแล้ว" aria-multiline="true" spellcheck="false"></div>
-          <div id="qualityWarningBox" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#FFF8DB;border:1px solid #E6C85C;border-radius:4px;font-size:13px;color:#232F3A;white-space:pre-line;"></div>
+          <div id="qualityWarningBox" role="status" aria-live="polite" class="warn-box" style="display:none;white-space:pre-line;"></div>
           <div id="tqgQualityPanel" class="tqg-quality-panel" hidden aria-live="polite"></div>
           <!-- กล่องแจ้งเตือนคำศัพท์ที่ AI ลืมใช้ (Post-Translation Glossary Enforcer) -->
           <div id="glossaryEnforceBox" role="status" style="display:none;margin-top:10px;padding:12px 14px;background:var(--paper);border:1.5px solid var(--gold);border-radius:6px;font-size:13px;color:var(--ink);box-shadow:var(--shadow-soft);"></div>
@@ -214,7 +214,7 @@
             <span id="historyViewLabelBottom"></span>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <button class="textbtn" id="renameHistoryBtnBottom" type="button" style="color:var(--pen);font-weight:600;">✎ เปลี่ยนชื่อ</button>
-              <button class="textbtn" id="deleteHistoryBtnBottom" type="button" style="color:var(--pen);font-weight:600;">✕ ลบประวัตินี้</button>
+              <button class="textbtn danger-link" id="deleteHistoryBtnBottom" type="button">✕ ลบประวัตินี้</button>
               <button class="close-history-btn" type="button">กลับไปแปลใหม่</button>
             </div>
           </div>

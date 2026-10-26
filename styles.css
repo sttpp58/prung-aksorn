@@ -11,6 +11,13 @@
     --pen-hover:#832F2D;
     --pen-fill:#9F3A38;
     --pen-fill-hover:#832F2D;
+    --danger:#B3261E;
+    --danger-fill:#B3261E;
+    --danger-fill-hover:#8F1F19;
+    --danger-bg:#F6DAD7;
+    --warn-bg:#FFF8DB;
+    --warn-border:#E6C85C;
+    --warn-ink:#232F3A;
     --pen-soft:#C07C79;
     --pen-bg:#F1DEDB;
     --gold:#70561D;
@@ -32,6 +39,13 @@
     --pen-hover:#C9302C;
     --pen-fill:#B93C38;
     --pen-fill-hover:#A63531;
+    --danger:#FF8A80;
+    --danger-fill:#C62828;
+    --danger-fill-hover:#A81F1F;
+    --danger-bg:#3A1F1F;
+    --warn-bg:#3A3320;
+    --warn-border:#7A6A2E;
+    --warn-ink:#F0E6C8;
     --pen-soft:#8B3A38;
     --pen-bg:#2C1E1E;
     --gold:#C5A059;
@@ -237,7 +251,7 @@
     flex:0 0 26px;width:26px;height:26px;padding:0;border:0;border-radius:4px;
     background:transparent;color:var(--ink-faint);font-size:13px;cursor:pointer;
   }
-  .model-picker-delete-btn:hover{background:var(--pen-bg);color:var(--pen);}
+  .model-picker-delete-btn:hover{background:var(--danger-bg);color:var(--danger);}
   .model-picker-empty{padding:14px 10px;color:var(--ink-faint);font-size:12px;text-align:center;}
   .model-picker-add{border-top:1px dashed var(--paper-line);padding:8px;}
   .model-picker-add-btn{
@@ -698,7 +712,7 @@
     transition: color 0.2s;
   }
   .utility-action-btn:hover { color: var(--ink); }
-  .utility-action-btn.danger { color: var(--pen); }
+  .utility-action-btn.danger { color: var(--danger); }
 
   #cancelBtn{display:none;}
   #cancelBtn.show{display:inline-block;}
@@ -806,8 +820,8 @@
   .app-dialog-btn.cancel:hover{background:var(--paper-deep);}
   .app-dialog-btn.confirm{background:var(--gold);color:#fff;}
   .app-dialog-btn.confirm:hover{background:var(--gold-light);}
-  .app-dialog-btn.confirm.danger{background:var(--pen);}
-  .app-dialog-btn.confirm.danger:hover{background:var(--pen-hover);}
+  .app-dialog-btn.confirm.danger{background:var(--danger-fill);}
+  .app-dialog-btn.confirm.danger:hover{background:var(--danger-fill-hover);}
 
   .diff-overlay{
     display:none;position:fixed;inset:0;
@@ -1162,3 +1176,11 @@ button.chip { font-family: 'Sarabun', sans-serif; line-height: 1.4; }
 .export-menu[open] > summary::after { transform: rotate(-135deg); }
 .export-menu-list { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 160px; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--paper-card); border: 1px solid var(--paper-line); border-radius: 6px; box-shadow: var(--shadow-card); }
 @media (max-width: 600px) { .tool-group + .tool-group { border-left: none; padding-left: 0; } }
+
+/* ===== UX pass 3: semantic danger/warn tokens, reduced motion ===== */
+.warn-box { margin-top: 10px; padding: 10px; background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 4px; font-size: 13px; color: var(--warn-ink); }
+.danger-link { color: var(--danger); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .gear-btn:hover, .process-btn-primary:hover { transform: none; }
+}
