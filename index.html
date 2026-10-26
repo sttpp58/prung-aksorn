@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <!-- CSP: runtime JavaScript is externalized to the same-origin app entrypoint; script/style/network capabilities remain explicitly restricted. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.openai.com https://generativelanguage.googleapis.com; worker-src 'self' blob:; manifest-src 'self';">
-<meta name="app-release-version" content="v11">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="app-release-version" content="v12">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ปรุงอักษร — ห้องทำงานนักแปล</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#9F3A38">
@@ -30,7 +30,7 @@
     </div>
     <div class="header-actions">
       <div id="costMeter" class="cost-meter" title="ค่าใช้จ่าย API สะสมโดยประมาณ (คลิกเพื่อรีเซ็ต)">
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--gold);"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8m-3-4h6"></path></svg> 
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--gold);"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg> 
         $<span id="costMeterValue">0.0000</span>
       </div>
       <button class="theme-toggle-btn" id="themeToggleBtn" type="button" title="สลับโหมดสีกระดาษ">☾ โหมดมืด</button>
@@ -44,7 +44,7 @@
 
   <div class="settings" id="settingsPanel">
     <div class="field">
-      <label>ผู้ให้บริการ AI</label>
+      <label for="provider">ผู้ให้บริการ AI</label>
       <select id="provider">
         <option value="openai">OpenAI</option>
         <option value="gemini">Google Gemini</option>
@@ -76,11 +76,11 @@
       <input type="hidden" id="model" value="gpt-4o-mini">
     </div>
     <div class="field" style="flex:1;">
-      <label>API key</label>
+      <label for="apiKey">API key</label>
       <input type="password" id="apiKey" placeholder="วางคีย์ของคุณที่นี่" autocomplete="off" data-lpignore="true" data-1p-ignore data-bwignore="true" data-bitwarden-ignore="true" spellcheck="false">
     </div>
     <div class="field">
-      <label>ความยาวสูงสุดต่อส่วน (ตัวอักษร)</label>
+      <label for="chunkLen">ความยาวสูงสุดต่อส่วน (ตัวอักษร)</label>
       <input type="number" id="chunkLen" value="3000" min="500" max="50000" step="100" style="min-width:100px;">
     </div>
     <p class="settings-note">คีย์จะอยู่เฉพาะในหน่วยความจำของเบราว์เซอร์ในขณะเปิดหน้านี้และจะไม่ถูกบันทึกในฐานข้อมูล · ใช้ไฟล์นี้แบบส่วนตัวเท่านั้น · โปรเจกต์ ร่างงาน คลังคำ และประวัติจะถูกเก็บใน IndexedDB เครื่องนี้ จึงควรดาวน์โหลดข้อมูลสำรองเป็นระยะ</p>
@@ -132,37 +132,37 @@
           <div class="controls">
             <div class="control-group">
               <span>ต้นฉบับ</span>
-              <div class="seg" id="sourceSeg">
-                <button data-val="translate" class="active">ภาษาอื่น (แปล)</button>
-                <button data-val="polish">ไทยอยู่แล้ว (ขัดสำนวน)</button>
+              <div class="seg" id="sourceSeg" role="group" aria-label="ต้นฉบับ">
+                <button type="button" data-val="translate" class="active" aria-pressed="true">ภาษาอื่น (แปล)</button>
+                <button type="button" data-val="polish" aria-pressed="false">ไทยอยู่แล้ว (ขัดสำนวน)</button>
               </div>
             </div>
             <div class="control-group">
               <span>ระดับการปรับ</span>
-              <div class="seg" id="levelSeg">
-                <button data-val="proof">พิสูจน์อักษร</button>
-                <button data-val="edit" class="active">เรียบเรียง</button>
-                <button data-val="rewrite">ขัดเกลาใหม่</button>
+              <div class="seg" id="levelSeg" role="group" aria-label="ระดับการปรับ">
+                <button type="button" data-val="proof" aria-pressed="false">พิสูจน์อักษร</button>
+                <button type="button" data-val="edit" class="active" aria-pressed="true">เรียบเรียง</button>
+                <button type="button" data-val="rewrite" aria-pressed="false">ขัดเกลาใหม่</button>
               </div>
             </div>
             <div class="control-group" style="flex:1;">
               <span>แนวเรื่อง</span>
-              <div class="chips" id="genreChips">
-                <div class="chip active" data-val="ทั่วไป">ทั่วไป</div>
-                <div class="chip" data-val="แฟนตาซี">แฟนตาซี</div>
-                <div class="chip" data-val="โรแมนซ์">โรแมนซ์</div>
-                <div class="chip" data-val="สืบสวน/ระทึกขวัญ">สืบสวน/ระทึกขวัญ</div>
-                <div class="chip" data-val="ไซไฟ">ไซไฟ</div>
-                <div class="chip" data-val="กำลังภายใน">กำลังภายใน</div>
+              <div class="chips" id="genreChips" role="group" aria-label="แนวเรื่อง">
+                <button type="button" class="chip active" data-val="ทั่วไป" aria-pressed="true">ทั่วไป</button>
+                <button type="button" class="chip" data-val="แฟนตาซี" aria-pressed="false">แฟนตาซี</button>
+                <button type="button" class="chip" data-val="โรแมนซ์" aria-pressed="false">โรแมนซ์</button>
+                <button type="button" class="chip" data-val="สืบสวน/ระทึกขวัญ" aria-pressed="false">สืบสวน/ระทึกขวัญ</button>
+                <button type="button" class="chip" data-val="ไซไฟ" aria-pressed="false">ไซไฟ</button>
+                <button type="button" class="chip" data-val="กำลังภายใน" aria-pressed="false">กำลังภายใน</button>
               </div>
             </div>
             <div class="control-group">
               <span>สำนวนภาษา</span>
-              <div class="seg" id="styleSeg">
-                <button data-val="สำนวนปัจจุบัน" class="active">ปัจจุบัน</button>
-                <button data-val="สำนวนย้อนยุค">ย้อนยุค</button>
-                <button data-val="สำนวนร่วมสมัย">ร่วมสมัย</button>
-                <button data-val="สำนวนทางการ">ทางการ</button>
+              <div class="seg" id="styleSeg" role="group" aria-label="สำนวนภาษา">
+                <button type="button" data-val="สำนวนปัจจุบัน" class="active" aria-pressed="true">ปัจจุบัน</button>
+                <button type="button" data-val="สำนวนย้อนยุค" aria-pressed="false">ย้อนยุค</button>
+                <button type="button" data-val="สำนวนร่วมสมัย" aria-pressed="false">ร่วมสมัย</button>
+                <button type="button" data-val="สำนวนทางการ" aria-pressed="false">ทางการ</button>
               </div>
             </div>
           </div>
@@ -177,9 +177,9 @@
       <div class="spread show-source" id="spread">
         <div class="page source-page">
           <h2>ต้นฉบับ <button class="source-expand-btn" id="expandSourceBtn" type="button">เปิดต้นฉบับ</button><button class="source-collapse-btn" id="collapseSourceBtn" type="button">ย่อต้นฉบับ</button></h2>
-          <input class="chapter-title" id="chapterTitle" type="text" maxlength="160" placeholder="ชื่อตอนสำหรับประวัติ เช่น ตอนที่ 1: บทนำ">
+          <input class="chapter-title" id="chapterTitle" type="text" aria-label="ชื่อตอน" maxlength="160" placeholder="ชื่อตอนสำหรับประวัติ เช่น ตอนที่ 1: บทนำ">
           <textarea class="main-input" id="inputText" placeholder="วางข้อความนิยายของคุณที่นี่..."></textarea>
-          <div id="suspiciousBox" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#FFF8DB;border:1px solid #E6C85C;border-radius:4px;font-size:13px;color:#232F3A;"></div>
+          <div id="suspiciousBox" role="status" aria-live="polite" class="warn-box" style="display:none;"></div>
           <div class="page-foot">
             <span style="display:flex;align-items:center;gap:4px;">
               <span id="inCount">0 คำ</span>
@@ -192,20 +192,17 @@
           </div>
         </div>
         <div class="page output-page">
-          <h2 class="output-heading"><span>ฉบับตรวจแล้ว</span><span class="font-size-controls" aria-label="ขนาดตัวอักษรฉบับตรวจแล้ว"><button id="outputFontDown" type="button" aria-label="ลดขนาดตัวอักษร">A−</button><span class="font-size-value" id="outputFontValue">16</span><button id="outputFontUp" type="button" aria-label="เพิ่มขนาดตัวอักษร">A+</button><button class="tqg-quality-toggle" id="tqgQualityToggleBtn" type="button" aria-controls="tqgQualityPanel" aria-expanded="false" title="เปิดแผงคุณภาพ TQG"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 5 6v5c0 4.4 2.9 8.3 7 10 4.1-1.7 7-5.6 7-10V6l-7-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>TQG</span></button></span></h2>
+          <h2 class="output-heading"><span>ฉบับตรวจแล้ว</span><span class="font-size-controls" aria-label="ขนาดตัวอักษรฉบับตรวจแล้ว"><button id="outputFontDown" type="button" aria-label="ลดขนาดตัวอักษร">A−</button><span class="font-size-value" id="outputFontValue">16</span><button id="outputFontUp" type="button" aria-label="เพิ่มขนาดตัวอักษร">A+</button><button class="tqg-quality-toggle" id="tqgQualityToggleBtn" type="button" aria-controls="tqgQualityPanel" aria-expanded="false" title="เปิดแผงคุณภาพ TQG"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 5 6v5c0 4.4 2.9 8.3 7 10 4.1-1.7 7-5.6 7-10V6l-7-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ตรวจคุณภาพ</span></button></span></h2>
           <div class="stamp" id="stamp">ตรวจแล้ว<br>✒</div>
           <div id="output" role="textbox" aria-label="ฉบับตรวจแล้ว" aria-multiline="true" spellcheck="false"></div>
-          <div id="qualityWarningBox" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#FFF8DB;border:1px solid #E6C85C;border-radius:4px;font-size:13px;color:#232F3A;white-space:pre-line;"></div>
+          <div id="qualityWarningBox" role="status" aria-live="polite" class="warn-box" style="display:none;white-space:pre-line;"></div>
           <div id="tqgQualityPanel" class="tqg-quality-panel" hidden aria-live="polite"></div>
           <!-- กล่องแจ้งเตือนคำศัพท์ที่ AI ลืมใช้ (Post-Translation Glossary Enforcer) -->
           <div id="glossaryEnforceBox" role="status" style="display:none;margin-top:10px;padding:12px 14px;background:var(--paper);border:1.5px solid var(--gold);border-radius:6px;font-size:13px;color:var(--ink);box-shadow:var(--shadow-soft);"></div>
           <div class="page-foot">
             <span id="outCount">0 คำ</span>
             <span>
-              <button class="textbtn" id="copyBtn" disabled>คัดลอก</button>
-              &nbsp;·&nbsp;
-              <button class="textbtn" id="downloadBtn" disabled>ดาวน์โหลด</button>
-              &nbsp;·&nbsp;
+              <button class="utility-btn foot-primary" id="copyBtn" type="button" disabled>คัดลอก</button> <button class="utility-btn foot-primary" id="downloadBtn" type="button" disabled>ดาวน์โหลด</button> &nbsp;&nbsp;
               <button class="textbtn" id="editOutputBtn" disabled>แก้ไขผลลัพธ์</button>
               &nbsp;·&nbsp;
               <button class="textbtn" id="saveRevisionBtn" disabled>บันทึกฉบับแก้ไข</button>
@@ -217,7 +214,7 @@
             <span id="historyViewLabelBottom"></span>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <button class="textbtn" id="renameHistoryBtnBottom" type="button" style="color:var(--pen);font-weight:600;">✎ เปลี่ยนชื่อ</button>
-              <button class="textbtn" id="deleteHistoryBtnBottom" type="button" style="color:var(--pen);font-weight:600;">✕ ลบประวัตินี้</button>
+              <button class="textbtn danger-link" id="deleteHistoryBtnBottom" type="button">✕ ลบประวัตินี้</button>
               <button class="close-history-btn" type="button">กลับไปแปลใหม่</button>
             </div>
           </div>
@@ -251,22 +248,27 @@
         
         <div class="bottom-history-controls">
           <input type="text" id="bottomHistorySearchInput" class="history-search-input" placeholder="ค้นหาในประวัติ (ชื่อตอน)...">
-          <button class="utility-btn" id="openReaderBtnBottom" type="button" title="อ่านเรื่องนี้ต่อเนื่อง (โหมดนักอ่าน)">
+          <div class="tool-group" role="group" aria-label="อ่าน">
+            <button class="utility-btn" id="openReaderBtnBottom" type="button" title="อ่านเรื่องนี้ต่อเนื่อง (โหมดนักอ่าน)">
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> โหมดนักอ่าน
           </button>
-          <!-- ปุ่มสแกนคลังคำทั้งเล่ม (Bilingual Alignment) -->
-          <button class="utility-btn" id="mineBookGlossaryBtn" type="button" title="สแกนคำศัพท์จากต้นฉบับและคำแปลทุกตอนในเล่มนี้">
+          </div>
+          <div class="tool-group" role="group" aria-label="คลังคำ">
+            <span class="tool-group-label" aria-hidden="true">คลังคำ</span>
+            <button class="utility-btn" id="mineBookGlossaryBtn" type="button" title="สแกนคำศัพท์จากต้นฉบับและคำแปลทุกตอนในเล่มนี้">
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> สแกนคลังคำทั้งเล่ม
           </button>
-          <!-- ปุ่มสืบทอดสำนวนข้ามเล่ม (Cross-Book Style & Term Inheritance) -->
-          <button class="utility-btn" id="inheritCrossBookBtn" type="button" title="สืบทอดคลังคำ สรรพนาม และสำนวนจากเล่มก่อนหน้า">
+            <button class="utility-btn" id="inheritCrossBookBtn" type="button" title="สืบทอดคลังคำ สรรพนาม และสำนวนจากเล่มก่อนหน้า">
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> สืบทอดสำนวนข้ามเล่ม
           </button>
-          <button class="utility-btn" id="exportDocxBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ Word (.docx)">Export .DOCX</button>
-          <button class="utility-btn" id="exportEpubBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ E-Book (.epub)">Export .EPUB</button>
-          <button class="utility-btn" id="checkConsistencyBtn" type="button" title="ให้ AI ตรวจสอบว่าชื่อตัวละคร/สถานที่ในคลังคำถูกแปลตรงกันทุกตอนในเล่มนี้หรือไม่">
+            <button class="utility-btn" id="checkConsistencyBtn" type="button" title="ให้ AI ตรวจสอบว่าชื่อตัวละคร/สถานที่ในคลังคำถูกแปลตรงกันทุกตอนในเล่มนี้หรือไม่">
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg> ตรวจสอบความสม่ำเสมอ
           </button>
+          </div>
+          <details class="export-menu"><summary class="utility-btn">ส่งออก</summary><div class="export-menu-list">
+            <button class="utility-btn" id="exportDocxBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ Word (.docx)">Export .DOCX</button>
+            <button class="utility-btn" id="exportEpubBtn" type="button" title="ส่งออกประวัติเล่มนี้เป็นไฟล์ E-Book (.epub)">Export .EPUB</button>
+          </div></details>
         </div>
 
         <div class="project-history-bottom-list" id="bottomHistoryList"></div>
