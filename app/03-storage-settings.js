@@ -133,14 +133,14 @@
     function setSegActive(id, val){
       var seg = document.getElementById(id);
       seg.querySelectorAll('button').forEach(function(b){
-        b.classList.toggle('active', b.dataset.val === val);
+        b.classList.toggle('active', b.dataset.val === val); b.setAttribute('aria-pressed', String(b.dataset.val === val));
       });
     }
     setSegActive('sourceSeg', s.source);
     setSegActive('levelSeg', s.level);
     setSegActive('styleSeg', s.style);
     document.getElementById('genreChips').querySelectorAll('.chip').forEach(function(c){
-      c.classList.toggle('active', c.dataset.val === s.genre);
+      c.classList.toggle('active', c.dataset.val === s.genre); c.setAttribute('aria-pressed', String(c.dataset.val === s.genre));
     });
     setOutputFontSize(outputFontSize, false);
     updateTranslationSummary();

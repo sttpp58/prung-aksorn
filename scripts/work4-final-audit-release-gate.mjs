@@ -293,6 +293,69 @@ function isApprovedServiceWorkerCoherenceFix() {
     fixture.includes('offline fallback keeps the newly activated versioned release assets consistent');
 }
 
+function isApprovedServiceWorkerReleaseMarkerBump() {
+  // A later release may change the marker only, but must retain the already-approved
+  // D-07 cache-coherence implementation without any Service Worker logic changes.
+  const normalize = (value) => String(value).replace(/\r\n/g, '\n').trimEnd();
+  const baseline = normalize(git(['show', RELEASE_BASE + ':sw.js']));
+  const current = normalize(read('sw.js'));
+  const baselineMatch = baseline.match(/^const APP_RELEASE_VERSION = ['"](v\d+)['"];$/m);
+  const currentMatch = current.match(/^const APP_RELEASE_VERSION = ['"](v\d+)['"];$/m);
+  if (!baselineMatch || !currentMatch) return false;
+
+  const baselineVersion = baselineMatch[1];
+  const currentVersion = currentMatch[1];
+  const baselineNumber = Number(baselineVersion.slice(1));
+  const currentNumber = Number(currentVersion.slice(1));
+  if (!Number.isSafeInteger(baselineNumber) || currentNumber !== baselineNumber + 1) return false;
+
+  const oldVersionLine = baselineMatch[0];
+  const newVersionLine = currentMatch[0];
+  if (baseline.split(oldVersionLine).length !== 2) return false;
+  if (baseline.replace(oldVersionLine, newVersionLine) !== current) return false;
+
+  const baselineManifestText = git(['show', RELEASE_BASE + ':manifest.json']);
+  const baselineIndexHtml = git(['show', RELEASE_BASE + ':index.html']);
+  let baselineManifest;
+  let currentManifest;
+  try {
+    baselineManifest = JSON.parse(baselineManifestText);
+    currentManifest = JSON.parse(read('manifest.json'));
+  } catch {
+    return false;
+  }
+
+  const baselineHtmlMatch = baselineIndexHtml.match(/<meta\s+name=["']app-release-version["']\s+content=["'](v\d+)["'][^>]*>/i);
+  const currentHtmlMatch = read('index.html').match(/<meta\s+name=["']app-release-version["']\s+content=["'](v\d+)["'][^>]*>/i);
+  if (!baselineHtmlMatch || !currentHtmlMatch) return false;
+  if (
+    baselineManifest['x-app-release-version'] !== baselineVersion ||
+    baselineHtmlMatch[1] !== baselineVersion ||
+    currentManifest['x-app-release-version'] !== currentVersion ||
+    currentHtmlMatch[1] !== currentVersion
+  ) return false;
+
+  const cacheName = 'const CACHE_NAME = \`prung-aksorn-\${APP_RELEASE_VERSION}\`;';
+  const cachedHitGuard = [
+    '      if (cached) {',
+    '        return cached;',
+    '      }'
+  ].join('\n');
+  const fixture = read('tests/e2e/browser-real-user-scenario.mjs');
+  return baseline.includes(cacheName) &&
+    current.includes(cacheName) &&
+    baseline.includes("if (url.origin !== self.location.origin) {") &&
+    baseline.includes("if (event.request.method !== 'GET') {") &&
+    baseline.includes(cachedHitGuard) &&
+    !baseline.includes('const networkFetch = fetch(event.request)') &&
+    baseline.includes('return cache.put(event.request, response.clone()).then(() => response);') &&
+    fixture.includes('async function runServiceWorkerVersionCoherenceFixture(cdp, baseUrl)') &&
+    fixture.includes('without a cache-version bump the active worker keeps serving a consistent cached A/A release instead of mixing individual B assets') &&
+    fixture.includes('versioned cache isolates the B release and serves a consistent B/B asset set') &&
+    fixture.includes('offline fallback keeps the active unbumped release assets consistent') &&
+    fixture.includes('offline fallback keeps the newly activated versioned release assets consistent');
+}
+
 function isApprovedTQGIntegrationFix() {
   const diff = git(['diff', '--unified=0', RELEASE_BASE, 'HEAD', '--', 'tqg-integration.js']);
   const changedLines = diff
@@ -327,9 +390,13 @@ for (const file of PROTECTED_FILES) {
       current === head,
       'sw.js working tree matches committed HEAD'
     );
+    const exactCoherenceFix = isApprovedServiceWorkerCoherenceFix();
+    const markerOnlyReleaseBump = !exactCoherenceFix && isApprovedServiceWorkerReleaseMarkerBump();
     check(
-      isApprovedServiceWorkerCoherenceFix(),
-      'sw.js contains only the reproduced D-07 v10-to-v11 cache-coherence fix and passes the browser/version/bypass contract'
+      exactCoherenceFix || markerOnlyReleaseBump,
+      exactCoherenceFix
+        ? 'sw.js contains only the reproduced D-07 v10-to-v11 cache-coherence fix and passes the browser/version/bypass contract'
+        : 'sw.js contains only a validated sequential release-marker bump; D-07 cache-coherence logic and browser contract remain unchanged'
     );
     continue;
   }
