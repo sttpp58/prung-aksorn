@@ -576,8 +576,8 @@
     seg.addEventListener('click', function(e){
       var btn = e.target.closest('button');
       if(!btn) return;
-      seg.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
-      btn.classList.add('active');
+      seg.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
+      btn.classList.add('active'); btn.setAttribute('aria-pressed', 'true');
       state[key] = btn.dataset.val;
       saveSettings();
       updateTranslationSummary();
@@ -591,8 +591,8 @@
   chips.addEventListener('click', function(e){
     var chip = e.target.closest('.chip');
     if(!chip) return;
-    chips.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('active'); });
-    chip.classList.add('active');
+    chips.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('active'); c.setAttribute('aria-pressed', 'false'); });
+    chip.classList.add('active'); chip.setAttribute('aria-pressed', 'true');
     state.genre = chip.dataset.val;
     saveSettings();
     updateTranslationSummary();

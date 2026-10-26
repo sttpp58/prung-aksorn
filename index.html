@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <!-- CSP: runtime JavaScript is externalized to the same-origin app entrypoint; script/style/network capabilities remain explicitly restricted. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.openai.com https://generativelanguage.googleapis.com; worker-src 'self' blob:; manifest-src 'self';">
-<meta name="app-release-version" content="v11">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="app-release-version" content="v12">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ปรุงอักษร — ห้องทำงานนักแปล</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#9F3A38">
@@ -44,7 +44,7 @@
 
   <div class="settings" id="settingsPanel">
     <div class="field">
-      <label>ผู้ให้บริการ AI</label>
+      <label for="provider">ผู้ให้บริการ AI</label>
       <select id="provider">
         <option value="openai">OpenAI</option>
         <option value="gemini">Google Gemini</option>
@@ -76,11 +76,11 @@
       <input type="hidden" id="model" value="gpt-4o-mini">
     </div>
     <div class="field" style="flex:1;">
-      <label>API key</label>
+      <label for="apiKey">API key</label>
       <input type="password" id="apiKey" placeholder="วางคีย์ของคุณที่นี่" autocomplete="off" data-lpignore="true" data-1p-ignore data-bwignore="true" data-bitwarden-ignore="true" spellcheck="false">
     </div>
     <div class="field">
-      <label>ความยาวสูงสุดต่อส่วน (ตัวอักษร)</label>
+      <label for="chunkLen">ความยาวสูงสุดต่อส่วน (ตัวอักษร)</label>
       <input type="number" id="chunkLen" value="3000" min="500" max="50000" step="100" style="min-width:100px;">
     </div>
     <p class="settings-note">คีย์จะอยู่เฉพาะในหน่วยความจำของเบราว์เซอร์ในขณะเปิดหน้านี้และจะไม่ถูกบันทึกในฐานข้อมูล · ใช้ไฟล์นี้แบบส่วนตัวเท่านั้น · โปรเจกต์ ร่างงาน คลังคำ และประวัติจะถูกเก็บใน IndexedDB เครื่องนี้ จึงควรดาวน์โหลดข้อมูลสำรองเป็นระยะ</p>
@@ -132,37 +132,37 @@
           <div class="controls">
             <div class="control-group">
               <span>ต้นฉบับ</span>
-              <div class="seg" id="sourceSeg">
-                <button data-val="translate" class="active">ภาษาอื่น (แปล)</button>
-                <button data-val="polish">ไทยอยู่แล้ว (ขัดสำนวน)</button>
+              <div class="seg" id="sourceSeg" role="group" aria-label="ต้นฉบับ">
+                <button type="button" data-val="translate" class="active" aria-pressed="true">ภาษาอื่น (แปล)</button>
+                <button type="button" data-val="polish" aria-pressed="false">ไทยอยู่แล้ว (ขัดสำนวน)</button>
               </div>
             </div>
             <div class="control-group">
               <span>ระดับการปรับ</span>
-              <div class="seg" id="levelSeg">
-                <button data-val="proof">พิสูจน์อักษร</button>
-                <button data-val="edit" class="active">เรียบเรียง</button>
-                <button data-val="rewrite">ขัดเกลาใหม่</button>
+              <div class="seg" id="levelSeg" role="group" aria-label="ระดับการปรับ">
+                <button type="button" data-val="proof" aria-pressed="false">พิสูจน์อักษร</button>
+                <button type="button" data-val="edit" class="active" aria-pressed="true">เรียบเรียง</button>
+                <button type="button" data-val="rewrite" aria-pressed="false">ขัดเกลาใหม่</button>
               </div>
             </div>
             <div class="control-group" style="flex:1;">
               <span>แนวเรื่อง</span>
-              <div class="chips" id="genreChips">
-                <div class="chip active" data-val="ทั่วไป">ทั่วไป</div>
-                <div class="chip" data-val="แฟนตาซี">แฟนตาซี</div>
-                <div class="chip" data-val="โรแมนซ์">โรแมนซ์</div>
-                <div class="chip" data-val="สืบสวน/ระทึกขวัญ">สืบสวน/ระทึกขวัญ</div>
-                <div class="chip" data-val="ไซไฟ">ไซไฟ</div>
-                <div class="chip" data-val="กำลังภายใน">กำลังภายใน</div>
+              <div class="chips" id="genreChips" role="group" aria-label="แนวเรื่อง">
+                <button type="button" class="chip active" data-val="ทั่วไป" aria-pressed="true">ทั่วไป</button>
+                <button type="button" class="chip" data-val="แฟนตาซี" aria-pressed="false">แฟนตาซี</button>
+                <button type="button" class="chip" data-val="โรแมนซ์" aria-pressed="false">โรแมนซ์</button>
+                <button type="button" class="chip" data-val="สืบสวน/ระทึกขวัญ" aria-pressed="false">สืบสวน/ระทึกขวัญ</button>
+                <button type="button" class="chip" data-val="ไซไฟ" aria-pressed="false">ไซไฟ</button>
+                <button type="button" class="chip" data-val="กำลังภายใน" aria-pressed="false">กำลังภายใน</button>
               </div>
             </div>
             <div class="control-group">
               <span>สำนวนภาษา</span>
-              <div class="seg" id="styleSeg">
-                <button data-val="สำนวนปัจจุบัน" class="active">ปัจจุบัน</button>
-                <button data-val="สำนวนย้อนยุค">ย้อนยุค</button>
-                <button data-val="สำนวนร่วมสมัย">ร่วมสมัย</button>
-                <button data-val="สำนวนทางการ">ทางการ</button>
+              <div class="seg" id="styleSeg" role="group" aria-label="สำนวนภาษา">
+                <button type="button" data-val="สำนวนปัจจุบัน" class="active" aria-pressed="true">ปัจจุบัน</button>
+                <button type="button" data-val="สำนวนย้อนยุค" aria-pressed="false">ย้อนยุค</button>
+                <button type="button" data-val="สำนวนร่วมสมัย" aria-pressed="false">ร่วมสมัย</button>
+                <button type="button" data-val="สำนวนทางการ" aria-pressed="false">ทางการ</button>
               </div>
             </div>
           </div>
@@ -177,7 +177,7 @@
       <div class="spread show-source" id="spread">
         <div class="page source-page">
           <h2>ต้นฉบับ <button class="source-expand-btn" id="expandSourceBtn" type="button">เปิดต้นฉบับ</button><button class="source-collapse-btn" id="collapseSourceBtn" type="button">ย่อต้นฉบับ</button></h2>
-          <input class="chapter-title" id="chapterTitle" type="text" maxlength="160" placeholder="ชื่อตอนสำหรับประวัติ เช่น ตอนที่ 1: บทนำ">
+          <input class="chapter-title" id="chapterTitle" type="text" aria-label="ชื่อตอน" maxlength="160" placeholder="ชื่อตอนสำหรับประวัติ เช่น ตอนที่ 1: บทนำ">
           <textarea class="main-input" id="inputText" placeholder="วางข้อความนิยายของคุณที่นี่..."></textarea>
           <div id="suspiciousBox" role="status" aria-live="polite" style="display:none;margin-top:10px;padding:10px;background:#FFF8DB;border:1px solid #E6C85C;border-radius:4px;font-size:13px;color:#232F3A;"></div>
           <div class="page-foot">

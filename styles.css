@@ -6,12 +6,14 @@
     --paper-line:#C9BE9C;
     --ink:#232F3A;
     --ink-soft:#57636E;
-    --ink-faint:#8A9199;
+    --ink-faint:#5B646E;
     --pen:#9F3A38;
     --pen-hover:#832F2D;
+    --pen-fill:#9F3A38;
+    --pen-fill-hover:#832F2D;
     --pen-soft:#C07C79;
     --pen-bg:#F1DEDB;
-    --gold:#8C6F2E;
+    --gold:#70561D;
     --gold-light:#B89243;
     --shadow-soft:0 4px 20px rgba(35,47,58,0.06);
     --shadow-card:0 8px 30px rgba(35,47,58,0.08);
@@ -25,9 +27,11 @@
     --paper-line:#3A4150;
     --ink:#E2D9C5;
     --ink-soft:#A8A08D;
-    --ink-faint:#6E6859;
-    --pen:#D9534F;
+    --ink-faint:#A09985;
+    --pen:#E8726E;
     --pen-hover:#C9302C;
+    --pen-fill:#B93C38;
+    --pen-fill-hover:#A63531;
     --pen-soft:#8B3A38;
     --pen-bg:#2C1E1E;
     --gold:#C5A059;
@@ -77,7 +81,7 @@
     top: 16px;
     right: 20px;
     z-index: 150;
-    background: var(--pen);
+    background: var(--pen-fill);
     color: #fff;
     border: 1px solid var(--pen-soft);
     border-radius: 30px;
@@ -433,7 +437,7 @@
     padding:5px 12px;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif; font-weight:600;
     white-space: nowrap; transition: all 0.2s ease;
   }
-  .history-view-banner button:hover{ background: var(--pen); color: #fff; }
+  .history-view-banner button:hover{ background: var(--pen-fill); color: #fff; }
   .history-view-banner.history-bottom-banner{ margin-top:18px; margin-bottom:6px; }
 
   .mobile-tabs{display:none;}
@@ -620,7 +624,7 @@
   .process-btn-primary {
     width: 100%;
     max-width: 600px;
-    background: linear-gradient(135deg, var(--pen), var(--pen-hover));
+    background: linear-gradient(135deg, var(--pen-fill), var(--pen-fill-hover));
     color: #fff;
     border: none;
     border-radius: 40px;
@@ -894,7 +898,7 @@
     text-align: center;
   }
   .mobile-sticky-btn.primary {
-    background: var(--pen);
+    background: var(--pen-fill);
     color: #fff;
     border-color: var(--pen);
   }
@@ -937,7 +941,7 @@
   }
   .reader-tts-bar.show { bottom: 20px; }
   .reader-tts-bar .reader-btn { padding: 7px 9px; }
-  .reader-tts-bar .reader-btn.primary { background: var(--pen); border-color: var(--pen); color: #fff; }
+  .reader-tts-bar .reader-btn.primary { background: var(--pen-fill); border-color: var(--pen); color: #fff; }
   .reader-tts-bar .reader-btn.primary:hover { background: var(--ink); border-color: var(--ink); }
   .reader-tts-rate { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
   .reader-tts-rate input[type=range] { width: 80px; accent-color: var(--pen); }
@@ -1113,3 +1117,20 @@
     padding: 14px 20px; border-top: 1px solid var(--paper-line);
     background: var(--paper-card);
   }
+
+/* ===== A11y pass 1: focus ring, chip-as-button, dark-mode text-on-gold ===== */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--pen) !important;
+  outline-offset: 2px;
+}
+textarea.main-input:focus-visible { outline-offset: -4px; }
+button.chip { font-family: 'Sarabun', sans-serif; line-height: 1.4; }
+.chip:disabled { opacity: .55; cursor: not-allowed; }
+.dark-mode .chip.active,
+.dark-mode .app-dialog-btn.confirm,
+.dark-mode .ai-glossary-btn:hover { color: var(--paper); }
