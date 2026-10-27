@@ -227,13 +227,17 @@
           <input class="chapter-title" id="chapterTitle" type="text" aria-label="ชื่อตอน" maxlength="160" placeholder="ชื่อตอนสำหรับประวัติ เช่น ตอนที่ 1: บทนำ">
           <textarea class="main-input" id="inputText" placeholder="วางข้อความนิยายของคุณที่นี่..."></textarea>
           <div id="suspiciousBox" role="status" aria-live="polite" class="warn-box" style="display:none;"></div>
-          <div class="page-foot">
-            <span style="display:flex;align-items:center;gap:4px;">
+          <div class="page-foot source-page-foot">
+            <span class="source-count-group">
               <span id="inCount">0 คำ</span>
               <span id="chunkInfo" style="color: var(--ink-faint); font-family: 'IBM Plex Mono', monospace; font-size: 11px;"></span>
             </span>
             <span class="save-status-text" id="saveStatusText">⚬ บันทึกแล้ว</span>
-            <span><button class="textbtn" id="importTextBtn" type="button">นำเข้า .txt</button>&nbsp;·&nbsp;<button class="textbtn" id="batchImportBtn" type="button">นำเข้าหลายไฟล์</button>&nbsp;·&nbsp;<button class="textbtn" id="clearBtn" type="button">ล้างข้อความ</button></span>
+            <span class="source-quick-actions" aria-label="การดำเนินการกับต้นฉบับ">
+              <button class="textbtn" id="importTextBtn" type="button">นำเข้า .txt</button>
+              <button class="textbtn" id="batchImportBtn" type="button">นำเข้าหลายไฟล์</button>
+              <button class="textbtn" id="clearBtn" type="button">ล้างข้อความ</button>
+            </span>
             <input id="textFile" type="file" accept="text/plain,.txt" hidden>
             <input id="batchFileInput" type="file" accept="text/plain,.txt" multiple hidden>
           </div>

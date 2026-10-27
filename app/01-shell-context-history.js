@@ -130,6 +130,7 @@
   var mainInput = document.getElementById('inputText');
   var outputBox = document.getElementById('output');
   var isSyncingScroll = false;
+  var syncScrollFrame = 0;
 
   function syncScroll(source, target){
     if(window.innerWidth > 900 && source.scrollHeight > source.clientHeight){
@@ -137,11 +138,12 @@
       isSyncingScroll = true;
       var percentage = source.scrollTop / (source.scrollHeight - source.clientHeight || 1);
       target.scrollTop = percentage * (target.scrollHeight - target.clientHeight);
-      setTimeout(function(){ isSyncingScroll = false; }, 40);
+      window.clearTimeout(syncScrollFrame);
+      syncScrollFrame = window.setTimeout(function(){ isSyncingScroll = false; }, 40);
     }
   }
-  mainInput.addEventListener('scroll', function(){ syncScroll(mainInput, outputBox); });
-  outputBox.addEventListener('scroll', function(){ syncScroll(outputBox, mainInput); });
+  mainInput.addEventListener('scroll', function(){ syncScroll(mainInput, outputBox); }, {passive:true});
+  outputBox.addEventListener('scroll', function(){ syncScroll(outputBox, mainInput); }, {passive:true});
 
   var mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
   var sidebar = document.getElementById('sidebar');
@@ -254,6 +256,11 @@
     return book ? (book.history || []) : (proj.history || []);
   }
 
+  var bottomHistoryVisibleCount = 60;
+  var bottomHistoryRenderKey = '';
+  var bottomHistorySearchTerm = '';
+  var bottomHistorySearchTimer = 0;
+
   function renderBottomHistory(){
     var container = document.getElementById('bottomHistoryList');
     var box = document.getElementById('projectHistoryBottom');
@@ -268,6 +275,12 @@
     box.style.display = 'block';
 
     var activeBook = getActiveBook(proj);
+    var renderKey = proj.id + ':' + (activeBook ? activeBook.id : 'legacy');
+    if(renderKey !== bottomHistoryRenderKey){
+      bottomHistoryRenderKey = renderKey;
+      bottomHistoryVisibleCount = 60;
+      bottomHistorySearchTerm = '';
+    }
     var bookSuffix = activeBook ? (' [' + activeBook.title + ']') : '';
     titleEl.textContent = 'ประวัติเรื่อง "' + proj.name + '"' + bookSuffix;
     container.innerHTML = '';
@@ -282,7 +295,27 @@
       return;
     }
 
-    historyList.forEach(function(entry, idx){
+    var indexedHistory = historyList.map(function(entry, idx){ return { entry: entry, idx: idx }; });
+    if(bottomHistorySearchTerm){
+      indexedHistory = indexedHistory.filter(function(item){
+        var label = item.entry.label || ('แปล' + (item.idx + 1));
+        return (label + ' ' + fmtTime(item.entry.ts)).toLowerCase().indexOf(bottomHistorySearchTerm) !== -1;
+      });
+    }
+
+    if(indexedHistory.length === 0){
+      var noMatch = document.createElement('div');
+      noMatch.className = 'history-empty';
+      noMatch.textContent = 'ไม่พบประวัติที่ตรงกับคำค้น';
+      container.appendChild(noMatch);
+      return;
+    }
+
+    var fragment = document.createDocumentFragment();
+    var startIdx = Math.max(0, indexedHistory.length - bottomHistoryVisibleCount);
+    indexedHistory.slice(startIdx).forEach(function(item){
+      var entry = item.entry;
+      var idx = item.idx;
       var item = document.createElement('div');
       item.className = 'bottom-history-item' + (viewingHistoryId === entry.id ? ' active' : '');
 
@@ -356,8 +389,22 @@
       }
 
       item.appendChild(actions);
-      container.appendChild(item);
+      fragment.appendChild(item);
     });
+
+    container.appendChild(fragment);
+
+    if(startIdx > 0){
+      var loadMoreBtn = document.createElement('button');
+      loadMoreBtn.type = 'button';
+      loadMoreBtn.className = 'textbtn history-load-more';
+      loadMoreBtn.textContent = 'โหลดตอนเก่าเพิ่ม (' + startIdx + ' ตอน)';
+      loadMoreBtn.addEventListener('click', function(){
+        bottomHistoryVisibleCount += 60;
+        renderBottomHistory();
+      });
+      container.insertBefore(loadMoreBtn, container.firstChild);
+    }
 
     applyBottomHistorySearchFilter();
   }
@@ -370,4 +417,9 @@
       item.style.display = (!term || txt.indexOf(term) !== -1) ? '' : 'none';
     });
   }
-  bottomHistorySearchInput.addEventListener('input', applyBottomHistorySearchFilter);
+  bottomHistorySearchInput.addEventListener('input', function(){
+    bottomHistorySearchTerm = (bottomHistorySearchInput.value || '').trim().toLowerCase();
+    bottomHistoryVisibleCount = 60;
+    window.clearTimeout(bottomHistorySearchTimer);
+    bottomHistorySearchTimer = window.setTimeout(renderBottomHistory, 120);
+  });

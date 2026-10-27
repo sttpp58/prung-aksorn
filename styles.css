@@ -1109,6 +1109,96 @@
     }
   }
 
+  /* Compact source-card footer: status stays on the left, actions form a
+     predictable touch-friendly group on the right. */
+  .source-page-foot {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+  .source-count-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+  .source-quick-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    min-width: 0;
+    margin-left: auto;
+  }
+  .source-quick-actions .textbtn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 4px;
+    touch-action: manipulation;
+    white-space: nowrap;
+  }
+
+  .translation-summary {
+    min-width: 0;
+    max-width: min(52vw, 420px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap !important;
+  }
+
+  /* Low-end mobile fallback: remove blur and reduce shadow rasterization from
+     the translucent card treatment while keeping the visual hierarchy. */
+  @media (max-width: 900px) {
+    .translation-modal,
+    .glossary-modal,
+    .app-dialog-overlay,
+    .reader-backdrop {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    .sidebar,
+    .settings,
+    .translation-settings-btn,
+    .translation-modal-card,
+    .glossary-modal-card,
+    .app-dialog-panel,
+    .reader-header,
+    .reader-toc-drawer,
+    .export-menu-list {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      background: var(--paper-card) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .12) !important;
+    }
+    .source-page-foot {
+      align-items: flex-start;
+    }
+    .source-quick-actions {
+      flex-basis: 100%;
+      justify-content: flex-start;
+      margin-left: 0;
+      border-top: 1px solid var(--paper-line);
+      padding-top: 4px;
+    }
+  }
+
+  @media (max-width: 430px) {
+    .translation-summary {
+      max-width: 48vw;
+      font-size: 11px;
+    }
+    .source-quick-actions {
+      gap: 2px 6px;
+    }
+    .source-quick-actions .textbtn {
+      font-size: 12px;
+      padding-inline: 2px;
+    }
+  }
+
   .reader-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 2015; opacity: 0; transition: opacity 0.3s ease; }
   .reader-backdrop.show { display: block; opacity: 1; }
 
@@ -1625,6 +1715,91 @@ button.chip { font-family: 'Sarabun', sans-serif; line-height: 1.4; }
     }
     .ink-vein-1 { transform: rotate(-18deg) !important; }
     .ink-vein-2 { transform: rotate(15deg) !important; }
+  }
+
+  /* Mobile performance primitives: keep scrolling on the compositor and avoid
+     repainting large history trees that are outside the viewport. */
+  html {
+    touch-action: manipulation;
+    scroll-behavior: smooth;
+  }
+  body {
+    overscroll-behavior-x: none;
+  }
+  .sidebar,
+  .project-history-bottom-list,
+  .history-list,
+  .translation-modal-card,
+  .glossary-modal-card {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .project-history-bottom-list,
+  .history-list {
+    contain: layout paint style;
+    content-visibility: auto;
+    contain-intrinsic-size: 0 420px;
+  }
+  .project-history-bottom-list {
+    scroll-behavior: smooth;
+  }
+
+  /* Stable hit areas prevent missed taps without changing visual icon size. */
+  .icon-btn,
+  .modal-close,
+  .mobile-sidebar-toggle,
+  .mobile-tab-btn,
+  .translation-settings-btn,
+  .history-entry,
+  .bottom-history-title,
+  .seg button,
+  .chip,
+  .export-menu > summary {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  /* Compositor-friendly open/close motion. Visibility preserves the existing
+     aria-hidden state while avoiding display:none layout churn during animation. */
+  .translation-modal,
+  .glossary-modal,
+  .app-dialog-overlay {
+    display: flex;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease-in-out, visibility 180ms ease-in-out;
+  }
+  .translation-modal.open,
+  .glossary-modal.show,
+  .app-dialog-overlay.show {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .translation-modal-card,
+  .glossary-modal-card,
+  .app-dialog-panel {
+    transform: translate3d(0, 8px, 0);
+    transition: transform 200ms ease-in-out;
+    will-change: transform;
+  }
+  .translation-modal.open .translation-modal-card,
+  .glossary-modal.show .glossary-modal-card,
+  .app-dialog-overlay.show .app-dialog-panel {
+    transform: translate3d(0, 0, 0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .translation-modal,
+    .glossary-modal,
+    .app-dialog-overlay,
+    .translation-modal-card,
+    .glossary-modal-card,
+    .app-dialog-panel { transition: none; }
   }
 
   /* ================================================================
@@ -2679,5 +2854,52 @@ button.chip { font-family: 'Sarabun', sans-serif; line-height: 1.4; }
       overflow-y: auto;
       overscroll-behavior: contain;
       scrollbar-gutter: stable;
+    }
+
+    /* Low-end mobile fallback: avoid expensive blur, filters, and large shadow
+       layers that can force GPU rasterization on budget devices. */
+    .translation-modal,
+    .glossary-modal,
+    .app-dialog-overlay {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      background: rgba(10, 12, 15, .82);
+    }
+    .translation-modal-card,
+    .glossary-modal-card,
+    .app-dialog-panel,
+    .project-history-bottom,
+    .sidebar,
+    .settings,
+    .export-menu-list {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+    }
+    .ink-bg-container,
+    .ink-svg-defs {
+      display: none;
+    }
+    .history-load-more {
+      width: 100%;
+      min-height: 44px;
+      margin: 4px 0 8px;
+    }
+  }
+
+  /* Final responsive contract for the settings summary. */
+  @media (max-width: 900px) {
+    .translation-summary {
+      display: block;
+      min-width: 0;
+      max-width: min(52vw, 420px) !important;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap !important;
+      line-height: 1.3;
+    }
+  }
+  @media (max-width: 430px) {
+    .translation-summary {
+      max-width: 48vw !important;
+      font-size: 11px;
     }
   }
