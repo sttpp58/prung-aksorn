@@ -130,6 +130,7 @@
             proj.currentBookId = book.id;
             commitChange();
             loadProjectDraft(proj);
+            updateActiveBanner();
             advanceAppContextGeneration();
           });
           brow.appendChild(btitle);

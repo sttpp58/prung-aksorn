@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!-- CSP: runtime JavaScript is externalized to the same-origin app entrypoint; script/style/network capabilities remain explicitly restricted. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.openai.com https://generativelanguage.googleapis.com; worker-src 'self' blob:; manifest-src 'self';">
-<meta name="app-release-version" content="v12">
+<meta name="app-release-version" content="v13">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ปรุงอักษร — ห้องทำงานนักแปล</title>
 <link rel="manifest" href="manifest.json">
@@ -19,6 +19,53 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<!-- Ink Wash Background Layer (SVG feTurbulence + CSS) -->
+<svg class="ink-svg-defs" aria-hidden="true">
+  <defs>
+    <filter id="inkWash" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.009" numOctaves="5" seed="3" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="120" xChannelSelector="R" yChannelSelector="G" result="displaced"/>
+      <feGaussianBlur in="displaced" stdDeviation="18" result="blurred"/>
+      <feComponentTransfer result="faded">
+        <feFuncA type="linear" slope="0.7" intercept="0"/>
+      </feComponentTransfer>
+    </filter>
+    <filter id="inkEdge" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.025" numOctaves="4" seed="7" result="noise2"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise2" scale="80" xChannelSelector="R" yChannelSelector="G" result="displaced2"/>
+      <feGaussianBlur in="displaced2" stdDeviation="10" result="blurred2"/>
+      <feComponentTransfer result="faded2">
+        <feFuncA type="linear" slope="0.85" intercept="0"/>
+      </feComponentTransfer>
+    </filter>
+    <filter id="inkSpatter" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.06" numOctaves="3" seed="12" result="noise3"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise3" scale="35" xChannelSelector="R" yChannelSelector="G"/>
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+    <filter id="goldVein" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.025 0.015" numOctaves="6" seed="5" result="gnoise"/>
+      <feDisplacementMap in="SourceGraphic" in2="gnoise" scale="50" xChannelSelector="R" yChannelSelector="G"/>
+      <feGaussianBlur stdDeviation="1.2"/>
+    </filter>
+  </defs>
+</svg>
+<div class="ink-bg-container" aria-hidden="true">
+  <!-- Main ink washes (large organic blobs) -->
+  <div class="ink-wash ink-wash-1"></div>
+  <div class="ink-wash ink-wash-2"></div>
+  <div class="ink-wash ink-wash-3"></div>
+  <!-- Secondary diffusion patches -->
+  <div class="ink-wash ink-wash-4"></div>
+  <div class="ink-wash ink-wash-5"></div>
+  <!-- Gold vein accents -->
+  <div class="ink-vein ink-vein-1"></div>
+  <div class="ink-vein ink-vein-2"></div>
+  <!-- Ink spatter dots -->
+  <div class="ink-spatter ink-spatter-1"></div>
+  <div class="ink-spatter ink-spatter-2"></div>
+</div>
+
 <div class="wrap">
 
   <button class="exit-zen-floating-btn" id="exitZenBtn" type="button">✖ ออกจากโหมดสมาธิ</button>
@@ -30,7 +77,7 @@
     </div>
     <div class="header-actions">
       <div id="costMeter" class="cost-meter" title="ค่าใช้จ่าย API สะสมโดยประมาณ (คลิกเพื่อรีเซ็ต)">
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--gold);"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg> 
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--gold);"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg>
         $<span id="costMeterValue">0.0000</span>
       </div>
       <button class="theme-toggle-btn" id="themeToggleBtn" type="button" title="สลับโหมดสีกระดาษ">☾ โหมดมืด</button>
@@ -224,7 +271,7 @@
 
       <div class="action-container">
         <button class="process-btn-primary" id="processBtn">ปรุงอักษร</button>
-        
+
         <div class="secondary-actions-row">
           <button class="btn-outline" id="quickRepairBtn" title="ล้างอักษรซ่อน PUA และสัญลักษณ์ขยะทันที (ไม่ต้องรอ AI)">ซ่อมรวดเร็ว</button>
           <button class="btn-outline" id="repairBtn" title="ให้ AI ช่วยซ่อมคำผิดจากการสแกน (ใช้ API)">ซ่อม OCR (AI)</button>
@@ -235,7 +282,7 @@
           <button class="utility-action-btn danger" id="cancelBtn">ยกเลิกการทำงาน</button>
         </div>
       </div>
-      
+
       <p id="progressText" class="status" role="status" aria-live="polite"></p>
 
       <div class="error" id="errorBox"></div>
@@ -245,7 +292,7 @@
           <span id="bottomHistoryProjectTitle">ประวัติการแปลทั้งหมดของเรื่องนี้</span>
           <button class="utility-btn" id="toggleBottomHistoryBtn" type="button">ซ่อน/แสดง</button>
         </div>
-        
+
         <div class="bottom-history-controls">
           <input type="text" id="bottomHistorySearchInput" class="history-search-input" placeholder="ค้นหาในประวัติ (ชื่อตอน)...">
           <div class="tool-group" role="group" aria-label="อ่าน">
@@ -345,11 +392,11 @@
         <span id="readerThemeIconWrapper">☾</span> <span class="text-label">โหมดมืด</span>
       </button>
       <button class="reader-btn" id="readerTocBtn" type="button" title="ดูสารบัญ">
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg> 
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         <span class="text-label">สารบัญ</span>
       </button>
       <button class="reader-btn" id="readerCloseBtn" type="button" title="ปิดโหมดนักอ่าน">
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> 
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         <span class="text-label">ปิด</span>
       </button>
     </div>
