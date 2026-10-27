@@ -95,7 +95,7 @@
   ::-webkit-scrollbar-thumb { background: var(--paper-line); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 
-  .wrap{max-width:1280px;margin:0 auto; min-width: 0;}
+  .wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;min-width:0;}
 
   /* โหมดสมาธิเต็มจอ (Zen Focus Mode) */
   body.zen-mode header,
@@ -1338,7 +1338,7 @@ button.chip { font-family: 'Sarabun', sans-serif; line-height: 1.4; }
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: -1;
+    z-index: 0;
     overflow: hidden;
     contain: strict;
   }
