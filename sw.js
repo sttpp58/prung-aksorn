@@ -3,7 +3,7 @@
 // ไม่แตะ/ไม่แคชการเรียก AI API (OpenAI, Gemini) หรือฟอนต์จาก Google เด็ดขาด
 // เพื่อไม่ให้คำแปลค้างหรือใช้คีย์/โควตาผิดพลาด
 
-const APP_RELEASE_VERSION = 'v13';
+const APP_RELEASE_VERSION = 'v14';
 const CACHE_NAME = `prung-aksorn-${APP_RELEASE_VERSION}`;
 const APP_SHELL = [
   './',
