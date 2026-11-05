@@ -2903,3 +2903,185 @@ button.chip { font-family: 'Sarabun', sans-serif; line-height: 1.4; }
       font-size: 11px;
     }
   }
+/* Keep the model picker above workspace cards. The desktop glass effect on
+   .settings creates a stacking context, so the open panel itself must be raised. */
+.settings.open {
+  position: relative;
+  z-index: 100;
+}
+
+
+/* Compact header controls aligned to the app-title row. */
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+.header-actions > .cost-meter,
+.header-actions > .theme-toggle-btn,
+.header-actions > .zen-toggle-btn,
+.header-actions > .gear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  transition-property: border-color, color, background-color, box-shadow, transform;
+}
+
+@media (min-width: 901px) {
+  header { align-items: flex-start; gap: 18px; }
+  header > .brand h1 { line-height: 36px; }
+  header > .header-actions { align-self: flex-start; gap: 6px; }
+  .header-actions > .cost-meter,
+  .header-actions > .theme-toggle-btn,
+  .header-actions > .zen-toggle-btn,
+  .header-actions > .gear-btn,
+  header .header-actions > button#gearBtn {
+    height: 36px !important;
+    min-height: 36px !important;
+    border-radius: 7px;
+  }
+  .header-actions > .cost-meter {
+    min-width: 72px;
+    padding: 0 9px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .header-actions > .theme-toggle-btn,
+  .header-actions > .zen-toggle-btn {
+    padding: 0 10px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .header-actions > .gear-btn,
+  header .header-actions > button#gearBtn {
+    width: 36px !important;
+    min-width: 36px !important;
+    flex-basis: 36px;
+    padding: 0;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "brand actions";
+    align-items: start;
+    gap: 8px;
+    width: 100%;
+  }
+  header > .brand { grid-area: brand; min-width: 0; }
+  header > .brand h1 { line-height: 44px; font-size: 22px; }
+  header > .brand p {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  header > .header-actions {
+    grid-area: actions;
+    align-self: start;
+    width: auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 0;
+  }
+  .header-actions > .cost-meter,
+  .header-actions > .theme-toggle-btn,
+  .header-actions > .zen-toggle-btn,
+  .header-actions > .gear-btn,
+  header .header-actions > button#gearBtn {
+    height: 44px !important;
+    min-height: 44px !important;
+    border-radius: 7px;
+    line-height: 1;
+  }
+  .header-actions > .cost-meter {
+    min-width: 64px;
+    max-width: none;
+    padding: 0 7px;
+    gap: 0;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .header-actions > .theme-toggle-btn,
+  .header-actions > .zen-toggle-btn {
+    min-width: 44px;
+    padding: 0 9px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .header-actions > .gear-btn,
+  header .header-actions > button#gearBtn {
+    width: 44px !important;
+    min-width: 44px !important;
+    flex-basis: 44px;
+    padding: 0;
+    font-size: 16px;
+    transform: none !important;
+  }
+}
+
+@media (max-width: 600px) {
+  header { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+  header > .brand h1 { font-size: 20px; }
+  header > .header-actions { gap: 4px; }
+  .header-actions > .cost-meter {
+    min-width: 60px;
+    padding: 0 5px;
+  }
+  .header-actions > .theme-toggle-btn,
+  .header-actions > .zen-toggle-btn {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+  .header-actions > .theme-toggle-btn::before,
+  .header-actions > .zen-toggle-btn::before {
+    font-size: 16px;
+    line-height: 1;
+  }
+  .header-actions > .gear-btn,
+  header .header-actions > button#gearBtn {
+    width: 44px !important;
+    min-width: 44px !important;
+    flex-basis: 44px;
+  }
+}
+
+@media (max-width: 360px) {
+  header > .brand h1 { font-size: 19px; }
+  header > .brand p { font-size: 10px; }
+}
+
+/* Always generate mobile action glyphs wherever their text labels are hidden. */
+@media (max-width: 600px) {
+  .header-actions > .theme-toggle-btn::before,
+  .header-actions > .zen-toggle-btn::before {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Segoe UI Symbol", "Apple Symbols", Arial, sans-serif;
+    font-size: 18px;
+    line-height: 1;
+    color: currentColor;
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .header-actions > .theme-toggle-btn::before {
+    content: "\263E";
+  }
+
+  .header-actions > .zen-toggle-btn::before {
+    content: "\26F6";
+  }
+}

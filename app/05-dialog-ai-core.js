@@ -217,7 +217,7 @@
 
   function renderCostMeter() {
     var stats = (appData.settings && appData.settings.apiStats) || { cost: 0 };
-    document.getElementById('costMeterValue').textContent = (stats.cost || 0).toFixed(4);
+    document.getElementById('costMeterValue').textContent = (stats.cost || 0).toFixed(2);
   }
 
   document.getElementById('costMeter').addEventListener('click', async function(){
