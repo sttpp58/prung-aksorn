@@ -3085,3 +3085,19 @@ button.chip { font-family: 'Sarabun', sans-serif; line-height: 1.4; }
     content: "\26F6";
   }
 }
+
+
+/* Preserve a 48px mobile hit area for icon-only actions without changing
+   the compact visual glyph size. */
+@media (max-width: 600px) {
+  .icon-btn,
+  .project-row .icon-btn,
+  .bottom-history-actions .icon-btn {
+    box-sizing: border-box;
+    flex-basis: 48px;
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    min-height: 48px;
+  }
+}

@@ -323,16 +323,19 @@ async function evaluate(cdp, expression) {
 }
 
 async function click(cdp, selector) {
+  await waitForFunction(cdp, "typeof storageReady !== 'undefined' && storageReady === true && window.PrungAksornAppReady === true", 15000);
   const ok = await evaluate(cdp, `(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)return false;el.click();return true;})()`);
   check(ok, 'click target exists: ' + selector);
 }
 
 async function clickText(cdp, selector, text) {
+  await waitForFunction(cdp, "typeof storageReady !== 'undefined' && storageReady === true && window.PrungAksornAppReady === true", 15000);
   const ok = await evaluate(cdp, `(()=>{const el=[...document.querySelectorAll(${JSON.stringify(selector)})].find(x=>x.textContent.includes(${JSON.stringify(text)}));if(!el)return false;el.click();return true;})()`);
   check(ok, `click visible control containing "${text}"`);
 }
 
 async function typeInto(cdp, selector, text) {
+  await waitForFunction(cdp, "typeof storageReady !== 'undefined' && storageReady === true && window.PrungAksornAppReady === true", 15000);
   const type = await evaluate(cdp, `(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)return null;return el.type || el.tagName.toLowerCase();})()`);
   const ready = await evaluate(cdp, `(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)return false;el.focus();if('value' in el){el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));}return true;})()`);
   check(ready, 'input target exists: ' + selector);
@@ -341,7 +344,8 @@ async function typeInto(cdp, selector, text) {
     check(set, 'test credential field accepts browser-side value');
     return;
   }
-  await cdp.send('Input.insertText', { text });
+  const set = await evaluate(cdp, `(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el||!('value' in el))return false;el.value=${JSON.stringify(text)};el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return el.value===${JSON.stringify(text)};})()`);
+  check(set, 'input field accepts browser input events: ' + selector);
 }
 
 async function read(cdp, expression) { return await evaluate(cdp, expression); }
@@ -364,7 +368,7 @@ async function reload(cdp, url) {
   );
   await waitForFunction(
     cdp,
-    `typeof storageReady !== 'undefined' && storageReady === true && typeof appData !== 'undefined'`,
+    `typeof storageReady !== 'undefined' && storageReady === true && typeof appData !== 'undefined' && window.PrungAksornAppReady === true`,
     15_000
   );
   await waitForFunction(cdp, `!!window.PrungAksornStorageV2 && !!document.getElementById('projectList')`, 10_000);
@@ -666,8 +670,10 @@ try {
 
   await waitForFunction(cdp, `document.readyState === 'complete' && !!document.getElementById('addProjBtn')`, 15_000);
   await waitForFunction(cdp, `!!window.PrungAksornStorageV2`, 15_000);
+  await waitForFunction(cdp, "typeof storageReady !== 'undefined' && storageReady === true && window.PrungAksornAppReady === true", 15000);
   await waitForFunction(cdp, `navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false`, 10_000, 100);
   check(true, 'app loads in a real Chromium browser over HTTP');
+  check(await read(cdp, "window.PrungAksornAppReady === true && document.body.inert === false && document.body.dataset.storageState === 'ready' && !document.body.hasAttribute('aria-busy')"), 'storage-ready startup releases the inert application shell');
 
   if (LIFECYCLE_TEST_MODE) {
     if (!['setup-exception', 'global-timeout', 'signal'].includes(LIFECYCLE_TEST_MODE)) {
@@ -815,10 +821,13 @@ try {
   await waitForFunction(cdp, `document.getElementById('output').textContent.includes('Translated result from Book A')`, 8_000);
   check(await read(cdp, `document.getElementById('output').textContent.includes('Translated result from Book A')`), 'Book A translated result remains accessible through visible history UI');
 
-  await cdp.send('Emulation.setDeviceMetricsOverride', {width:390,height:844,deviceScaleFactor:1,mobile:true});
-  const touchTargetAudit = await read(cdp, `(()=>{const selectors=['.icon-btn','.book-item-row .icon-btn','.bottom-history-actions .icon-btn','.history-entry','.book-title-text','.mobile-sidebar-toggle','.mobile-tab-btn','.translation-settings-btn','.gear-btn','#processBtn','#addProjBtn'];const checked=selectors.flatMap(selector=>[...document.querySelectorAll(selector)].filter(el=>el.getClientRects().length>0).map(el=>({selector,width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height})));return {viewport:window.innerWidth,checked:checked.length,failures:checked.filter(item=>{const floor=item.selector==='.gear-btn'?44:48;return item.width<floor||item.height<floor;})};})()`);
-  check(touchTargetAudit.checked >= 6 && touchTargetAudit.failures.length === 0, 'visible primary mobile controls meet their touch-target floors (44px for compact header gear, 48px for other primary controls): ' + JSON.stringify(touchTargetAudit));
-
+  const touchTargetAudits = [];
+  for (const width of [320, 360, 390, 430]) {
+    await cdp.send('Emulation.setDeviceMetricsOverride', {width,height:844,deviceScaleFactor:1,mobile:true});
+    const audit = await read(cdp, `(()=>{const selectors=['.icon-btn','.book-item-row .icon-btn','.bottom-history-actions .icon-btn','.history-entry','.book-title-text','.mobile-sidebar-toggle','.mobile-tab-btn','.translation-settings-btn','.gear-btn','#processBtn','#addProjBtn'];const checked=selectors.flatMap(selector=>[...document.querySelectorAll(selector)].filter(el=>el.getClientRects().length>0).map(el=>({selector,width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height})));return {viewport:window.innerWidth,checked:checked.length,failures:checked.filter(item=>{const floor=item.selector==='.gear-btn'?44:48;return item.width<floor||item.height<floor;}),horizontalOverflow:document.documentElement.scrollWidth>window.innerWidth};})()`);
+    touchTargetAudits.push(audit);
+  }
+  check(touchTargetAudits.every(audit => audit.checked >= 6 && audit.failures.length === 0 && !audit.horizontalOverflow), 'mobile touch targets and viewport fit pass at 320/360/390/430px: ' + JSON.stringify(touchTargetAudits));
   check(await read(cdp, `(()=>{const host=document.querySelector('.action-container'); const box=document.createElement('div'); box.id='translationRecoveryBox'; box.innerHTML='<div>พบงานแปลที่ต้องตรวจสอบ</div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">千零四十五章 書奇隔落 長標題สำหรับทดสอบมือถือ — 0/1 (failed) — ไม่พบ Project ต้นทาง</span><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><button type="button">ซ่อน</button></div></div><div style="margin-top:8px;font-size:.9em;opacity:.75">ระบบจะไม่เริ่ม API อัตโนมัติ ต้องกดกู้คืนและเริ่มงานด้วยตนเอง</div>'; host.appendChild(box); const dismiss=box.querySelector('button'); const boxRect=box.getBoundingClientRect(); const buttonRect=dismiss.getBoundingClientRect(); const fits=boxRect.left>=0 && boxRect.right<=window.innerWidth && document.documentElement.scrollWidth<=window.innerWidth && buttonRect.width>0 && buttonRect.left>=0 && buttonRect.right<=window.innerWidth; box.remove(); return fits;})()`), 'mobile recovery box keeps the dismiss button inside the viewport');
   await cdp.send('Emulation.clearDeviceMetricsOverride');
 

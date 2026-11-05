@@ -184,6 +184,7 @@ async function waitForFunction(cdp, expression, timeoutMs = 10000, intervalMs = 
 }
 
 async function click(cdp, selector) {
+  await waitForFunction(cdp, "typeof storageReady !== 'undefined' && storageReady === true && window.PrungAksornAppReady === true", 15000);
   const ok = await evaluate(cdp, '(() => {' +
     'const el=document.querySelector(' + JSON.stringify(selector) + ');' +
     'if(!el)return false; el.click(); return true;' +
@@ -192,6 +193,7 @@ async function click(cdp, selector) {
 }
 
 async function clickText(cdp, selector, text) {
+  await waitForFunction(cdp, "typeof storageReady !== 'undefined' && storageReady === true && window.PrungAksornAppReady === true", 15000);
   const ok = await evaluate(cdp, '(() => {' +
     'const el=[...document.querySelectorAll(' + JSON.stringify(selector) + ')].find(x=>x.textContent.includes(' + JSON.stringify(text) + '));' +
     'if(!el)return false; el.click(); return true;' +
@@ -200,6 +202,7 @@ async function clickText(cdp, selector, text) {
 }
 
 async function typeInto(cdp, selector, value) {
+  await waitForFunction(cdp, "typeof storageReady !== 'undefined' && storageReady === true && window.PrungAksornAppReady === true", 15000);
   const kind = await evaluate(cdp, '(() => {' +
     'const el=document.querySelector(' + JSON.stringify(selector) + ');' +
     'return el ? (el.type || el.tagName.toLowerCase()) : null;' +
@@ -223,7 +226,15 @@ async function typeInto(cdp, selector, value) {
     check(set, 'browser-side API credential field accepted');
     return;
   }
-  await cdp.send('Input.insertText', { text: value });
+  const set = await evaluate(cdp, '(() => {' +
+    'const el=document.querySelector(' + JSON.stringify(selector) + ');' +
+    'if(!el || !(\'value\' in el))return false;' +
+    'el.value=' + JSON.stringify(value) + ';' +
+    'el.dispatchEvent(new Event(\'input\',{bubbles:true}));' +
+    'el.dispatchEvent(new Event(\'change\',{bubbles:true}));' +
+    'return el.value===' + JSON.stringify(value) + ';' +
+    '})()');
+  check(set, 'input field accepts browser input events: ' + selector);
 }
 
 async function setupBrowser(label) {
@@ -275,6 +286,7 @@ async function setupBrowser(label) {
     await waitForFunction(cdp,
       "document.readyState === 'complete' && !!document.getElementById('addProjBtn')", 15000);
     await waitForFunction(cdp, '!!window.PrungAksornStorageV2', 15000);
+    await waitForFunction(cdp, "typeof storageReady !== 'undefined' && storageReady === true && window.PrungAksornAppReady === true", 15000);
     await evaluate(cdp,
       "navigator.serviceWorker ? navigator.serviceWorker.ready.then(() => true).catch(() => false) : false");
     check(
@@ -432,6 +444,7 @@ async function reloadBrowser(ctx) {
   await waitForFunction(ctx.cdp,
     "document.readyState==='complete' && !!document.getElementById('inputText')", 12000);
   await waitForFunction(ctx.cdp, '!!window.PrungAksornStorageV2', 12000);
+  await waitForFunction(ctx.cdp, "typeof storageReady !== 'undefined' && storageReady === true && window.PrungAksornAppReady === true", 15000);
   await evaluate(ctx.cdp,
     "navigator.serviceWorker ? navigator.serviceWorker.ready.then(()=>true).catch(()=>false) : false");
 }

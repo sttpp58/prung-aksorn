@@ -72,6 +72,7 @@
   }
 
   function saveSettings(){
+    if(!storageReady) return false;
     var prevSettings = appData.settings || {};
     var customModels = typeof getCustomModelStore === 'function'
       ? getCustomModelStore()
@@ -195,6 +196,7 @@
   }
 
   async function flushSaveData(){
+    if(!storageReady) return false;
     if(saveDataInFlight) return saveDataInFlight;
     saveDataInFlight = (async function(){
       clearTimeout(saveDataTimer);
@@ -228,7 +230,13 @@
   }
 
   function saveData(){
-    if(!storageReady) return false;
+    if(!storageReady){
+      if(saveStatusText){
+        saveStatusText.textContent = '⚠ ฐานข้อมูลยังไม่พร้อม';
+        saveStatusText.classList.remove('saving');
+      }
+      return false;
+    }
     saveDataPending = true;
     saveDataVersion += 1;
     saveRetryCount = 0;
@@ -259,6 +267,7 @@
   }
 
   function getCurrentProject(){
+    if(!storageReady) return null;
     return appData.projects.find(function(p){ return p.id === appData.currentProjectId; }) || null;
   }
 
