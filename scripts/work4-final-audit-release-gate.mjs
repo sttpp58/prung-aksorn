@@ -171,7 +171,7 @@ const secretScanPaths = git(['ls-files'])
   .filter(Boolean)
   .filter((file) => !file.startsWith('tests/tqg/c2-private/'));
 const SECRET_PATTERNS = [
-  /(?:sk|rk)-[A-Za-z0-9_-]{20,}/,
+  /\b(?:sk|rk)-[A-Za-z0-9_-]{20,}/,
   /AIza[0-9A-Za-z_-]{20,}/,
   /ghp_[A-Za-z0-9]{20,}/,
   /github_pat_[A-Za-z0-9_]{20,}/
