@@ -132,12 +132,14 @@ async function waitFor(cdp, expression, timeout = TIMEOUT) {
   throw new Error('Timed out: ' + expression);
 }
 async function click(cdp, selector) {
+  await waitFor(cdp, 'typeof storageReady !== "undefined" && storageReady === true && window.PrungAksornAppReady === true', 15000);
   const expression = '(()=>{const el=document.querySelector(' + JSON.stringify(selector) +
     ');if(!el)return false;el.click();return true;})()';
   check(await evaluate(cdp, expression), 'click target exists: ' + selector);
 }
 
 async function setInput(cdp, selector, value) {
+  await waitFor(cdp, 'typeof storageReady !== "undefined" && storageReady === true && window.PrungAksornAppReady === true', 15000);
   const expression = '(()=>{const el=document.querySelector(' + JSON.stringify(selector) +
     ');if(!el)return false;el.focus();el.value=' + JSON.stringify(value) +
     ';el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));return true;})()';
@@ -200,6 +202,7 @@ try {
   });
 
   await waitFor(cdp, 'document.readyState === "complete" && !!document.getElementById("addProjBtn")', 15_000);
+  await waitFor(cdp, 'typeof storageReady !== "undefined" && storageReady === true && window.PrungAksornAppReady === true', 15_000);
   check(await evaluate(cdp, '!!window.TQG && !!window.TQGIntegration && !!window.TQGQualityUI'),
     'browser loads the complete TQG runtime surface');
   check(await evaluate(cdp, 'document.getElementById("tqgQualityPanel").hidden === true'),

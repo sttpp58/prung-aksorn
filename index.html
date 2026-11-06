@@ -224,6 +224,7 @@
         <div class="page source-page">
           <h2>ต้นฉบับ <button class="source-expand-btn" id="expandSourceBtn" type="button">เปิดต้นฉบับ</button><button class="source-collapse-btn" id="collapseSourceBtn" type="button">ย่อต้นฉบับ</button></h2>
           <input class="chapter-title" id="chapterTitle" type="text" aria-label="ชื่อตอน" maxlength="160" placeholder="ชื่อตอนสำหรับประวัติ เช่น ตอนที่ 1: บทนำ">
+          <label for="inputText" class="sr-only">ต้นฉบับ</label>
           <textarea class="main-input" id="inputText" placeholder="วางข้อความนิยายของคุณที่นี่..."></textarea>
           <div id="suspiciousBox" role="status" aria-live="polite" class="warn-box" style="display:none;"></div>
           <div class="page-foot source-page-foot">
@@ -343,7 +344,7 @@
         <div class="diff-panel">
           <div class="diff-panel-head">
             <span id="diffTitle">เทียบความต่าง</span>
-            <button class="icon-btn" id="diffCloseBtn" type="button" title="ปิด">✕</button>
+            <button class="icon-btn" id="diffCloseBtn" type="button" title="ปิด" aria-label="ปิดหน้าเทียบความต่าง">✕</button>
           </div>
           <div class="diff-legend"><span class="diff-added">เพิ่ม/แก้ใหม่</span> &nbsp; <span class="diff-removed">ของเดิมที่ถูกลบ/แทนที่</span></div>
           <div class="diff-body" id="diffBody"></div>
@@ -360,7 +361,7 @@
   <div class="glossary-modal-card">
     <div class="glossary-modal-head">
       <span>ตรวจสอบและเลือกคำศัพท์เข้าคลังคำ</span>
-      <button class="icon-btn" id="glossaryModalCloseBtn" type="button" title="ปิด">✕</button>
+      <button class="icon-btn" id="glossaryModalCloseBtn" type="button" title="ปิด" aria-label="ปิดหน้าตรวจสอบคลังคำ">✕</button>
     </div>
     <div class="glossary-modal-toolbar">
       <div class="glossary-modal-toolbar-actions">
