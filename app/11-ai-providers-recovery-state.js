@@ -273,6 +273,7 @@
     closeBtn.className = 'icon-btn';
     closeBtn.textContent = '✕';
     closeBtn.title = 'ซ่อนคำเตือนนี้';
+    closeBtn.setAttribute('aria-label', 'ซ่อนคำเตือนนี้');
     closeBtn.addEventListener('click', hideGlossaryEnforce);
     header.appendChild(closeBtn);
     glossaryEnforceBox.appendChild(header);

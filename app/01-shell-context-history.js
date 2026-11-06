@@ -280,6 +280,9 @@
       bottomHistoryRenderKey = renderKey;
       bottomHistoryVisibleCount = 60;
       bottomHistorySearchTerm = '';
+      window.clearTimeout(bottomHistorySearchTimer);
+      bottomHistorySearchTimer = 0;
+      if(bottomHistorySearchInput) bottomHistorySearchInput.value = '';
     }
     var bookSuffix = activeBook ? (' [' + activeBook.title + ']') : '';
     titleEl.textContent = 'ประวัติเรื่อง "' + proj.name + '"' + bookSuffix;
@@ -333,6 +336,7 @@
       var renameBtn = document.createElement('button');
       renameBtn.className = 'icon-btn';
       renameBtn.title = 'เปลี่ยนชื่อ';
+      renameBtn.setAttribute('aria-label', 'เปลี่ยนชื่อตอน');
       renameBtn.textContent = '✎';
       renameBtn.addEventListener('click', async function(e){
         e.stopPropagation();
@@ -352,6 +356,7 @@
       var delBtn = document.createElement('button');
       delBtn.className = 'icon-btn';
       delBtn.title = 'ลบประวัติ';
+      delBtn.setAttribute('aria-label', 'ลบประวัตินี้');
       delBtn.textContent = '✕';
       delBtn.addEventListener('click', async function(e){
         e.stopPropagation();
@@ -378,6 +383,7 @@
         var diffBtnEl = document.createElement('button');
         diffBtnEl.className = 'icon-btn diff-btn';
         diffBtnEl.title = 'เทียบความต่างกับต้นฉบับที่แก้มาจาก';
+        diffBtnEl.setAttribute('aria-label', 'เทียบความต่าง');
         diffBtnEl.textContent = 'Δ';
         diffBtnEl.addEventListener('click', async function(e){
           e.stopPropagation();

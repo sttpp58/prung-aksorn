@@ -25,6 +25,7 @@
       var renameProjBtn = document.createElement('button');
       renameProjBtn.className = 'icon-btn';
       renameProjBtn.title = 'เปลี่ยนชื่อเรื่อง';
+      renameProjBtn.setAttribute('aria-label', 'เปลี่ยนชื่อเรื่อง');
       renameProjBtn.textContent = '✎';
       renameProjBtn.addEventListener('click', async function(e){
         e.stopPropagation();
@@ -40,6 +41,7 @@
       var glossBtn = document.createElement('button');
       glossBtn.className = 'icon-btn';
       glossBtn.title = 'คลังคำ & บริบท';
+      glossBtn.setAttribute('aria-label', 'คลังคำ & บริบท');
       glossBtn.textContent = '⚙';
       glossBtn.addEventListener('click', function(e){
         e.stopPropagation();
@@ -50,6 +52,7 @@
       var delBtn = document.createElement('button');
       delBtn.className = 'icon-btn';
       delBtn.title = 'ลบเรื่องนี้';
+      delBtn.setAttribute('aria-label', 'ลบเรื่องนี้');
       delBtn.textContent = '✕';
       delBtn.addEventListener('click', async function(e){
         e.stopPropagation();
@@ -73,6 +76,7 @@
         expandedProjects[proj.id] = !expandedProjects[proj.id];
         saveData();
         renderProjects();
+        renderBottomHistory();
         updateActiveBanner();
         loadProjectDraft(proj);
         advanceAppContextGeneration();
@@ -139,6 +143,7 @@
           breadBtn.className = 'icon-btn';
           breadBtn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
           breadBtn.title = 'อ่านเล่มนี้ต่อเนื่อง (โหมดนักอ่าน)';
+          breadBtn.setAttribute('aria-label', 'อ่านเล่มนี้ต่อเนื่อง');
           breadBtn.addEventListener('click', function(e){
             e.stopPropagation();
             openReaderMode(proj, book.id);
@@ -149,6 +154,7 @@
           brename.className = 'icon-btn';
           brename.textContent = '✎';
           brename.title = 'เปลี่ยนชื่อเล่ม';
+          brename.setAttribute('aria-label', 'เปลี่ยนชื่อเล่ม');
           brename.addEventListener('click', async function(e){
             e.stopPropagation();
             var newTitle = await showPromptDialog('เปลี่ยนชื่อเล่ม/โฟลเดอร์', book.title);
@@ -163,6 +169,7 @@
           bdel.className = 'icon-btn';
           bdel.textContent = '✕';
           bdel.title = 'ลบเล่มนี้';
+          bdel.setAttribute('aria-label', 'ลบเล่มนี้');
           bdel.addEventListener('click', async function(e){
             e.stopPropagation();
             if(warnIfAiBusy()) return;
@@ -218,6 +225,7 @@
                 var erename = document.createElement('button');
                 erename.className = 'icon-btn';
                 erename.title = 'เปลี่ยนชื่อตอนนี้';
+                erename.setAttribute('aria-label', 'เปลี่ยนชื่อตอนนี้');
                 erename.textContent = '✎';
                 erename.addEventListener('click', async function(ev){
                   ev.stopPropagation();
@@ -238,6 +246,7 @@
                   var ediff = document.createElement('button');
                   ediff.className = 'icon-btn diff-btn';
                   ediff.title = 'เทียบความต่างกับต้นฉบับที่แก้มาจาก';
+                  ediff.setAttribute('aria-label', 'เทียบความต่าง');
                   ediff.textContent = 'Δ';
                   ediff.addEventListener('click', async function(ev){
                     ev.stopPropagation();

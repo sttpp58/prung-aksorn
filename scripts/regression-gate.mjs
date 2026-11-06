@@ -1089,6 +1089,54 @@ function main() {
   );
 
   assert(
+    app.includes('document.body.inert = true;') &&
+      app.includes("document.body.dataset.storageState = 'loading';") &&
+      app.includes('window.PrungAksornAppReadyPromise') &&
+      app.includes('window.PrungAksornAppReady = true;') &&
+      app.includes("document.body.dataset.storageState = 'error';") &&
+      app.includes('document.body.inert = true;'),
+    'Storage Initialization Guard keeps UI inert until storage and recovery startup complete and fails closed'
+  );
+
+  assert(
+    appRuntime.includes('if(!storageReady) return false;') &&
+      appRuntime.includes("if(!storageReady){") &&
+      appRuntime.includes("saveStatusText.textContent = '⚠ ฐานข้อมูลยังไม่พร้อม';"),
+    'Storage write and flush entry points reject work before IndexedDB readiness'
+  );
+
+  const historyUi = readText('app/01-shell-context-history.js');
+  assert(
+    historyUi.includes('window.clearTimeout(bottomHistorySearchTimer);') &&
+      historyUi.includes("if(bottomHistorySearchInput) bottomHistorySearchInput.value = '';") &&
+      historyUi.includes("bottomHistorySearchTerm = '';"),
+    'History Search resets the query and pending debounce when Book/Project context changes'
+  );
+
+  const readinessTestFiles = [
+    'tests/e2e/browser-real-user-scenario.mjs',
+    'tests/e2e/failure-injection.mjs',
+    'tests/e2e/backup-restore-real-world.mjs',
+    'tests/e2e/translation-job-recovery-stress.mjs',
+    'tests/e2e/tqg-production-assurance.mjs'
+  ];
+  for (const file of readinessTestFiles) {
+    const source = readText(file);
+    assert(
+      source.includes('storageReady === true') && source.includes('window.PrungAksornAppReady === true'),
+      `${file} waits for application storage readiness before browser interactions`
+    );
+  }
+
+  assert(
+    styles.includes('min-height: 48px;') &&
+      styles.includes('min-width: 48px;') &&
+      styles.includes('header .header-actions > button#gearBtn') &&
+      styles.includes('min-height: 48px !important;'),
+    'Mobile primary touch targets enforce a 48px minimum including the API settings action'
+  );
+
+  assert(
     indexHtml.includes("window.addEventListener('unhandledrejection', function(event){") &&
       indexHtml.includes("window.addEventListener('error', function(event){"),
     'Production hardening installs runtime error observability boundaries'
